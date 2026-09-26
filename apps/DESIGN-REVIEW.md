@@ -96,6 +96,8 @@ All nine findings (M1–M9) are applied:
 - **Icons:** `lucide-react@0.545.0` (`ArrowDown`, `ArrowRight`, `ArrowUpRight`, `Maximize2`, `Minimize2`, `Copy`,
   `Check`) replaces every Unicode arrow and hand-drawn SVG.
 - **Nav:** the `links` array is gone; the sidebar footer gained the About / Contact / Privacy row.
+- **Cards, not rules (LAY-2, applied later):** the principles and guide rows are plain-UI cards (card fill, hairline
+  border, `--radius-xl`) with the `workers/docs` hover tint, replacing the rules that separated them.
 - **Mobile (390 px):** the two hero actions take their natural width and wrap to full-width pills when they don't fit,
   matching the app's full-width primary action.
 
@@ -108,7 +110,6 @@ These come from the earlier review and are layout decisions rather than design-s
 
 - **Split hero (HIER-2 / LAY-5):** the h1 and its copy and actions sit in opposite columns on wide screens.
 - **Duplicate feature sections (HIER-2):** "principles" and the guide list make overlapping points.
-- **Rules (LAY-2):** several full-width rules separate the lower landing bands.
 - **Preview chrome (LAY-1):** the preview's footer bar repeats the hero copy.
 - **Entrance motion (MOT-2):** the hero appears all at once.
 
