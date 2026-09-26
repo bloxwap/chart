@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowDown, ArrowRight } from 'lucide-react';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { baseOptions } from '@/lib/layout.shared';
 import { ChartPreview } from '@/components/chart-preview';
@@ -15,7 +16,7 @@ export default function Home() {
         </div>
         <div className="hero-intro">
           <p className="hero-description">Your next trading interface starts here. Try the full chart below: draw a trend line, add indicators, change timeframes, and make it your own.</p>
-          <div className="hero-actions"><a href="#playground" className="primary-link">Play with the chart <span aria-hidden="true">↓</span></a><Link href="/docs/getting-started" className="secondary-link">Start building →</Link></div>
+          <div className="hero-actions"><a href="#playground" className="btn">Play with the chart <ArrowDown aria-hidden="true" /></a><Link href="/docs/getting-started" className="btn btn--secondary">Start building <ArrowRight aria-hidden="true" /></Link></div>
           <InstallCommand />
         </div>
       </section>
@@ -34,7 +35,7 @@ export default function Home() {
           ['/docs/guides/react', '02', 'Use it with React', 'A canvas component with a clear lifecycle.'],
           ['/docs/guides/toolbar-settings', '03', 'Build the chart workspace', 'Drawing tools, settings, and themes.'],
           ['/docs/api/configuration', '04', 'Configuration reference', 'Make every pixel fit your product.'],
-        ].map(([href, number, title, description]) => <Link href={href} key={href}><span>{number}</span><div><h3>{title}</h3><p>{description}</p></div><span>↗</span></Link>)}</div>
+        ].map(([href, number, title, description]) => <Link href={href} key={href}><span>{number}</span><div><h3>{title}</h3><p>{description}</p></div><ArrowRight aria-hidden="true" /></Link>)}</div>
       </section>
     </main>
     <footer className="site-footer"><span>© Bloxwap, Inc. · MIT licensed</span><span><a href={organization.about}>About</a> · <a href={organization.contact}>Contact</a> · <a href={organization.privacy}>Privacy</a> · <a href="llms.txt">llms.txt</a> · Built with <a href="https://www.fumadocs.dev">Fumadocs</a></span></footer>

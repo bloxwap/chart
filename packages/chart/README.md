@@ -29,7 +29,7 @@ to open the playground at http://localhost:8641/demo/ (requires Bun).
 - **Interactive editing API** — live draft preview, hit-testing, selection handles, point dragging, translation, magnet snapping (weak/strong), hide/clear, per-drawing color/width/line style/text/lock
 - **Cursor modes** — cross, dot, arrow and presenter halo (`crosshair.mode`)
 - **Watermark** — text and/or image layer rendered under the series
-- **100% test coverage** enforced by `npm run coverage`
+- **Test coverage** — line, branch, and function coverage measured by `npm run coverage`, with a 100% target
 
 ## Quick start
 

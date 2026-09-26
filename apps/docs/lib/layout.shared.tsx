@@ -14,9 +14,5 @@ export function baseOptions(): BaseLayoutProps {
     },
     themeSwitch: { enabled: false },
     githubUrl: repository,
-    links: [
-      { text: 'Documentation', url: '/docs', active: 'nested-url' },
-      { text: 'Playground', url: '/docs/playground' },
-    ],
   };
 }
