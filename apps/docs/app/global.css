@@ -326,6 +326,7 @@ button[data-search-full] kbd {
 .preview-intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); margin-bottom: var(--space-2xl); }
 .preview-intro h2 { margin: 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 700; }
 .preview-intro > p:not(.eyebrow) { margin: 0; max-width: 25rem; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); line-height: 1.7; }
+.preview-intro--section { align-items: center; text-align: center; }
 .preview-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs); }
 .preview-intro > .preview-actions:not(:first-child) { margin-top: var(--space-xs); }
 .chart-preview {

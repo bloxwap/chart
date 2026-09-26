@@ -58,7 +58,7 @@ export function ChartPreview({ children }: { children?: ReactNode }) {
   }
 
   return <div className="chart-preview-section not-prose">
-    <div className="preview-intro">
+    <div className={children ? 'preview-intro preview-intro--section' : 'preview-intro'}>
       {children}
       <div className="preview-actions">
         <a href={demoUrl} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm">Open playground <ArrowUpRight aria-hidden="true" /></a>

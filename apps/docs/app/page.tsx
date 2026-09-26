@@ -23,7 +23,7 @@ export default function Home() {
       </section>
       <section id="playground" className="hero-preview" aria-labelledby="playground-title">
         <ChartPreview>
-          <p className="eyebrow"><span className="status-dot" /> SIMULATED LIVE DATA</p>
+          <p className="eyebrow">SIMULATED LIVE DATA</p>
           <h2 id="playground-title">Chart playground</h2>
           <p>Draw, zoom, add indicators, and make it yours.</p>
         </ChartPreview>
