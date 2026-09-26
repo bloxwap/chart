@@ -3,9 +3,9 @@ name: Documentation
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'demo/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
+    paths: ['apps/**', 'packages/**', 'package.json', 'package-lock.json', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['docs/**', 'demo/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
+    paths: ['apps/**', 'packages/**', 'package.json', 'package-lock.json', '.github/workflows/docs.yml']
   workflow_dispatch:
 
 permissions:
@@ -28,16 +28,13 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            docs/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm --prefix docs ci
       - run: npm run docs:build
       - run: npm run docs:check
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: docs/out
+          path: apps/docs/out
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

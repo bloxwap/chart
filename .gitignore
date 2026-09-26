@@ -4,8 +4,9 @@ dist-test/
 coverage/
 *.tsbuildinfo
 .DS_Store
-docs/.next/
-docs/.source/
-docs/out/
-docs/next-env.d.ts
-docs/public/chart-demo/
+apps/docs/.next/
+apps/docs/.source/
+apps/docs/out/
+apps/docs/next-env.d.ts
+apps/docs/public/chart-demo/
+*.tgz

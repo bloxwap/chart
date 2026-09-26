@@ -1,0 +1,61 @@
+---
+title: Development and documentation
+description: Run the library, edit these guides, and publish a static site with GitHub Pages.
+---
+
+## Run the documentation locally
+
+Use Node.js 24 or newer. From the repository root:
+
+```sh
+npm ci
+npm run docs:dev
+```
+
+Open `http://localhost:3901`. The docs app builds the local chart package before starting, so the playground runs the same code as the library. Restart the docs command after editing library TypeScript or the playground to rebuild and copy the embedded demo assets.
+
+## Edit pages
+
+MDX content lives in `apps/docs/content/docs`. Set `title` and `description` in the frontmatter, then write Markdown and code fences. Folder `meta.json` files control sidebar order.
+
+The main app is in `apps/docs/app`; shared integration components are in `apps/docs/components`. This is a [Fumadocs](https://www.fumadocs.dev) site using the [static export configuration](https://www.fumadocs.dev/docs/deploying/static).
+
+## Validate
+
+```sh
+npm run docs:check
+npm run docs:build
+npm run docs:preview
+```
+
+The production build generates static HTML, assets, and a search index in `apps/docs/out`. Its postbuild check validates local links and assets. The preview command serves the exact exported files at `http://localhost:3901`.
+
+The repository uses npm workspaces with one root lockfile. The library lives in `packages/chart`, the docs in `apps/docs`, and the standalone playground in `apps/playground`. Each workspace declares its own dependencies; the library and docs have separate TypeScript configurations. Building the docs does not add framework dependencies to the published chart package.
+
+## GitHub Pages
+
+The repository includes `.github/workflows/docs.yml`. Pull requests build and validate the static site. Pushes to `main` and manual runs on `main` also deploy it to GitHub Pages.
+
+In the repository's **Settings → Pages**, use **GitHub Actions** as the build source. The project URL is `https://bloxwap.github.io/chart/`.
+
+To test that exact subpath locally:
+
+```sh
+NEXT_PUBLIC_BASE_PATH=/chart npm run docs:build
+npm run docs:preview
+```
+
+The preview server reads the exported base path, so this build opens at `http://localhost:3901/chart/`. Pages paths, assets, and static search must all work under `/chart`, not just at the origin root.
+
+## Library commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run build` | Generate icons, compile embedded WASM, and compile TypeScript |
+| `npm test` | Build and run library tests |
+| `npm run coverage` | Run the coverage threshold check |
+| `npm run bench` | Run calculation and rendering benchmarks |
+| `npm run pack:chart` | Build the library and create a tarball in `packages/chart` |
+| `npm run demo` | Start the standalone playground; requires Bun |
+
+See the [repository](https://github.com/bloxwap/chart) for the source and MIT license.

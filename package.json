@@ -1,89 +1,26 @@
 {
-  "name": "@bloxwap/chart",
-  "version": "0.1.0",
-  "description": "Zero-dependency, WASM-accelerated candlestick/financial charting library in TypeScript with injected DOM",
+  "name": "bloxwap-chart-workspace",
+  "private": true,
   "type": "module",
-  "sideEffects": false,
-  "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/bloxwap/chart.git" },
-  "homepage": "https://bloxwap.github.io/chart/",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./config": {
-      "types": "./dist/config.d.ts",
-      "import": "./dist/config.js"
-    },
-    "./color": {
-      "types": "./dist/color.d.ts",
-      "import": "./dist/color.js"
-    },
-    "./dom": {
-      "types": "./dist/dom.d.ts",
-      "import": "./dist/dom.js"
-    },
-    "./indicators": {
-      "types": "./dist/indicators/index.d.ts",
-      "import": "./dist/indicators/index.js"
-    },
-    "./drawings": {
-      "types": "./dist/drawings/index.d.ts",
-      "import": "./dist/drawings/index.js"
-    },
-    "./wasm": {
-      "types": "./dist/wasm/loader.d.ts",
-      "import": "./dist/wasm/loader.js"
-    },
-    "./ui": {
-      "types": "./dist/ui/index.d.ts",
-      "import": "./dist/ui/index.js"
-    },
-    "./icons": {
-      "types": "./dist/ui/icons.d.ts",
-      "import": "./dist/ui/icons.js"
-    }
-  },
-  "files": [
-    "dist",
-    "LICENSE",
-    "README.md",
-    "PERFORMANCE.md"
+  "workspaces": [
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
-    "build": "npm run build:icons && npm run build:wasm && npm run build:ts",
-    "build:ts": "tsc -p tsconfig.json",
-    "build:ts-test": "tsc -p tsconfig.test.json",
-    "build:wasm": "node scripts/build-wasm.mjs",
-    "build:icons": "node scripts/build-icons.mjs",
-    "test": "npm run build && npm run build:ts-test && node --test \"dist-test/**/*.test.js\"",
-    "coverage": "npm run build && npm run build:ts-test && node scripts/check-coverage.mjs",
-    "bench": "npm run build && node bench/indicators.bench.mjs && node bench/rolling.bench.mjs && node bench/render.bench.mjs",
-    "demo": "bun run demo/serve.ts",
-    "docs:dev": "npm --prefix docs run dev",
-    "docs:build": "npm --prefix docs run build",
-    "docs:check": "npm --prefix docs run check",
-    "docs:preview": "npm --prefix docs run preview",
-    "prepublishOnly": "npm run build && npm test"
-  },
-  "keywords": [
-    "chart",
-    "candlestick",
-    "financial",
-    "trading",
-    "wasm",
-    "simd",
-    "canvas",
-    "typescript"
-  ],
-  "devDependencies": {
-    "@types/node": "^24.13.6",
-    "happy-dom": "^20.14.5",
-    "typescript": "^6.0.3",
-    "wabt": "^1.0.39"
+    "build": "npm --workspace @bloxwap/chart run build",
+    "build:ts": "npm --workspace @bloxwap/chart run build:ts",
+    "build:ts-test": "npm --workspace @bloxwap/chart run build:ts-test",
+    "build:wasm": "npm --workspace @bloxwap/chart run build:wasm",
+    "build:icons": "npm --workspace @bloxwap/chart run build:icons",
+    "test": "npm --workspace @bloxwap/chart run test",
+    "coverage": "npm --workspace @bloxwap/chart run coverage",
+    "bench": "npm --workspace @bloxwap/chart run bench",
+    "demo": "npm --workspace @bloxwap/chart-playground run dev",
+    "docs:dev": "npm --workspace @bloxwap/chart-docs run dev",
+    "docs:build": "npm --workspace @bloxwap/chart-docs run build",
+    "docs:check": "npm --workspace @bloxwap/chart-docs run check",
+    "docs:preview": "npm --workspace @bloxwap/chart-docs run preview",
+    "pack:chart": "npm pack --workspace @bloxwap/chart --pack-destination packages/chart"
   },
   "engines": {
     "node": ">=24"
