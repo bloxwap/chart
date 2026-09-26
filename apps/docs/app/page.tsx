@@ -5,7 +5,8 @@ import { baseOptions } from '@/lib/layout.shared';
 import { ChartPreview } from '@/components/chart-preview';
 import { InstallCommand } from '@/components/install-command';
 import { HeroCode } from '@/components/hero-code';
-import { homeStructuredData, organization } from '@/lib/structured-data';
+import { SiteFooter } from '@/components/site-footer';
+import { homeStructuredData } from '@/lib/structured-data';
 
 export default function Home() {
   return <HomeLayout {...baseOptions()}>
@@ -43,6 +44,6 @@ export default function Home() {
         ].map(([href, number, title, description]) => <Link href={href} key={href}><span>{number}</span><div><h3>{title}</h3><p>{description}</p></div><ArrowRight aria-hidden="true" /></Link>)}</div>
       </section>
     </main>
-    <footer className="site-footer"><span>© Bloxwap, Inc. · MIT licensed</span><span><a href={organization.about}>About</a> · <a href={organization.contact}>Contact</a> · <a href={organization.privacy}>Privacy</a> · <a href="llms.txt">llms.txt</a> · Built with <a href="https://www.fumadocs.dev">Fumadocs</a></span></footer>
+    <SiteFooter />
   </HomeLayout>;
 }

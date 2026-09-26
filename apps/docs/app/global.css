@@ -374,9 +374,26 @@ button[data-search-full] kbd {
 .guide-links a:hover h3 { color: var(--color-fd-primary); }
 .guide-links p { color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
 /* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
-.site-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-2xl) max(var(--space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--space-lg))); border-top: 1px solid var(--color-fd-border); color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
-.site-footer a { transition: color var(--duration-fast) var(--ease-spring); }
-.site-footer a:hover { color: var(--color-fd-primary); }
+/* The bloxwap.com footer (monorepo workers/www), inset to the header's box. margin-top: auto pins it to the bottom of short pages in the flex-column body. */
+.site-footer { margin-top: auto; padding: var(--space-5xl) max(var(--space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--space-lg))) var(--space-4xl); }
+.footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--space-2xl); row-gap: var(--space-4xl); }
+.footer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+.footer-brand p { margin: 0; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); }
+.footer-lockup { display: flex; align-items: center; gap: var(--space-sm); }
+.footer-icon { width: 36px; height: 36px; border-radius: 10px; }
+.footer-wordmark { width: auto; height: 32px; }
+.footer-col h2 { margin: 0 0 var(--space-md); color: var(--color-fd-muted-foreground); font: 700 var(--text-2xs) / 1.5 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
+.footer-col a, .footer-base a { transition: color var(--duration-fast) var(--ease-spring), opacity var(--duration-fast) var(--ease-spring); }
+.footer-col a { display: block; width: fit-content; padding: var(--space-xs) 0; color: var(--color-fd-foreground); font-size: var(--text-sm); opacity: .8; }
+.footer-col a:hover, .footer-base a:hover { color: var(--color-fd-primary); opacity: 1; }
+.footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-sm); margin-top: var(--space-4xl); color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
+.footer-legal { display: inline-flex; align-items: center; gap: var(--space-sm); }
+@media (max-width: 860px) {
+  .footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--space-xl); }
+  .footer-brand { grid-column: 1 / -1; }
+  .footer-col a { padding: var(--space-md) 0; }
+}
+@media (max-width: 480px) { .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .docs-sidebar-links { display: flex; align-items: center; gap: var(--space-lg); padding-top: var(--space-lg); font-size: var(--text-xs); color: var(--color-fd-muted-foreground); }
 .docs-sidebar-links a { transition: color var(--duration-fast) var(--ease-spring); }
 .docs-sidebar-links a:hover { color: var(--color-fd-foreground); }
