@@ -13,7 +13,8 @@ import {
   type DrawingPoint,
   type IndicatorConfig,
 } from '../config.js';
-import type { CanvasImageSourceLike, ChartCanvas, ChartDocument } from '../dom.js';
+import type { AutoResizeCanvas, CanvasImageSourceLike, ChartCanvas, ChartDocument, ResizeObserverLike } from '../dom.js';
+import { CHART_THEMES, type ThemeName } from '../themes.js';
 import { DataStore, type Candle } from './data.js';
 import { PriceScale, TimeScale, seriesMinMax, visibleMinMax, type VisibleRange } from './scale.js';
 import { layoutPanes, MAIN_PANE_WEIGHT, type PaneSpec } from './pane.js';
@@ -47,6 +48,15 @@ export interface CreateChartOptions {
   pixelRatio?: number;
   /** Opt-in live candle, indicator, pane and autoscale transitions using the host's frame clock. */
   animation?: { scheduler: FrameScheduler; duration?: number };
+  /** A built-in color theme, applied under `config` (fields in `config` win). */
+  theme?: ThemeName;
+  /**
+   * Size the chart to the canvas's parent element and keep it in sync, including the device pixel
+   * ratio. The canvas is placed out of flow to fill the parent (`position: absolute; inset: 0`), so it
+   * can never feed back into the size being measured; give the parent a height. Needs a `container`
+   * canvas attached to a parent in a document with `ResizeObserver`. {@link Chart.destroy} stops it.
+   */
+  autoResize?: boolean;
   /** Custom registries; default ones carry all built-ins. */
   registries?: {
     indicators?: IndicatorRegistry;
@@ -167,6 +177,7 @@ export class Chart {
   private mainPriceScale: PriceScale | null = null;
   private pixelRatio: number;
   private destroyed = false;
+  private resizeObserver: ResizeObserverLike | null = null;
   private indicatorSeq = 0;
   private drawingSeq = 0;
   private plotWidth = 0;
@@ -188,7 +199,7 @@ export class Chart {
   private lastGeometry: { id: string; primitives: readonly DrawPrimitive[] }[] = [];
 
   constructor(options: CreateChartOptions) {
-    this.config = resolveConfig(options.config);
+    this.config = resolveConfig(options.theme !== undefined ? mergeDeep(CHART_THEMES[options.theme], options.config ?? {}) : options.config);
     if (options.animation !== undefined) {
       this.indicatorPresence = new Presence(options.animation.scheduler, () => this.render(),
         options.animation.duration ?? 240, this.config.indicators.filter((ind) => ind.visible));
@@ -220,6 +231,23 @@ export class Chart {
       this.ready = Promise.resolve(this);
     }
     this.render();
+    if (options.autoResize === true) this.startAutoResize();
+  }
+
+  /** Fills the canvas's parent and follows its size; see {@link CreateChartOptions.autoResize}. */
+  private startAutoResize(): void {
+    const canvas = this.canvas as AutoResizeCanvas;
+    const view = canvas.ownerDocument?.defaultView ?? null;
+    const parent = canvas.parentElement ?? null;
+    if (view?.ResizeObserver === undefined || parent === null || canvas.style === undefined) {
+      throw new Error('chart-ts: autoResize needs a container canvas attached to a parent element in a document with ResizeObserver');
+    }
+    Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block' });
+    if (view.getComputedStyle(parent as never).position === 'static') parent.style.position = 'relative';
+    const fit = (): void => this.resize(parent.clientWidth, parent.clientHeight, view.devicePixelRatio || 1);
+    this.resizeObserver = new view.ResizeObserver(fit);
+    this.resizeObserver.observe(parent);
+    fit();
   }
 
   /** The current resolved config. Mutate via {@link updateConfig}. */
@@ -583,6 +611,8 @@ export class Chart {
   /** Tears down the chart; further renders become no-ops. */
   destroy(): void {
     this.destroyed = true;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.indicatorPresence?.destroy();
     this.rangeAnimation?.clear();
     this.candleAnimation?.clear();

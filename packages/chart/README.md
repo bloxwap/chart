@@ -33,6 +33,16 @@ to open the playground at http://localhost:8641/demo/ (requires Bun).
 
 ## Quick start
 
+In React:
+
+```tsx
+import { Chart } from '@bloxwap/chart/react';
+
+<Chart data={candles} theme="dark" height={360} />;
+```
+
+Anywhere else:
+
 ```ts
 import { createChart, defineConfig } from '@bloxwap/chart';
 
@@ -42,7 +52,8 @@ const config = defineConfig({
   watermark: { visible: true, text: 'ACME', opacity: 0.08 },
 });
 
-const chart = createChart({ container: document.querySelector('canvas')!, config });
+// autoResize fills the canvas's parent (give it a height) and follows its size and pixel ratio.
+const chart = createChart({ container: document.querySelector('canvas')!, autoResize: true, theme: 'dark', config });
 await chart.ready; // WASM kernels live (or JS fallback chosen)
 
 chart.addIndicator({ name: 'sma', params: { period: 20 } });
@@ -52,7 +63,7 @@ chart.addDrawing({ name: 'fib', points: [{ index: 10, price: 95 }, { index: 90, 
 chart.scale.zoom(1.2, 300); // pinch/scroll handlers call these
 chart.scale.scrollBy(5);
 chart.setCrosshair(x, y); // pointermove
-chart.resize(w, h, window.devicePixelRatio); // ResizeObserver — CSS px in, HiDPI handled
+chart.resize(w, h, window.devicePixelRatio); // manual sizing, when not using autoResize (CSS px in, HiDPI handled)
 chart.destroy();
 ```
 

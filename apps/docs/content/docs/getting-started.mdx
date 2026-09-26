@@ -23,13 +23,13 @@ npm install /path/to/chart/packages/chart/bloxwap-chart-0.1.0.tgz
 
 Once the first public release is available, the intended installation command is `npm install @bloxwap/chart`. All examples use this package name, including when installed from the local archive.
 
-## Give the canvas a size
+## Give the chart a box
 
-Your application owns layout. Use a wrapper with an explicit height so the canvas has measurable dimensions:
+Your application owns layout. Put the canvas inside an element with a height; the chart fills it:
 
 ```html
-<div id="chart-stage" style="height: 400px; position: relative;">
-  <canvas id="chart" style="display: block; width: 100%; height: 100%;"></canvas>
+<div id="chart-stage" style="height: 400px">
+  <canvas id="chart"></canvas>
 </div>
 ```
 
@@ -41,7 +41,6 @@ Run this in a browser module through your application's bundler:
 import { createChart, type Candle } from '@bloxwap/chart';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#chart')!;
-const stage = document.querySelector<HTMLElement>('#chart-stage')!;
 
 const data: Candle[] = [
   { time: 1700000000, open: 100, high: 104, low: 98, close: 102, volume: 1200 },
@@ -49,26 +48,15 @@ const data: Candle[] = [
   { time: 1700007200, open: 105, high: 106, low: 100, close: 101, volume: 950 },
 ];
 
-const chart = createChart({
-  container: canvas,
-  config: {
-    data,
-    series: { type: 'candlestick', upColor: '#26a69a', downColor: '#ef5350' },
-  },
-});
-
-const resize = () => {
-  chart.resize(stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1);
-};
-const observer = new ResizeObserver(resize);
-observer.observe(stage);
-resize();
+const chart = createChart({ container: canvas, autoResize: true, theme: 'dark', config: { data } });
 
 chart.scale.zoomToRange(0, data.length - 1);
 await chart.ready;
 ```
 
-Timestamps are **UNIX seconds**, not milliseconds. Width and height passed to `resize` are **CSS pixels**; the library applies the device pixel ratio to its backing canvas.
+Timestamps are **UNIX seconds**, not milliseconds. `autoResize` sizes the chart to `#chart-stage` and keeps it in sync, including the device pixel ratio; `theme: 'dark'` applies the built-in dark colors. To size the chart yourself instead, omit `autoResize` and call `chart.resize(width, height, pixelRatio)` with **CSS pixels**.
+
+Using React? `@bloxwap/chart/react` wraps all of this in one component; see [React integration](/docs/guides/react).
 
 The core paints immediately. `chart.ready` resolves after WASM initialization or selection of the JavaScript fallback; you do not need to wait before calling other methods.
 
@@ -82,8 +70,7 @@ The core does not attach pointer listeners. Add the [drawing toolbar](/docs/guid
 chart.appendData({ time: 1700010800, open: 101, high: 108, low: 100, close: 107 });
 chart.updateConfig({ grid: { visible: false } });
 
-// When your view is removed:
-observer.disconnect();
+// When your view is removed (this also stops autoResize):
 chart.destroy();
 ```
 

@@ -45,6 +45,6 @@ export function HeroCode() {
       <span className="code-language">TSX</span>
     </figcaption>
     <pre><code>{highlight(source)}</code></pre>
-    <p className="code-status"><span aria-hidden="true" /> A dark candlestick chart that fits its container</p>
+    <p className="code-status"><span aria-hidden="true" /> A dark candlestick chart that fills its box</p>
   </figure>;
 }

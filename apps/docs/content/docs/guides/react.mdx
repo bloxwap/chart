@@ -1,62 +1,84 @@
 ---
 title: React integration
-description: Keep the chart instance in a ref and manage its lifetime in an effect.
+description: Render a chart with one component, and reach the chart instance when you need it.
 ---
 
-The package does not require a React wrapper. Create a chart after the canvas mounts, update it when your data changes, and dispose of it when the component unmounts.
+`@bloxwap/chart/react` exports a `<Chart>` component. React is an optional peer dependency, so the core package stays dependency-free and only this import needs React.
 
-## A reusable component
+## A chart in one component
+
+```tsx
+import { Chart } from '@bloxwap/chart/react';
+import type { Candle } from '@bloxwap/chart';
+
+export function PriceChart({ data }: { data: Candle[] }) {
+  return <Chart data={data} theme="dark" height={360} />;
+}
+```
+
+The component is marked `'use client'`, so it works in the Next.js App Router. It:
+
+- creates the chart after mount and fills its box, following size and device pixel ratio changes;
+- calls `setData` when `data` changes, without recreating the chart;
+- applies `theme` changes live;
+- destroys the chart on unmount, which also makes it safe under React Strict Mode.
+
+| Prop | Type | Meaning |
+| --- | --- | --- |
+| `data` | `readonly Candle[]` | Candles to display; a new array replaces the data |
+| `theme` | `'dark' \| 'light'` | Built-in color theme |
+| `config` | `DeepPartial<ChartConfig>` | Initial configuration, applied once at mount |
+| `height` | `number \| string` | Height of the chart box; default `400`. The width fills the parent |
+| `className`, `style` | | Passed to the chart box |
+| `onReady` | `(chart) => void` | Called once with the chart instance |
+
+## Reach the chart instance
+
+Pass a `ref` to stream updates, add drawings, or attach the toolbar. `onReady` runs once, which suits one-time setup like indicators:
+
+```tsx
+import { useEffect, useRef } from 'react';
+import { Chart, type ChartInstance } from '@bloxwap/chart/react';
+
+export function LiveChart({ data, feed }) {
+  const chart = useRef<ChartInstance | null>(null);
+
+  // Stream live candles into the current bar.
+  useEffect(() => feed.subscribe((candle) => chart.current?.appendData(candle)), [feed]);
+
+  return (
+    <Chart
+      ref={chart}
+      data={data}
+      theme="dark"
+      onReady={(c) => c.addIndicator({ name: 'sma', params: { period: 20 } })}
+    />
+  );
+}
+```
+
+`config` is read once at mount; change configuration later through the instance with `updateConfig`. Attach the [toolbar and settings](/docs/guides/toolbar-settings) from an effect like the one above, and dispose of their handles in its cleanup.
+
+## Without the component
+
+If you prefer to own the lifecycle, the core does the sizing for you with `autoResize`:
 
 ```tsx
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { createChart, type Candle, type Chart } from '@bloxwap/chart';
+import { createChart, type Candle } from '@bloxwap/chart';
 
-export function PriceChart({ data }: { data: readonly Candle[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<Chart | null>(null);
+export function PriceChart({ data }: { data: Candle[] }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const stage = stageRef.current;
-    if (!canvas || !stage) return;
+    const chart = createChart({ container: canvas.current!, autoResize: true, theme: 'dark', config: { data } });
+    return () => chart.destroy();
+  }, [data]);
 
-    const chart = createChart({ container: canvas });
-    chartRef.current = chart;
-    const resize = () => chart.resize(
-      stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1,
-    );
-    const observer = new ResizeObserver(resize);
-    observer.observe(stage);
-    resize();
-
-    return () => {
-      observer.disconnect();
-      chart.destroy();
-      chartRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => { chartRef.current?.setData(data); }, [data]);
-
-  return (
-    <div ref={stageRef} style={{ height: 400, position: 'relative' }}>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-    </div>
-  );
+  return <div style={{ height: 400 }}><canvas ref={canvas} /></div>;
 }
 ```
 
-Cleanup makes this pattern compatible with React Strict Mode's development mount/unmount checks. In a Next.js application, use a client component because the canvas and resize observer are browser objects.
-
-## Keep updates incremental
-
-Use `setData` when replacing the dataset. For a streaming feed, hold the chart instance and call `appendData(candle)` as updates arrive. You can update appearance with `updateConfig` without recreating the chart.
-
-Attach the [toolbar and settings](/docs/guides/toolbar-settings) inside the same mount effect. Dispose of both UI handles in its cleanup.
-
-## Avoid layout feedback
-
-Give the wrapper a stable height. Observing a canvas whose layout depends on its own backing-store size can create a resize loop. Observe its wrapper, size the canvas using CSS, and pass the wrapper's CSS dimensions to `chart.resize`.
+`autoResize` places the canvas out of flow to fill its parent, so give the parent a height. Because the canvas never contributes to the size being measured, there is no resize feedback loop.

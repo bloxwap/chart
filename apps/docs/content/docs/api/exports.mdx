@@ -3,7 +3,7 @@ title: Package exports
 description: Import the chart core or the specific integration layer you need.
 ---
 
-The package ships ESM and TypeScript declarations. There is no CommonJS export. It declares no runtime dependencies; the docs app's React and Fumadocs dependencies are separate from the chart package.
+The package ships ESM and TypeScript declarations. There is no CommonJS export. It declares no runtime dependencies. React is an optional peer dependency, needed only for `@bloxwap/chart/react`.
 
 | Import path | Main exports |
 | --- | --- |
@@ -16,6 +16,7 @@ The package ships ESM and TypeScript declarations. There is no CommonJS export. 
 | `@bloxwap/chart/wasm` | WASM initialization and kernel interface |
 | `@bloxwap/chart/ui` | Drawing toolbar, settings, controller, history, UI primitives, and frame scheduler |
 | `@bloxwap/chart/icons` | `ICONS` and `icon(name, size?)` |
+| `@bloxwap/chart/react` | `<Chart>` React component (`'use client'`), `ChartProps`, `ChartInstance` |
 
 ## Icons
 

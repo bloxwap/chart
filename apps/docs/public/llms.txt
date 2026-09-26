@@ -31,16 +31,25 @@ cd chart && npm ci && npm run pack:chart
 npm install /path/to/chart/packages/chart/bloxwap-chart-0.1.0.tgz
 ```
 
-Then create a chart on a sized canvas:
+In React, render the component (React is an optional peer dependency):
+
+```tsx
+import { Chart } from '@bloxwap/chart/react';
+
+<Chart data={candles} theme="dark" height={360} />; // candles: { time, open, high, low, close, volume? }[], UNIX seconds
+```
+
+Without React, put a canvas inside an element with a height; `autoResize` makes the chart fill it and follow its size:
 
 ```ts
 import { createChart } from '@bloxwap/chart';
 
 const chart = createChart({
   container: document.querySelector('canvas')!,
-  config: { data: candles, series: { type: 'candlestick' } }, // candles: { time, open, high, low, close, volume? }[]
+  autoResize: true,
+  theme: 'dark',
+  config: { data: candles },
 });
-chart.resize(width, height, window.devicePixelRatio);
 chart.addIndicator({ name: 'sma', params: { period: 20 } });
 chart.addDrawing({ name: 'fib', points: [{ index: 10, price: 95 }, { index: 90, price: 110 }] });
 ```

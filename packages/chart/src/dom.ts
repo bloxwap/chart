@@ -77,6 +77,36 @@ export interface ChartCanvas {
   getContext(contextId: '2d'): Canvas2DLike | null;
 }
 
+/** A `ResizeObserver` as the canvas's own window provides it. */
+export interface ResizeObserverLike {
+  observe(target: unknown): void;
+  disconnect(): void;
+}
+
+/** The window members `autoResize` reads, taken from the canvas's `ownerDocument`, never from globals. */
+export interface AutoResizeWindow {
+  readonly ResizeObserver?: new (callback: () => void) => ResizeObserverLike;
+  readonly devicePixelRatio?: number;
+  getComputedStyle(element: never): { readonly position: string };
+}
+
+/** The canvas parent that `autoResize` fills and observes. */
+export interface AutoResizeParent {
+  readonly clientWidth: number;
+  readonly clientHeight: number;
+  readonly style: { position: string };
+}
+
+/**
+ * The extra canvas surface `autoResize` uses. A real `HTMLCanvasElement` attached to the page satisfies
+ * it; the core reads it structurally so it still never touches the global `document` or `window`.
+ */
+export interface AutoResizeCanvas extends ChartCanvas {
+  readonly ownerDocument?: { readonly defaultView: AutoResizeWindow | null } | null;
+  readonly parentElement?: AutoResizeParent | null;
+  readonly style?: { position: string; inset: string; width: string; height: string; display: string };
+}
+
 /** Factory abstraction over a host `Document`. */
 export interface ChartDocument {
   createCanvas(width: number, height: number): ChartCanvas;
