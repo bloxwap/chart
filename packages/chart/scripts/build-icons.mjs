@@ -1,10 +1,12 @@
 /**
- * Generates src/ui/icons.ts from the hand-authored Lucide-style SVGs in
- * assets/icons. The .svg files are the source of truth; run
- * `npm run build:icons` after editing them.
+ * Generates src/ui/icons.ts from the hand-authored SVGs in assets/icons.
+ * The .svg files are the source of truth; run `npm run build:icons` after
+ * editing them. `npm run lint:icons` (chained into this script) enforces the
+ * full crispness ruleset — 0.25 coordinate grid, baseline attributes,
+ * repo-local content only.
  *
- * Validation: every file must be a single-root <svg> with balanced tags and
- * carry the Lucide baseline attributes.
+ * Validation here: every file must be a single-root <svg> with balanced tags
+ * and carry the Lucide baseline attributes.
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

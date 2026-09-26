@@ -95,8 +95,13 @@ button.setAttribute('aria-label', 'Trend line');
 ```
 
 Icons inherit their host's CSS `color` through `currentColor`. The same exports
-remain available from `@bloxwap/chart/ui`. Edit source SVGs in `assets/icons`; the
-normal build validates them and regenerates the shared icon module.
+remain available from `@bloxwap/chart/ui`. Edit source SVGs in `assets/icons` —
+the set is fully repo-local (no icon packages or CDN references) and follows a
+24×24 Lucide-style grid with a 1.5px stroke; all coordinates sit on a 0.25
+crispness grid. `npm run lint:icons` enforces those rules, `npm run build:icons`
+regenerates the shared icon module, and `npm run preview:icons` renders a
+contact sheet (`assets/icons/preview.html`) at 16–32px on light and dark
+surfaces for visual review.
 
 ## Chart settings
 
@@ -172,7 +177,9 @@ chart.scale.zoomToRange(fromIndex, toIndex); // box zoom
 Run these commands from the repository root or this package directory.
 
 - `npm run build` — validate/generate icons, compile WASM (wabt → embedded base64) + TypeScript
-- `npm run build:icons` — regenerate the library icon module from `assets/icons/*.svg`
+- `npm run build:icons` — lint `assets/icons/*.svg` and regenerate the library icon module
+- `npm run lint:icons` — enforce the icon crispness/consistency rules (0.25 coordinate grid, repo-local)
+- `npm run preview:icons` — render `assets/icons/preview.html`, a contact sheet at 16–32px on light/dark
 - `npm test` — build and run the test suite (node:test)
 - `npm run coverage` — tests with 100% line/branch/function threshold enforcement
 - `npm run bench` — indicator math, rolling-window algorithms, data ingestion and render CPU benchmarks
