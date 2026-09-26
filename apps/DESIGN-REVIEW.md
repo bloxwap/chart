@@ -99,6 +99,13 @@ All nine findings (M1–M9) are applied:
 - **Cards, not rules (LAY-2, applied later):** the principles and guide rows are zero-stroke cards (card fill,
   `--radius-xl`, no border; hover lightens the fill), replacing the rules that separated them. Bloxwap cards are
   fill-only by team preference, overriding the border in plain-UI's `.card`.
+- **Hero (HIER-2 / LAY-5, applied later):** the eyebrow, headline, copy, actions and install block stack in one left
+  column; the right column is a zero-stroke code window showing a React component that renders a default dark chart.
+  The snippet lives in `docs/snippets/price-chart.tsx`, which `docs:check` compiles, and is read at build time, so the
+  homepage never shows code that does not type-check.
+- **Entrance motion (MOT-2, applied later):** `landing-rise` (600 ms, 8 px, spring curve), staggered: eyebrow 0 ms,
+  headline 60 ms, copy and actions 200 ms, code window 360 ms, playground 520 ms. Off under reduced motion.
+- **Search box (applied later):** a zero-stroke filled pill at the small control height, with filled key chips.
 - **Mobile (390 px):** the two hero actions take their natural width and wrap to full-width pills when they don't fit,
   matching the app's full-width primary action.
 
@@ -109,10 +116,8 @@ Before: `04-chart-landing-before.jpg`. After: `07-chart-hero-after.png` (desktop
 
 These come from the earlier review and are layout decisions rather than design-system alignment:
 
-- **Split hero (HIER-2 / LAY-5):** the h1 and its copy and actions sit in opposite columns on wide screens.
 - **Duplicate feature sections (HIER-2):** "principles" and the guide list make overlapping points.
 - **Preview chrome (LAY-1):** the preview's footer bar repeats the hero copy.
-- **Entrance motion (MOT-2):** the hero appears all at once.
 
 ## Outside catalog (reviewer judgment)
 
