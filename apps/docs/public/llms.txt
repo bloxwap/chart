@@ -1,0 +1,74 @@
+# @bloxwap/chart
+
+> A zero-dependency TypeScript library for interactive financial charts, drawn on an HTML canvas with WebAssembly-accelerated math and a JavaScript fallback. Open source (MIT) by Bloxwap, Inc.
+
+`@bloxwap/chart` renders candlestick, OHLC bar, line, area, and histogram series with built-in indicators (SMA, EMA, Bollinger Bands, MACD, RSI, KDJ, volume) and 89 drawing tools grouped the way trading terminals present them (trend lines, channels, pitchforks, Fibonacci, Gann, harmonic patterns, Elliott waves, long/short positions, measurers, shapes, annotations). An optional UI layer, `@bloxwap/chart/ui`, adds a drawing toolbar, settings card, and on-chart editing.
+
+## When to use this
+
+Reach for `@bloxwap/chart` when an agent or developer needs to:
+
+- Put an interactive price chart (candles, OHLC, line, area) into a web app, dashboard, or trading interface.
+- Let users draw and edit technical-analysis annotations: trend lines, Fibonacci retracements, pitchforks, long/short positions, price and date ranges.
+- Add standard technical indicators to a chart without writing the math.
+- Stream live candle updates into an existing chart.
+- Keep full control of layout and DOM: the core draws into a canvas you pass in and never touches global `document` or `window`, so it also runs in workers, SSR, and tests.
+- Ship without runtime dependencies.
+
+## When not to use this
+
+- General-purpose business charts (pie, scatter, stacked bars): use a general charting library instead.
+- Server-side image generation without any canvas implementation available.
+- Projects that need an npm install today: the package is not yet published on npm (see "How to use it").
+
+## How to use it
+
+The package is not yet on npm. Build it from source (Node.js 24+):
+
+```sh
+git clone https://github.com/bloxwap/chart.git
+cd chart && npm ci && npm run pack:chart
+npm install /path/to/chart/packages/chart/bloxwap-chart-0.1.0.tgz
+```
+
+Then create a chart on a sized canvas:
+
+```ts
+import { createChart } from '@bloxwap/chart';
+
+const chart = createChart({
+  container: document.querySelector('canvas')!,
+  config: { data: candles, series: { type: 'candlestick' } }, // candles: { time, open, high, low, close, volume? }[]
+});
+chart.resize(width, height, window.devicePixelRatio);
+chart.addIndicator({ name: 'sma', params: { period: 20 } });
+chart.addDrawing({ name: 'fib', points: [{ index: 10, price: 95 }, { index: 90, price: 110 }] });
+```
+
+Add the toolbar with `createDrawingToolbar({ chart, document, canvas, rail, overlay })` from `@bloxwap/chart/ui`.
+
+## Docs
+
+- [Introduction](https://bloxwap.github.io/chart/docs/): What the library is and how its layers fit together.
+- [Quick start](https://bloxwap.github.io/chart/docs/getting-started/): Build the package locally and render a first candlestick chart.
+- [Data and updates](https://bloxwap.github.io/chart/docs/guides/data/): Supply candles, stream the current bar, and group changes.
+- [Series and appearance](https://bloxwap.github.io/chart/docs/guides/series/): Renderers, colors, labels, scales, and themes.
+- [Indicators](https://bloxwap.github.io/chart/docs/guides/indicators/): Built-in studies and custom calculations.
+- [Drawings](https://bloxwap.github.io/chart/docs/guides/drawings/): Place, edit, and manage annotations in data coordinates.
+- [Toolbar and settings](https://bloxwap.github.io/chart/docs/guides/toolbar-settings/): Drawing rail, navigation, and the settings card.
+- [React integration](https://bloxwap.github.io/chart/docs/guides/react/): Keep the chart in a ref and manage its lifetime.
+- [Rendering and performance](https://bloxwap.github.io/chart/docs/guides/performance/): Batching, caches, animation, and the canvas boundary.
+
+## API reference
+
+- [Chart API](https://bloxwap.github.io/chart/docs/api/chart/): Construction, data updates, studies, drawings, rendering, cleanup.
+- [Configuration](https://bloxwap.github.io/chart/docs/api/configuration/): The single typed configuration object.
+- [Scale and coordinates](https://bloxwap.github.io/chart/docs/api/scale/): Visible bars and data/pixel conversion.
+- [Package exports](https://bloxwap.github.io/chart/docs/api/exports/): Import the core or a specific integration layer.
+
+## Optional
+
+- [Interactive playground](https://bloxwap.github.io/chart/docs/playground/): The complete chart with drawing tools and a simulated live feed.
+- [Development](https://bloxwap.github.io/chart/docs/development/): Run the library and edit these docs.
+- [Source code](https://github.com/bloxwap/chart): MIT-licensed repository and issue tracker.
+- [Bloxwap](https://bloxwap.github.io/about/): About Bloxwap, Inc., contact, and privacy.
