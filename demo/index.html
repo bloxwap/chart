@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>chart-ts playground</title>
+  <style>
+    @font-face {
+      font-family: 'Geist';
+      src: url('./fonts/Geist-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Geist';
+      src: url('./fonts/Geist-Medium.woff2') format('woff2');
+      font-weight: 500;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Geist Mono';
+      src: url('./fonts/GeistMono-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Geist Mono';
+      src: url('./fonts/GeistMono-Medium.woff2') format('woff2');
+      font-weight: 500;
+      font-display: swap;
+    }
+    :root {
+      --bg: #131722;
+      --panel: #1e222d;
+      --edge: #2a2e39;
+      --idle: #b2b5be;
+      --hover: #d1d4dc;
+      --accent: #2962ff;
+      --accent-soft: rgba(41, 98, 255, 0.18);
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    body.light {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --edge: #d8dee6;
+      --idle: #5a6472;
+      --hover: #23283d;
+      --accent-soft: rgba(41, 98, 255, 0.12);
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--idle);
+      font: 12px/1.45 'Geist', system-ui, sans-serif; }
+    svg { display: block; }
+
+    /* ---- layout: ctrl rail | drawing rail | chart ---- */
+    #app { display: flex; height: 100vh; }
+    .rail {
+      width: 48px; flex: none; display: flex; flex-direction: column;
+      padding: 6px; background: var(--bg); border-right: 1px solid var(--edge);
+    }
+    .rail-scroll {
+      flex: 1; min-height: 0; width: 100%;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      overflow-y: auto; scrollbar-width: none; /* full height, scrolls if short window */
+    }
+    .rail-scroll::-webkit-scrollbar { display: none; }
+    .rail .icon-btn { width: 36px; height: 36px; border-radius: 8px; flex: none; }
+    .rail-divider { width: 22px; height: 1px; flex: none; background: var(--edge); margin: 5px 0; }
+    /* Settings gear: bottom-anchored in the controls rail. */
+    #settings-pop { flex: none; margin-top: 4px; }
+    /* Show/hide drawing-tools toggle: bottom-anchored directly under the gear. */
+    #tools-toggle { flex: none; margin-top: 2px; }
+    #chart-wrap { position: relative; flex: 1; min-width: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #hint {
+      position: absolute; bottom: 8px; left: 12px; pointer-events: none;
+      color: var(--idle); opacity: 0.6; font-size: 11px;
+    }
+
+    /* ---- overlay scroll arrows (shown when bars are too compressed) ---- */
+    :root { --overlay-pill: rgba(30, 34, 45, 0.85); }
+    body.light { --overlay-pill: rgba(255, 255, 255, 0.9); }
+    .scroll-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 20;
+      width: 32px; height: 32px; padding: 0; display: none;
+      align-items: center; justify-content: center;
+      background: var(--overlay-pill); border: 1px solid var(--edge); border-radius: 8px;
+      color: var(--idle); cursor: pointer; box-shadow: var(--shadow);
+    }
+    .scroll-arrow.visible { display: flex; }
+    .scroll-arrow:hover { color: var(--hover); background: var(--accent-soft); border-color: var(--accent); }
+    #scroll-left { left: 8px; }
+    #scroll-right { right: 8px; }
+
+    .icon-btn {
+      position: relative; /* anchor for the flyout caret */
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 32px; padding: 0;
+      background: transparent; color: var(--idle); border: none; border-radius: 6px; cursor: pointer;
+    }
+    /* tiny disclosure chevron pinned to the bottom-right corner of buttons
+       that open a flyout (TradingView's corner-triangle vibe, our chevron) */
+    .flyout-caret {
+      position: absolute; right: 1px; bottom: 1px;
+      display: flex; color: #5d6673; pointer-events: none;
+    }
+    .icon-btn:hover { color: var(--hover); background: var(--accent-soft); }
+    .icon-btn:disabled { opacity: 0.35; cursor: default; background: transparent; color: var(--idle); }
+    .icon-btn.open { background: var(--accent-soft); color: var(--accent); }
+    #rail .icon-btn.armed { background: var(--accent); color: #fff; }
+    .rail .icon-btn.on { color: var(--accent); background: var(--accent-soft); }
+
+    /* timeframe button: small mono label with the disclosure chevron to its right */
+    #tf-btn { flex-direction: row; align-items: center; justify-content: center; gap: 2px; }
+    #tf-btn .tf-label { font: 500 11px/1 'Geist Mono', ui-monospace, monospace; }
+
+    /* ---- flyout menus (fixed to the RIGHT of the rails at the button's y) ---- */
+    .pop-wrap { position: relative; flex: none; }
+    .menu {
+      position: fixed; min-width: 176px; z-index: 30;
+      background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+      box-shadow: var(--shadow); padding: 4px; display: none;
+    }
+    .menu.open { display: block; }
+    .menu-item {
+      display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px;
+      background: transparent; border: none; border-radius: 5px; color: var(--idle);
+      font: inherit; cursor: pointer; text-align: left; white-space: nowrap;
+    }
+    .menu-item:hover { background: var(--accent-soft); color: var(--hover); }
+    .menu-item.active { color: var(--accent); }
+    .menu-item.active .tick { opacity: 1; }
+    .tick { margin-left: auto; opacity: 0; color: var(--accent); font-family: 'Geist Mono', monospace; }
+    .menu-sep { height: 1px; background: var(--edge); margin: 4px 6px; }
+    .menu-label { padding: 6px 10px 2px; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.08em; opacity: 0.55; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav id="ctrl-rail" class="rail">
+      <div class="rail-scroll">
+        <div class="pop-wrap">
+          <button id="tf-btn" class="icon-btn" title="Timeframe"></button>
+          <div class="menu" id="tf-menu"></div>
+        </div>
+        <div class="pop-wrap">
+          <button id="ct-btn" class="icon-btn" title="Chart type"></button>
+          <div class="menu" id="ct-menu"></div>
+        </div>
+        <div class="pop-wrap">
+          <button id="fx-btn" class="icon-btn" title="Indicators"></button>
+          <div class="menu" id="fx-menu"></div>
+        </div>
+        <div class="rail-divider"></div>
+        <button id="undo-btn" class="icon-btn" title="Undo drawing"></button>
+        <button id="redo-btn" class="icon-btn" title="Redo drawing"></button>
+        <div class="rail-divider"></div>
+        <button id="theme-btn" class="icon-btn" title="Toggle theme"></button>
+      </div>
+      <div class="pop-wrap" id="settings-pop">
+        <button id="settings-btn" class="icon-btn" title="Settings"></button>
+        <div class="menu" id="settings-menu"></div>
+      </div>
+      <button id="tools-toggle" class="icon-btn" title="Hide tools"></button>
+    </nav>
+    <nav id="rail" class="rail">
+      <div class="rail-scroll" id="rail-scroll"></div>
+    </nav>
+    <div id="chart-wrap">
+      <canvas id="chart"></canvas>
+      <button id="scroll-left" class="scroll-arrow" title="Scroll back (older bars)"></button>
+      <button id="scroll-right" class="scroll-arrow" title="Scroll forward (newer bars)"></button>
+      <div id="hint">drag scroll &middot; wheel zoom &middot; esc / right-click cancels a tool</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createChart, defineConfig } from '../dist/index.js';
+    import { icon } from './icons/icons.js';
+
+    // --- deterministic synthetic data (LCG random walk) ---
+    let seed = 42;
+    const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
+    function genWalk(count, intervalSec, { gapChance = 0, startPrice = 100 } = {}) {
+      const out = [];
+      let price = startPrice;
+      let time = Math.floor(Date.now() / 1000) - count * intervalSec;
+      const volScale = intervalSec >= 86400 ? 4 : intervalSec >= 3600 ? 1.6 : 0.6;
+      for (let i = 0; i < count; i++) {
+        time += intervalSec;
+        if (gapChance > 0 && next() < gapChance) continue; // missing bars
+        const drift = (next() - 0.48) * volScale;
+        const open = price;
+        const close = Math.max(1, open + drift);
+        out.push({
+          time,
+          open, close,
+          high: Math.max(open, close) + next() * volScale * 0.4,
+          low: Math.min(open, close) - next() * volScale * 0.4,
+          volume: Math.round(500 + next() * 4500),
+        });
+        price = close;
+      }
+      return out;
+    }
+
+    const TIMEFRAMES = [
+      { label: '1m', seconds: 60, count: 1500 },
+      { label: '5m', seconds: 300, count: 1500 },
+      { label: '15m', seconds: 900, count: 1500 },
+      { label: '1h', seconds: 3600, count: 1200 },
+      { label: '4h', seconds: 14400, count: 1000 },
+      { label: '1d', seconds: 86400, count: 500 },
+    ];
+    const DATA_PRESETS = [
+      { label: '1m × 2000', make: () => genWalk(2000, 60) },
+      { label: '1d × 500', make: () => genWalk(500, 86400) },
+      { label: 'gaps (1h)', make: () => genWalk(1500, 3600, { gapChance: 0.15 }) },
+    ];
+
+    let timeframe = TIMEFRAMES[2]; // 15m
+    let candles = genWalk(timeframe.count, timeframe.seconds);
+
+    // --- fonts first, so the first paint isn't in fallback fonts ---
+    await Promise.all([
+      document.fonts.load('12px "Geist"'),
+      document.fonts.load('12px "Geist Mono"'),
+    ]).catch(() => {});
+
+    const CHART_THEMES = {
+      dark: {
+        theme: { background: '#131722', textColor: '#b2b5be', borderColor: '#2a2e39' },
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        crosshair: { color: '#758696' },
+      },
+      light: {
+        theme: { background: '#ffffff', textColor: '#4a5568', borderColor: '#e2e8f0' },
+        grid: { color: 'rgba(120,130,150,0.15)' },
+        crosshair: { color: '#4a5568' },
+      },
+    };
+
+    const config = defineConfig({
+      data: candles,
+      series: {
+        type: 'candlestick',
+        upColor: 'color(display-p3 0 1 0.55)',
+        downColor: 'color(display-p3 1 0.2 0.35)',
+      },
+      theme: {
+        fontFamily: "'Geist', system-ui, sans-serif",
+        monoFamily: "'Geist Mono', ui-monospace, monospace",
+        fontSize: 12,
+        ...CHART_THEMES.dark.theme,
+      },
+      grid: CHART_THEMES.dark.grid,
+      crosshair: CHART_THEMES.dark.crosshair,
+      watermark: { visible: true, text: 'BLOXWAP', opacity: 0.06, fontFamily: "'Geist'" },
+    });
+
+    const canvas = document.getElementById('chart');
+    const wrap = document.getElementById('chart-wrap');
+    const hint = document.getElementById('hint');
+    const chart = createChart({ container: canvas, config });
+
+    // ---------- overlay scroll arrows (compressed-data paging) ----------
+    const COMPRESS_SPACING_PX = 4; // reveal when avg bar spacing drops below this
+    const PAGE_FRACTION = 0.8; // one click pages 80% of the visible bars
+    const scrollLeftBtn = document.getElementById('scroll-left');
+    const scrollRightBtn = document.getElementById('scroll-right');
+    scrollLeftBtn.innerHTML = icon('chevron-left', 18);
+    scrollRightBtn.innerHTML = icon('chevron-right', 18);
+
+    const updateScrollArrows = () => {
+      const range = chart.scale.visibleRange();
+      const count = range.to - range.from;
+      const spacing = count > 0 ? wrap.clientWidth / count : Infinity;
+      const compressed = spacing < COMPRESS_SPACING_PX;
+      scrollLeftBtn.classList.toggle('visible', compressed && range.from > 0);
+      scrollRightBtn.classList.toggle('visible', compressed && range.to < chart.dataLength);
+    };
+
+    // click pages ~80% of a viewport; press-and-hold auto-repeats (400ms, then 80ms)
+    const wireHoldRepeat = (btn, direction) => {
+      const page = () => {
+        const range = chart.scale.visibleRange();
+        const count = Math.max(1, range.to - range.from);
+        let bars = count * PAGE_FRACTION;
+        // clamp at the data edges so paging never scrolls into empty space
+        if (direction > 0) bars = Math.min(bars, range.from);
+        else bars = Math.min(bars, chart.dataLength - range.to);
+        chart.scale.scrollBy(direction * bars);
+        updateScrollArrows();
+      };
+      let delayTimer = 0;
+      let repeatTimer = 0;
+      const stop = () => {
+        clearTimeout(delayTimer);
+        clearInterval(repeatTimer);
+        delayTimer = 0;
+        repeatTimer = 0;
+      };
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        stop();
+        page();
+        delayTimer = setTimeout(() => {
+          repeatTimer = setInterval(page, 80);
+        }, 400);
+      });
+      btn.addEventListener('pointerup', stop);
+      btn.addEventListener('pointerleave', stop);
+      btn.addEventListener('pointercancel', stop);
+    };
+    wireHoldRepeat(scrollLeftBtn, 1); // scrollBy positive = toward history
+    wireHoldRepeat(scrollRightBtn, -1);
+
+    // safety net so arrows never go stale; cleared on unload
+    const arrowTicker = setInterval(updateScrollArrows, 250);
+    window.addEventListener('beforeunload', () => clearInterval(arrowTicker));
+    updateScrollArrows();
+
+    // ---------- flyout plumbing (right-opening, one at a time) ----------
+    // Corner disclosure caret for buttons that open a flyout. innerHTML swaps
+    // wipe child elements, so this is re-invoked after each icon refresh.
+    const addFlyoutCaret = (btn) => {
+      const caret = document.createElement('span');
+      caret.className = 'flyout-caret';
+      caret.innerHTML = icon('chevron-right', 10);
+      btn.appendChild(caret);
+    };
+    const menus = [...document.querySelectorAll('.menu')];
+    const closeMenus = () => {
+      for (const m of menus) m.classList.remove('open');
+      for (const b of document.querySelectorAll('.icon-btn.open')) b.classList.remove('open');
+    };
+    const wireMenu = (btnId, menuId) => {
+      const btn = document.getElementById(btnId);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menu = document.getElementById(menuId);
+        const wasOpen = menu.classList.contains('open');
+        closeMenus();
+        if (!wasOpen) {
+          // position:fixed flyout to the right of the rail at the button's y,
+          // clamped so it never overflows the bottom edge of the viewport
+          menu.classList.add('open');
+          btn.classList.add('open');
+          const r = btn.getBoundingClientRect();
+          const top = Math.max(8, Math.min(r.top, window.innerHeight - menu.offsetHeight - 8));
+          menu.style.left = `${r.right + 8}px`;
+          menu.style.top = `${top}px`;
+        }
+      });
+    };
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.pop-wrap')) closeMenus();
+    });
+
+    // ---------- timeframe ----------
+    const tfBtn = document.getElementById('tf-btn');
+    const tfMenu = document.getElementById('tf-menu');
+    const setTimeframeLabel = () => {
+      tfBtn.innerHTML = `<span class="tf-label">${timeframe.label}</span>${icon('chevron-down', 12)}`;
+    };
+    for (const tf of TIMEFRAMES) {
+      const item = document.createElement('button');
+      item.className = 'menu-item';
+      item.textContent = `${tf.label}  ·  ${tf.count} bars`;
+      item.addEventListener('click', () => {
+        timeframe = tf;
+        candles = genWalk(tf.count, tf.seconds);
+        chart.setData(candles);
+        chart.scale.scrollTo(candles.length - 1);
+        setTimeframeLabel();
+        updateScrollArrows();
+        closeMenus();
+      });
+      tfMenu.appendChild(item);
+    }
+    setTimeframeLabel();
+    wireMenu('tf-btn', 'tf-menu');
+
+    // ---------- chart type ----------
+    const SERIES_TYPES = [
+      ['candlestick', 'Candlestick'],
+      ['line', 'Line'],
+      ['area', 'Area'],
+      ['bar', 'Bar (OHLC)'],
+      ['histogram', 'Histogram'],
+    ];
+    const ctBtn = document.getElementById('ct-btn');
+    const ctMenu = document.getElementById('ct-menu');
+    let seriesType = 'candlestick';
+    const setChartTypeIcon = () => {
+      ctBtn.innerHTML = icon(`chart-${seriesType}`);
+      ctBtn.title = `Chart type: ${seriesType}`;
+      addFlyoutCaret(ctBtn); // innerHTML swap wipes the caret; re-append
+    };
+    for (const [type, label] of SERIES_TYPES) {
+      const item = document.createElement('button');
+      item.className = 'menu-item';
+      item.innerHTML = `${icon(`chart-${type}`, 18)}<span>${label}</span>`;
+      item.addEventListener('click', () => {
+        seriesType = type;
+        chart.updateConfig({ series: { type } });
+        setChartTypeIcon();
+        closeMenus();
+      });
+      ctMenu.appendChild(item);
+    }
+    setChartTypeIcon();
+    wireMenu('ct-btn', 'ct-menu');
+
+    // ---------- indicators ----------
+    const INDICATORS = [
+      ['sma', 'SMA (20)', { period: 20 }],
+      ['ema', 'EMA (50)', { period: 50 }],
+      ['boll', 'BOLL (20, 2)', {}],
+      ['vol', 'Volume', {}],
+      ['macd', 'MACD (12, 26, 9)', {}],
+      ['rsi', 'RSI (14)', {}],
+      ['kdj', 'KDJ (9)', {}],
+    ];
+    const fxBtn = document.getElementById('fx-btn');
+    fxBtn.innerHTML = icon('function-square');
+    addFlyoutCaret(fxBtn);
+    const fxMenu = document.getElementById('fx-menu');
+    const indicatorIds = new Map();
+    for (const [name, label, params] of INDICATORS) {
+      const item = document.createElement('button');
+      item.className = 'menu-item';
+      item.innerHTML = `<span>${label}</span><span class="tick">✓</span>`;
+      item.addEventListener('click', () => {
+        const id = indicatorIds.get(name);
+        if (id !== undefined) {
+          chart.removeIndicator(id);
+          indicatorIds.delete(name);
+          item.classList.remove('active');
+        } else {
+          indicatorIds.set(name, chart.addIndicator({ name, params }));
+          item.classList.add('active');
+        }
+      });
+      fxMenu.appendChild(item);
+      if (name === 'vol') item.click(); // VOL on by default
+    }
+    wireMenu('fx-btn', 'fx-menu');
+
+    // ---------- drawing history (undo/redo) ----------
+    const undoStack = []; // { name, points, id }
+    const redoStack = [];
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    undoBtn.innerHTML = icon('undo');
+    redoBtn.innerHTML = icon('redo');
+    const syncHistoryButtons = () => {
+      undoBtn.disabled = undoStack.length === 0;
+      redoBtn.disabled = redoStack.length === 0;
+    };
+    undoBtn.addEventListener('click', () => {
+      const entry = undoStack.pop();
+      if (!entry) return;
+      chart.removeDrawing(entry.id);
+      redoStack.push(entry);
+      syncHistoryButtons();
+    });
+    redoBtn.addEventListener('click', () => {
+      const entry = redoStack.pop();
+      if (!entry) return;
+      entry.id = chart.addDrawing({ name: entry.name, points: entry.points });
+      undoStack.push(entry);
+      syncHistoryButtons();
+    });
+    syncHistoryButtons();
+
+    // ---------- theme toggle (sun/moon) ----------
+    let light = false;
+    const themeBtn = document.getElementById('theme-btn');
+    const syncThemeBtn = () => {
+      themeBtn.innerHTML = icon(light ? 'moon' : 'sun');
+      themeBtn.title = light ? 'Switch to dark theme' : 'Switch to light theme';
+    };
+    themeBtn.addEventListener('click', () => {
+      light = !light;
+      document.body.classList.toggle('light', light);
+      chart.updateConfig(CHART_THEMES[light ? 'light' : 'dark']);
+      syncThemeBtn();
+    });
+    syncThemeBtn();
+
+    // ---------- settings flyout: watermark, live feed, datasets ----------
+    const settingsBtn = document.getElementById('settings-btn');
+    settingsBtn.innerHTML = icon('settings');
+    addFlyoutCaret(settingsBtn);
+    const settingsMenu = document.getElementById('settings-menu');
+
+    let watermarkOn = true;
+    let live = true;
+
+    const wmItem = document.createElement('button');
+    wmItem.className = 'menu-item active';
+    wmItem.innerHTML = `<span>Watermark</span><span class="tick">✓</span>`;
+    wmItem.addEventListener('click', () => {
+      watermarkOn = !watermarkOn;
+      wmItem.classList.toggle('active', watermarkOn);
+      chart.updateConfig({ watermark: { visible: watermarkOn } });
+    });
+
+    const liveItem = document.createElement('button');
+    liveItem.className = 'menu-item';
+    const syncLiveItem = () => {
+      liveItem.innerHTML = `${icon(live ? 'pause' : 'play', 16)}<span>Live feed ${live ? 'on' : 'off'}</span>`;
+    };
+    liveItem.addEventListener('click', () => {
+      live = !live;
+      syncLiveItem();
+    });
+    syncLiveItem();
+
+    settingsMenu.append(wmItem, liveItem);
+    const sep = document.createElement('div');
+    sep.className = 'menu-sep';
+    settingsMenu.appendChild(sep);
+    const dataLabel = document.createElement('div');
+    dataLabel.className = 'menu-label';
+    dataLabel.textContent = 'Datasets';
+    settingsMenu.appendChild(dataLabel);
+    for (const preset of DATA_PRESETS) {
+      const item = document.createElement('button');
+      item.className = 'menu-item';
+      item.textContent = preset.label;
+      item.addEventListener('click', () => {
+        candles = preset.make();
+        chart.setData(candles);
+        chart.scale.scrollTo(candles.length - 1);
+        updateScrollArrows();
+        closeMenus();
+      });
+      settingsMenu.appendChild(item);
+    }
+    wireMenu('settings-btn', 'settings-menu');
+
+    // ---------- drawing rail: tools + extras ----------
+    const TOOLS = [
+      ['trend-line', 'trendline', 2, 'Trend line'],
+      ['horizontal-line', 'hline', 1, 'Horizontal line'],
+      ['fib-retracement', 'fib', 2, 'Fibonacci retracement'],
+      ['rectangle', 'rect', 2, 'Rectangle'],
+      ['ruler', 'trendline', 2, 'Measure (approximated by a trend line)'],
+      ['text', 'hline', 1, 'Text note (approximated by a horizontal line at the clicked price)'],
+      ['crosshair', null, 0, 'Cursor / crosshair'],
+    ];
+    const rail = document.getElementById('rail');
+    const railScroll = document.getElementById('rail-scroll');
+    let armedTool = null; // { iconName, registry, points, label }
+    let pendingPoints = [];
+    let magnetOn = false;
+    let locked = false;
+
+    const setArmed = (tool) => {
+      armedTool = tool;
+      pendingPoints = [];
+      for (const b of rail.querySelectorAll('button[data-tool]')) {
+        b.classList.toggle('armed', armedTool !== null && b.dataset.tool === armedTool.iconName);
+      }
+      hint.textContent = armedTool === null
+        ? 'drag scroll · wheel zoom · esc / right-click cancels a tool'
+        : `${armedTool.label}: click ${armedTool.points} point(s) — esc cancels`;
+    };
+
+    for (const [iconName, registry, points, label] of TOOLS) {
+      const btn = document.createElement('button');
+      btn.className = 'icon-btn rail-item';
+      btn.dataset.tool = iconName;
+      btn.title = label;
+      btn.innerHTML = icon(iconName);
+      btn.addEventListener('click', () => {
+        if (locked) return;
+        if (registry === null || (armedTool !== null && armedTool.iconName === iconName)) {
+          setArmed(null); // crosshair = default cursor mode
+        } else {
+          setArmed({ iconName, registry, points, label });
+        }
+      });
+      railScroll.appendChild(btn);
+    }
+
+    const railDivider = document.createElement('div');
+    railDivider.className = 'rail-divider rail-item';
+    railScroll.appendChild(railDivider);
+
+    const railButton = (iconName, label, onClick, { disabled = false } = {}) => {
+      const btn = document.createElement('button');
+      btn.className = 'icon-btn rail-item';
+      btn.title = label;
+      btn.innerHTML = icon(iconName);
+      btn.disabled = disabled;
+      btn.addEventListener('click', () => onClick(btn));
+      railScroll.appendChild(btn);
+      return btn;
+    };
+
+    railButton('magnet', 'Snap to candle OHLC when placing points', (btn) => {
+      magnetOn = !magnetOn;
+      btn.classList.toggle('on', magnetOn);
+    });
+
+    railButton('unlock', 'Lock drawing tools', (btn) => {
+      locked = !locked;
+      btn.innerHTML = icon(locked ? 'lock' : 'unlock');
+      btn.title = locked ? 'Unlock drawing tools' : 'Lock drawing tools';
+      btn.classList.toggle('on', locked);
+      if (locked) setArmed(null);
+    });
+
+    railButton('zoom-in', 'Zoom in 1.2×', () => {
+      chart.scale.zoom(1.2, wrap.clientWidth / 2);
+      updateScrollArrows();
+    });
+
+    railButton('smile', 'mood: bullish (decorative)', () => {}, { disabled: true });
+
+    railButton('trash', 'Clear all drawings', () => {
+      for (const entry of undoStack.splice(0)) chart.removeDrawing(entry.id);
+      redoStack.length = 0;
+      syncHistoryButtons();
+    });
+
+    // ---------- show/hide drawing rail (toggle lives in the controls rail,
+    // bottom-anchored under the settings gear, so it never moves) ----------
+    const toolsToggle = document.getElementById('tools-toggle');
+    toolsToggle.innerHTML = icon('panel-left-close');
+    toolsToggle.addEventListener('click', () => {
+      const show = rail.style.display === 'none';
+      rail.style.display = show ? '' : 'none';
+      toolsToggle.innerHTML = icon(show ? 'panel-left-close' : 'panel-left-open');
+      toolsToggle.title = show ? 'Hide tools' : 'Show tools';
+      // #chart-wrap reflows; its ResizeObserver re-fits the canvas.
+    });
+
+    // ---------- drawing placement ----------
+    const snapPrice = (index, price) => {
+      if (!magnetOn) return price;
+      const i = Math.min(candles.length - 1, Math.max(0, index));
+      const c = candles[i];
+      if (!c) return price;
+      let best = c.close;
+      for (const v of [c.open, c.high, c.low, c.close]) {
+        if (Math.abs(v - price) < Math.abs(best - price)) best = v;
+      }
+      return best;
+    };
+
+    const placePoint = (x, y) => {
+      const index = Math.round(chart.scale.xToIndex(x));
+      pendingPoints.push({ index, price: snapPrice(index, chart.scale.yToPrice(y)) });
+      hint.textContent = `${armedTool.label}: ${pendingPoints.length}/${armedTool.points} points`;
+      if (pendingPoints.length >= armedTool.points) {
+        const id = chart.addDrawing({ name: armedTool.registry, points: pendingPoints });
+        undoStack.push({ name: armedTool.registry, points: pendingPoints, id });
+        redoStack.length = 0;
+        syncHistoryButtons();
+        setArmed(null);
+      }
+    };
+
+    const cancelTool = () => setArmed(null);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMenus();
+        cancelTool();
+      }
+    });
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      cancelTool();
+    });
+
+    // ---------- live feed (1s tick mutating the last candle) ----------
+    setInterval(() => {
+      if (!live || candles.length === 0) return;
+      const last = { ...candles[candles.length - 1] };
+      last.close = Math.max(1, last.close + (next() - 0.5) * 1.2);
+      last.high = Math.max(last.high, last.close);
+      last.low = Math.min(last.low, last.close);
+      last.volume += Math.round(next() * 50);
+      candles[candles.length - 1] = last;
+      chart.appendData(last);
+      updateScrollArrows();
+    }, 1000);
+
+    // ---------- sizing (dpr-aware; observes the remaining flex space) ----------
+    const resize = () => {
+      chart.resize(wrap.clientWidth, wrap.clientHeight, window.devicePixelRatio || 1);
+      updateScrollArrows();
+    };
+    new ResizeObserver(resize).observe(wrap);
+    resize();
+
+    // ---------- chart interaction: crosshair, wheel zoom, drag scroll, tool clicks ----------
+    const toCanvas = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
+    };
+    canvas.addEventListener('pointermove', (e) => {
+      const [x, y] = toCanvas(e);
+      chart.setCrosshair(x, y);
+    });
+    canvas.addEventListener('pointerleave', () => chart.clearCrosshair());
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const [x] = toCanvas(e);
+      chart.scale.zoom(e.deltaY < 0 ? 1.1 : 0.9, x);
+      updateScrollArrows();
+    }, { passive: false });
+
+    let downX = 0, downY = 0, lastX = 0, dragged = false, pointerDown = false;
+    canvas.addEventListener('pointerdown', (e) => {
+      pointerDown = true;
+      dragged = false;
+      downX = lastX = e.clientX;
+      downY = e.clientY;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!pointerDown) return;
+      if (!dragged && Math.hypot(e.clientX - downX, e.clientY - downY) > 4) dragged = true;
+      if (dragged) {
+        chart.scale.scrollBy((e.clientX - lastX) / 6); // ~bar-spacing scaled
+        lastX = e.clientX;
+        updateScrollArrows(); // arrows track compression/position mid-drag
+      }
+    });
+    window.addEventListener('pointerup', (e) => {
+      if (!pointerDown) return;
+      pointerDown = false;
+      updateScrollArrows();
+      // a click (<4px movement) places a point only while a tool is armed and unlocked
+      if (dragged || armedTool === null || locked) return;
+      const [x, y] = toCanvas(e);
+      placePoint(x, y);
+    });
+  </script>
+</body>
+</html>

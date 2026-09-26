@@ -1,0 +1,74 @@
+{
+  "name": "chart-ts",
+  "version": "0.1.0",
+  "description": "Zero-dependency, WASM-accelerated candlestick/financial charting library in TypeScript with injected DOM",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./color": {
+      "types": "./dist/color.d.ts",
+      "import": "./dist/color.js"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.js"
+    },
+    "./indicators": {
+      "types": "./dist/indicators/index.d.ts",
+      "import": "./dist/indicators/index.js"
+    },
+    "./drawings": {
+      "types": "./dist/drawings/index.d.ts",
+      "import": "./dist/drawings/index.js"
+    },
+    "./wasm": {
+      "types": "./dist/wasm/loader.d.ts",
+      "import": "./dist/wasm/loader.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run build:wasm && npm run build:ts",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:ts-test": "tsc -p tsconfig.test.json",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "npm run build && npm run build:ts-test && node --test \"dist-test/**/*.test.js\"",
+    "coverage": "npm run build && npm run build:ts-test && node scripts/check-coverage.mjs",
+    "bench": "npm run build && node bench/indicators.bench.mjs && node bench/render.bench.mjs",
+    "demo": "bun run demo/serve.ts",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "chart",
+    "candlestick",
+    "financial",
+    "trading",
+    "wasm",
+    "simd",
+    "canvas",
+    "typescript"
+  ],
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "typescript": "^6.0.3",
+    "wabt": "^1.0.39"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
