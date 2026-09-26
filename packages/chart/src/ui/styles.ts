@@ -45,15 +45,28 @@ export const TOOLBAR_CSS = `
   box-shadow: 0 16px 64px rgba(0, 0, 0, .38);
 }
 .cts-settings.cts-light { color-scheme: light; }
+.cts-settings [hidden] { display: none; }
 .cts-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 20px 16px; }
 .cts-settings h2 { font-size: 18px; font-weight: 500; margin: 0 0 5px; }
 .cts-settings-head p { font-size: 12px; color: var(--cts-muted); margin: 0; }
+.cts-settings-search { display: flex; align-items: center; flex: none; gap: 4px; margin: 0 20px 14px; padding: 0 6px 0 12px; border: 1px solid var(--cts-edge); border-radius: 7px; background: var(--cts-bg); }
+.cts-settings-search:focus-within { border-color: var(--cts-accent); }
+.cts-settings-search-input { flex: 1; width: 100%; min-width: 0; padding: 10px 0; border: 0; background: transparent; color: var(--cts-hover); font: inherit; }
+.cts-settings-search-input::placeholder { color: var(--cts-muted); }
+.cts-settings-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.cts-settings .cts-settings-search-input:focus-visible { outline: none; }
+.cts-settings-search .cts-btn { flex: none; width: 28px; height: 28px; }
+.cts-settings-search-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.cts-settings-empty { padding: 30px 0; text-align: center; }
+.cts-settings-empty p { margin: 0 0 8px; font-size: 14px; }
+.cts-settings-empty small { color: var(--cts-muted); font-size: 12px; }
 .cts-settings-nav { display: flex; gap: 4px; padding: 0 16px 12px; border-bottom: 1px solid var(--cts-edge); }
 .cts-settings-tab { flex: 1; border: 0; border-radius: 6px; padding: 8px 6px; background: var(--cts-panel-raised); color: var(--cts-idle); cursor: pointer; white-space: nowrap; }
 .cts-settings-tab:hover, .cts-settings-tab:focus-visible { background: var(--cts-accent-soft); color: var(--cts-hover); }
 .cts-settings-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 0 20px 20px; scrollbar-width: thin; scrollbar-color: var(--cts-edge) transparent; }
 .cts-settings-section { padding-top: 22px; }
 .cts-settings-section + .cts-settings-section { margin-top: 20px; border-top: 1px solid var(--cts-edge); }
+.cts-settings-section.cts-settings-first { margin-top: 0; border-top: 0; }
 .cts-settings h3 { margin: 0 0 12px; color: var(--cts-muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .09em; }
 .cts-settings h4 { margin: 20px 0 6px; font-size: 12px; color: var(--cts-muted); font-weight: 400; }
 .cts-settings-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; }
@@ -79,6 +92,7 @@ export const TOOLBAR_CSS = `
 @media (max-width: 540px) {
   .cts-settings { left: 8px; bottom: 8px; width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   .cts-settings-head { padding: 16px; }
+  .cts-settings-search { margin-inline: 16px; }
   .cts-settings-body { padding: 0 16px 16px; }
   .cts-settings-select, .cts-settings-input { width: 132px; }
 }

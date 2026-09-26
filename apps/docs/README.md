@@ -44,6 +44,25 @@ is intentionally dark, matching the main Bloxwap docs.
 These copies keep this repository's GitHub Pages build independent of a sibling
 monorepo checkout.
 
+## Social cards
+
+The homepage and every documentation page have a 1200×630 PNG for Open Graph
+and Twitter/X large-image previews. The design follows `monorepo/packages/og`:
+black surfaces, a colored edge, the supplied Bloxwap wordmark, Nunito headlines,
+and Space Grotesk labels. Fonts and artwork are local assets.
+
+`lib/og-card.tsx` renders the cards with Next's `ImageResponse`. The static route
+in `app/og/[...slug]/route.tsx` generates `/og/home.png` and
+`/og/docs/<page>.png` at build time, including `/og/docs/index.png` for the docs
+introduction. Titles and descriptions come from each page's MDX frontmatter.
+New pages receive a card automatically. No image server is needed after export.
+
+`lib/social.ts` sets page-specific Open Graph and Twitter metadata and canonical
+URLs using `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_BASE_PATH`. The postbuild
+checker validates all page image URLs, preview metadata, and PNG dimensions.
+For a `/chart` build, preview the homepage image at
+`http://localhost:3901/chart/og/home.png` after `npm run docs:preview`.
+
 The `predev` and `prebuild` scripts compile the library and run
 `scripts/prepare-demo.mjs`. It copies `apps/playground/index.html`,
 `packages/chart/dist/`, and `packages/chart/assets/fonts/` from the repository

@@ -4,6 +4,7 @@ import { Window, type HTMLInputElement, type HTMLSelectElement } from 'happy-dom
 import { createChart, MockDocument, MockCanvas, MockContext2D, PriceScale, TimeScale, resolveConfig, type Candle } from '../dist/index.js';
 import { drawCandlesticks } from '../dist/series/candlestick.js';
 import { createChartSettings, createDrawingToolbar, type UIDocument, type UIElement } from '../dist/ui/index.js';
+import { matchesSettingsSearch } from '../dist/ui/settings-search.js';
 
 const data: Candle[] = Array.from({ length: 200 }, (_, i) => ({ time: 1700000000 + i * 60, open: 100 + i, high: 104 + i, low: 98 + i, close: 102 + i, volume: 1000 }));
 const near = (a: number, b: number): void => { assert.ok(Math.abs(a - b) < 1e-7, `${a} ≠ ${b}`); };
@@ -145,19 +146,119 @@ describe('candle settings', () => {
   });
 });
 
-function mount() {
+function mount(withExtras = false) {
   const win = new Window({ url: 'http://localhost/' }); windows.push(win);
   const doc = win.document, trigger = doc.createElement('button'); doc.body.append(trigger);
   const chart = createChart({ document: new MockDocument(), config: { wasm: false, data, series: { upColor: 'color(display-p3 0 1 0.55)' } } });
   let changed = 0;
-  const settings = createChartSettings({ chart, document: doc as unknown as UIDocument, trigger: trigger as unknown as UIElement, onChange: () => { changed++; } });
+  const extraContent = doc.createElement('div');
+  extraContent.innerHTML = '<button type="button">Live feed</button><button type="button">Navigation arrows</button>';
+  const settings = createChartSettings({ chart, document: doc as unknown as UIDocument, trigger: trigger as unknown as UIElement,
+    ...(withExtras ? { extraContent: extraContent as unknown as UIElement } : {}), onChange: () => { changed++; } });
   const input = (name: string) => doc.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
   const select = (name: string, value: string) => { const node = doc.querySelector<HTMLSelectElement>(`[name="${name}"]`)!; node.value = value; node.dispatchEvent(new win.Event('change')); };
   const check = (name: string) => input(name).click();
-  return { win, doc, chart, trigger, settings, input, select, check, changed: () => changed };
+  const search = (query: string) => {
+    const node = doc.querySelector<HTMLInputElement>('[type="search"]')!;
+    node.value = query; node.dispatchEvent(new win.Event('input', { bubbles: true }));
+    return node;
+  };
+  const visibleRows = () => Array.from(doc.querySelectorAll('.cts-settings-row')).filter((row) => !row.closest('[hidden]'));
+  return { win, doc, chart, trigger, settings, input, select, check, search, visibleRows, changed: () => changed };
 }
 
+describe('settings fuzzy matching', () => {
+  it('handles partial words, abbreviations, accents and misspellings without loose short matches', () => {
+    for (const [query, fields] of [
+      ['gird', ['Horizontal grid lines']],
+      ['bakground', ['Background color']],
+      ['logrithmc', ['Logarithmic']],
+      ['crshr', ['Crosshair']],
+      ['COLOUR', ['Colour']],
+      ['precision', ['Précision']],
+      ['  color   wick ', ['Candles', 'Wick up color']],
+      ['border up', ['borderUpColor']],
+      ['', ['Grid']],
+      ['---', ['Grid']],
+    ] as const) assert.equal(matchesSettingsSearch(query, fields), true, query);
+    for (const query of ['zzzzzz', 'gx', 'crosshair volume', 'gridlock', 'priceless']) {
+      assert.equal(matchesSettingsSearch(query, ['Grid color', 'Canvas']), false, query);
+    }
+  });
+});
+
 describe('unified settings card', () => {
+  it('filters across sections and choices while keeping matching controls live', () => {
+    const m = mount(); m.settings.open();
+    const total = m.visibleRows().length;
+    const original = m.chart.getConfig();
+    const search = m.search('gird');
+    assert.ok(m.visibleRows().length > 0 && m.visibleRows().length < total);
+    assert.ok(m.visibleRows().every((row) => /grid/i.test(row.textContent)));
+    assert.equal(m.doc.querySelector('[aria-label="Candles"]')!.hasAttribute('hidden'), true);
+    assert.deepEqual(m.chart.getConfig(), original, 'search must not change chart settings');
+    search.focus(); m.search('log scale');
+    assert.equal(m.visibleRows().length, 1);
+    assert.ok(m.visibleRows()[0].contains(m.input('scale-mode')));
+    assert.equal(m.doc.activeElement, search);
+    m.select('scale-mode', 'logarithmic');
+    assert.equal(m.chart.getConfig().priceAxis.mode, 'logarithmic');
+    assert.equal(m.changed(), 1);
+    assert.equal(m.visibleRows().length, 1);
+    m.search('wick up color');
+    assert.equal(m.visibleRows().length, 1);
+    m.input('wickUpColor').value = '#123456'; m.input('wickUpColor').dispatchEvent(new m.win.Event('input'));
+    assert.equal(m.chart.getConfig().series.wickUpColor, '#123456');
+    m.search('scale');
+    assert.ok(m.doc.querySelector('[aria-label="Scales and lines"]')!.querySelector('.cts-settings-row:not([hidden])'));
+    m.settings.destroy();
+  });
+
+  it('hides empty sections and subheadings, announces no matches, and clears with Escape or the button', () => {
+    const m = mount(); m.settings.open();
+    const total = m.visibleRows().length;
+    const search = m.search('inverted');
+    assert.equal(m.visibleRows().length, 1);
+    assert.ok(Array.from(m.doc.querySelectorAll('.cts-settings-group')).every((group) => group.hasAttribute('hidden')));
+    m.search('zzzzzz');
+    assert.equal(m.visibleRows().length, 0);
+    assert.ok(Array.from(m.doc.querySelectorAll('.cts-settings-section')).every((section) => section.hasAttribute('hidden')));
+    assert.equal(m.doc.querySelector('.cts-settings-empty')!.hasAttribute('hidden'), false);
+    assert.equal(m.doc.querySelector('[role="status"]')!.textContent, 'No settings found.');
+    search.dispatchEvent(new m.win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(search.value, ''); assert.equal(m.visibleRows().length, total);
+    assert.equal(m.trigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(m.doc.activeElement, search);
+    assert.equal(m.doc.querySelector('.cts-settings-empty')!.hasAttribute('hidden'), true);
+    m.search('background');
+    m.doc.querySelector<HTMLInputElement>('[aria-label="Clear settings search"]')!.click();
+    assert.equal(search.value, ''); assert.equal(m.visibleRows().length, total);
+    assert.equal(m.doc.querySelector('[aria-label="Clear settings search"]')!.hasAttribute('hidden'), true);
+    search.dispatchEvent(new m.win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(m.trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(m.doc.activeElement, m.trigger);
+    m.settings.destroy();
+  });
+
+  it('searches host controls, preserves queries during reset, and restores all sections on navigation or reopen', () => {
+    const m = mount(true); m.settings.open();
+    const search = m.search('live fed');
+    const extra = () => m.doc.querySelector('[aria-label="Playback and data"]')!;
+    assert.equal(extra().hasAttribute('hidden'), false);
+    assert.equal(m.visibleRows().length, 0);
+    m.search('grid'); assert.equal(extra().hasAttribute('hidden'), true);
+    m.doc.querySelector<HTMLInputElement>('.cts-settings-reset')!.click();
+    assert.equal(search.value, 'grid');
+    assert.ok(m.visibleRows().every((row) => /grid/i.test(row.textContent)));
+    const canvas = Array.from(m.doc.querySelectorAll<HTMLInputElement>('.cts-settings-tab')).find((button) => button.textContent === 'Canvas')!;
+    canvas.click(); assert.equal(search.value, '');
+    assert.equal(extra().hasAttribute('hidden'), false);
+    assert.equal(m.doc.activeElement, m.input('background'));
+    m.search('watermark'); m.settings.close(); m.settings.open();
+    assert.equal(search.value, ''); assert.ok(m.visibleRows().length > 10);
+    m.settings.destroy();
+  });
+
   it('opens from the gear, updates live, keeps current values on reopen and restores focus', () => {
     const m = mount();
     assert.equal(m.doc.querySelector('[role="dialog"]')!.getAttribute('hidden'), '');

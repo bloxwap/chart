@@ -96,6 +96,11 @@ canvas appearance update live. The scale's optional plus button adds an undoable
 horizontal price line. Alt/Option+I inverts the scale; Alt/Option+P and L toggle
 percent and logarithmic modes.
 
+Use the search field to filter settings by name, section, or option. It accepts
+partial names and common typos, such as `gird` for grid or `log scale` for scale
+mode. Matching controls stay editable. Escape clears a search first, then closes
+the card; the clear button and section shortcuts also restore the full list.
+
 Hosts can attach the same card to their own button:
 
 ```ts
