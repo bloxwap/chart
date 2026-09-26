@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 
 const managers = [
   { name: 'bun', command: 'bun add @bloxwap/chart' },
@@ -63,13 +64,8 @@ export function InstallCommand() {
     <div className="install-command" role="tabpanel" id={`${id}-command`} aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
       <span className="install-prompt" aria-hidden="true">$</span>
       <code>{command}</code>
-      <button type="button" className="install-copy" aria-label="Copy install command" title={result?.success ? 'Copied!' : 'Copy command'} onClick={copy}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          {result?.success ? <path d="m5 12 4 4L19 6" /> : <>
-            <rect x="9" y="9" width="13" height="13" rx="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </>}
-        </svg>
+      <button type="button" className="btn btn--ghost btn--icon" aria-label="Copy install command" title={result?.success ? 'Copied!' : 'Copy command'} onClick={copy}>
+        {result?.success ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       </button>
     </div>
     <span role="status" className={result && !result.success ? 'install-feedback' : 'sr-only'}>

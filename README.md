@@ -7,6 +7,8 @@
 
 <p align="center">
   <a href="https://github.com/bloxwap/chart/actions/workflows/docs.yml"><img alt="Docs build" src="https://img.shields.io/github/actions/workflow/status/bloxwap/chart/docs.yml?branch=main&style=flat-square"></a>
+  <!-- Line coverage snapshot from npm run coverage; refresh after source or test changes. -->
+  <a href="packages/chart/scripts/check-coverage.mjs"><img alt="Line coverage: 99.65%" src="https://img.shields.io/badge/line_coverage-99.65%25-brightgreen?style=flat-square"></a>
   <a href="https://github.com/bloxwap/chart/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/bloxwap/chart?style=flat-square"></a>
   <a href="packages/chart/package.json"><img alt="Zero runtime dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square"></a>
 </p>
@@ -25,7 +27,7 @@
   Fibonacci, Gann, harmonic patterns, Elliott waves, shapes, and annotations.
 - **Display-P3 colors** — wide-gamut colors flow straight to the canvas, with
   automatic label contrast.
-- **Tested** — 100% test coverage enforced by `npm run coverage`.
+- **Tested** — line, branch, and function coverage measured by `npm run coverage`, with a 100% target.
 
 ## Documentation
 

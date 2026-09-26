@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react';
 import { assetUrl } from '@/lib/site';
 
 /** Embed the actual demo, including its controls, styling, and keyboard shortcuts. */
@@ -57,8 +58,9 @@ export function ChartPreview() {
     <div className="preview-header">
       <div className="preview-title"><strong>Chart playground</strong><span className="demo-label"><span /> Simulated live data</span></div>
       <div className="preview-actions">
-        <a href={demoUrl} target="_blank" rel="noreferrer">Open playground <span aria-hidden="true">↗</span></a>
-        {canFullscreen && <button type="button" onClick={toggleFullscreen} aria-pressed={fullscreen}>
+        <a href={demoUrl} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm">Open playground <ArrowUpRight aria-hidden="true" /></a>
+        {canFullscreen && <button type="button" className="btn btn--secondary btn--sm" onClick={toggleFullscreen} aria-pressed={fullscreen}>
+          {fullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
           {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         </button>}
       </div>
