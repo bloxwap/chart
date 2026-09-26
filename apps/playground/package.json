@@ -1,6 +1,6 @@
 {
   "name": "@bloxwap/chart-playground",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "dev": "bun run serve.ts"
   },
   "dependencies": {
-    "@bloxwap/chart": "0.1.0"
+    "@bloxwap/chart": "0.0.1"
   },
   "engines": {
     "node": ">=24"

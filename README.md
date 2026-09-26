@@ -39,15 +39,11 @@ in [`apps/docs/`](apps/docs).
 
 ## Installation
 
-The chart package is not yet published to npm. From the repository root, build
-a local archive and install it in your application:
-
 ```sh
-npm ci
-npm run pack:chart
-cd /path/to/your-app
-npm install /path/to/chart/packages/chart/bloxwap-chart-0.1.0.tgz
+npm install @bloxwap/chart
 ```
+
+`0.0.1` is an early developer preview; expect breaking changes before `1.0`.
 
 ## Quick Example
 

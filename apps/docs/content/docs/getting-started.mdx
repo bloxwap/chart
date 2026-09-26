@@ -5,23 +5,11 @@ description: Build the package locally and put your first candlestick chart on s
 
 ## Install from source
 
-`@bloxwap/chart` is not yet published on npm. For now, build and package the repository using Node.js 24 or newer:
-
 ```sh
-git clone https://github.com/bloxwap/chart.git
-cd chart
-npm ci
-npm run pack:chart
+npm install @bloxwap/chart
 ```
 
-Install the resulting archive in your application. Version `0.1.0` produces `packages/chart/bloxwap-chart-0.1.0.tgz`:
-
-```sh
-cd /path/to/your-app
-npm install /path/to/chart/packages/chart/bloxwap-chart-0.1.0.tgz
-```
-
-Once the first public release is available, the intended installation command is `npm install @bloxwap/chart`. All examples use this package name, including when installed from the local archive.
+`0.0.1` is an early developer preview, so expect breaking changes before `1.0`. To try unreleased changes, build a local archive from the repository with `npm ci && npm run pack:chart` and install the resulting `packages/chart/bloxwap-chart-<version>.tgz`.
 
 ## Give the chart a box
 
