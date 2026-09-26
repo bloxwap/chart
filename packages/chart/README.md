@@ -7,9 +7,8 @@ Zero-dependency, WASM+SIMD-accelerated candlestick/financial charting library in
 Read the [documentation and interactive playground](https://bloxwap.github.io/chart/)
 for guides, an API reference, and the complete chart controls.
 
-`@bloxwap/chart` is not yet published to npm. From the repository root, run
-`npm ci` followed by `npm run pack:chart`. Install the resulting
-`packages/chart/bloxwap-chart-0.1.0.tgz` in your application.
+Install it with `npm install @bloxwap/chart`. `0.0.1` is an early developer
+preview; expect breaking changes before `1.0`.
 
 The library lives in `packages/chart`, the Fumadocs app in `apps/docs`, and the
 standalone playground in `apps/playground`. Run `npm run docs:dev` from the

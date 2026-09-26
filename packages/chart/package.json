@@ -1,10 +1,13 @@
 {
   "name": "@bloxwap/chart",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Zero-dependency, WASM-accelerated candlestick/financial charting library in TypeScript with injected DOM",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/bloxwap/chart.git",

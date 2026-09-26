@@ -15,7 +15,7 @@ function candles(n: number): Candle[] {
 
 describe('createChart', () => {
   it('exposes a version', () => {
-    assert.equal(version, '0.1.0');
+    assert.equal(version, '0.0.1');
   });
   it('throws without a container or document', () => {
     assert.throws(() => createChart({}), /inject a container/);
