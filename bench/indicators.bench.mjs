@@ -2,9 +2,9 @@
  * Indicator math benchmark: SMA/EMA/MACD over 100k candles, WASM vs scalar JS.
  * Reports ops/sec (one "op" = one full indicator computation over the series).
  *
- * Note: indicator computes are O(n) streaming passes, so the JS→wasm marshal
- * copy dominates at any size — reported below. The SIMD minmax kernel used by
- * the price-scale hot path is where vectorization pays off.
+ * Includes JS→WASM marshalling in indicator timings. The minmax comparison
+ * separates object-to-f32 conversion from resident-data kernel throughput;
+ * the chart uses the scalar object scan to retain full price precision.
  */
 import { performance } from 'node:perf_hooks';
 import { initWasm } from '../dist/wasm/loader.js';
@@ -42,7 +42,7 @@ if (kernels) bench('ema(20) wasm (incl. marshal)', () => emaIndicator.compute(ca
 bench('macd(12,26,9) scalar', () => macdIndicator.compute(candles, {}, [], null));
 
 if (kernels) {
-  console.log('\nprice-scale minmax hot path (100k candles visible):');
+  console.log('\nobject candle minmax comparison (100k candles):');
   bench('visibleMinMax scalar', () => visibleMinMax(candles, 0, N, null));
   bench('visibleMinMax wasm SIMD', () => visibleMinMax(candles, 0, N, kernels));
 

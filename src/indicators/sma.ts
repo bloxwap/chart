@@ -22,9 +22,11 @@ export function smaValues(values: readonly number[], period: number): (number | 
 }
 
 /** SMA via the WASM kernel: NaNs become `null`. */
-export function smaWasm(values: readonly number[], period: number, kernels: WasmKernels): (number | null)[] {
-  const out = kernels.sma(Float32Array.from(values), period);
-  return Array.from(out, (v) => (Number.isNaN(v) ? null : v));
+export function smaWasm(values: readonly number[] | Float32Array, period: number, kernels: WasmKernels): (number | null)[] {
+  const out = kernels.sma(values instanceof Float32Array ? values : Float32Array.from(values), period);
+  const valuesOut = new Array<number | null>(out.length);
+  for (let i = 0; i < out.length; i++) valuesOut[i] = Number.isNaN(out[i]) ? null : out[i];
+  return valuesOut;
 }
 
 /** SMA indicator definition (name `'sma'`, param `period`, default 20). */
@@ -40,8 +42,14 @@ export const smaIndicator: IndicatorDef = {
     kernels: WasmKernels | null,
   ) {
     const period = Math.max(1, Math.floor(params['period'] ?? 20));
-    const closes = candles.map((c) => c.close);
-    const values = kernels !== null ? smaWasm(closes, period, kernels) : smaValues(closes, period);
+    let values: (number | null)[];
+    if (kernels !== null) {
+      const closes = new Float32Array(candles.length);
+      for (let i = 0; i < candles.length; i++) closes[i] = candles[i].close;
+      values = smaWasm(closes, period, kernels);
+    } else {
+      values = smaValues(candles.map((c) => c.close), period);
+    }
     return {
       pane: 'main',
       lines: [{ key: 'value', values, color: colors[0] ?? '#2962ff' }],

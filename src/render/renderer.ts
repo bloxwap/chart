@@ -11,25 +11,26 @@ import type { PriceScale, TimeScale, VisibleRange } from '../core/scale.js';
 import type { PaneLayout } from '../core/pane.js';
 import type { ChartConfig } from '../config.js';
 import type { IndicatorOutput } from '../indicators/types.js';
-import type { DrawPrimitive } from '../drawings/types.js';
 import type { Canvas2DLike } from '../dom.js';
+import { contrastingTextColor } from '../color.js';
 import { SERIES_RENDERERS } from '../series/index.js';
 import { drawHistogramBars } from '../series/histogram.js';
 import { drawWatermark } from '../watermark.js';
 import { drawTimeAxis, timeTickIndices } from './axis.js';
+import { drawDrawings, type ResolvedDrawing } from './drawings.js';
+import { drawPriceReferences, drawStatusLine } from './settings-layers.js';
+
+export type { ResolvedDrawing } from './drawings.js';
 
 /** One pane with its scale and the indicator outputs that belong to it. */
 export interface PaneRenderInfo {
   readonly layout: PaneLayout;
   readonly priceScale: PriceScale;
   readonly indicators: readonly IndicatorOutput[];
-}
-
-/** A resolved drawing with its pixel-space primitives. */
-export interface ResolvedDrawing {
-  readonly color: string;
-  readonly lineWidth: number;
-  readonly primitives: readonly DrawPrimitive[];
+  /** Per-overlay opacity during indicator transitions. Defaults to 1. */
+  readonly indicatorOpacities?: readonly number[];
+  /** Sub-pane opacity, including its grid, separator and axis. Defaults to 1. */
+  readonly opacity?: number;
 }
 
 /** Everything {@link renderChart} needs for one frame. All sizes are CSS pixels. */
@@ -37,10 +38,13 @@ export interface RenderView {
   readonly canvasWidth: number;
   readonly canvasHeight: number;
   readonly plotWidth: number;
+  readonly plotLeft?: number;
   readonly plotHeight: number;
   /** Backing-store pixels per CSS pixel; the context is scaled by this ratio. */
   readonly pixelRatio: number;
   readonly candles: readonly Candle[];
+  /** Visual OHLC override for the last candle; calculations use `candles`. */
+  readonly liveCandle?: Candle;
   readonly range: VisibleRange;
   readonly timeScale: TimeScale;
   /** First entry is the main pane; the rest are indicator sub-panes. */
@@ -140,6 +144,13 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   // Layer 0: background.
   ctx.fillStyle = config.theme.background;
   ctx.fillRect(0, 0, view.canvasWidth, view.canvasHeight);
+  const plotLeft = view.plotLeft ?? 0;
+  if (plotLeft > 0) {
+    ctx.translate(plotLeft, 0);
+    view = { ...view, crosshair: { ...view.crosshair, x: view.crosshair.x - plotLeft } };
+  }
+  const axisWidth = view.canvasWidth - plotWidth;
+  const axisX = config.priceAxis.position === 'left' ? -axisWidth : plotWidth;
 
   // Layer 1: watermark (under everything else).
   drawWatermark(ctx, config.watermark, plotWidth, plotHeight, config.theme.fontFamily);
@@ -152,12 +163,14 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     ctx.lineWidth = 1;
     if (config.grid.horizontal) {
       for (const pane of view.panes) {
+        ctx.globalAlpha = pane.opacity ?? 1;
         for (const tick of pane.priceScale.ticks(config.priceAxis.tickCount)) {
           strokeHLine(ctx, 0, plotWidth, pane.layout.y + pane.priceScale.priceToY(tick));
         }
       }
     }
     if (config.grid.vertical) {
+      ctx.globalAlpha = 1;
       for (const i of timeIndices) {
         strokeVLine(ctx, view.timeScale.indexToX(i, view.candles.length), 0, plotHeight);
       }
@@ -170,6 +183,9 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   if (mainPane !== undefined) {
     ctx.save();
     ctx.translate(0, mainPane.layout.y);
+    ctx.beginPath();
+    ctx.rect(0, 0, plotWidth, mainPane.layout.height);
+    ctx.clip();
     SERIES_RENDERERS[config.series.type](
       ctx,
       view.candles,
@@ -177,9 +193,11 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
       view.timeScale,
       mainPane.priceScale,
       config.series,
+      view.liveCandle,
     );
     // Layer 4a: main-pane indicators overlay the series.
-    for (const output of mainPane.indicators) {
+    for (const [index, output] of mainPane.indicators.entries()) {
+      ctx.globalAlpha = mainPane.indicatorOpacities?.[index] ?? 1;
       drawIndicatorOutput(ctx, output, view.range, view.timeScale, mainPane.priceScale);
     }
     ctx.restore();
@@ -188,39 +206,31 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   // Layer 4b: sub-pane indicators.
   for (const pane of view.panes.slice(1)) {
     ctx.save();
+    ctx.globalAlpha = pane.opacity ?? 1;
     ctx.translate(0, pane.layout.y);
+    ctx.beginPath();
+    ctx.rect(0, 0, plotWidth, pane.layout.height);
+    ctx.clip();
     for (const output of pane.indicators) {
       drawIndicatorOutput(ctx, output, view.range, view.timeScale, pane.priceScale);
     }
     ctx.restore();
   }
 
-  // Layer 5: drawings on the main pane.
-  if (mainPane !== undefined) {
+  // Layer 5: drawings on the main pane, clipped to its plot area.
+  if (mainPane !== undefined && view.drawings.length > 0) {
     ctx.save();
     ctx.translate(0, mainPane.layout.y);
-    for (const drawing of view.drawings) {
-      ctx.strokeStyle = drawing.color;
-      ctx.fillStyle = drawing.color;
-      ctx.lineWidth = drawing.lineWidth;
-      ctx.font = monoFont;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      for (const prim of drawing.primitives) {
-        if (prim.type === 'line') {
-          ctx.beginPath();
-          ctx.moveTo(prim.x1, prim.y1);
-          ctx.lineTo(prim.x2, prim.y2);
-          ctx.stroke();
-        } else if (prim.type === 'rect') {
-          ctx.beginPath();
-          ctx.rect(prim.x, prim.y, prim.w, prim.h);
-          ctx.stroke();
-        } else {
-          ctx.fillText(prim.text, prim.x, prim.y);
-        }
-      }
-    }
+    ctx.beginPath();
+    ctx.rect(0, 0, plotWidth, mainPane.layout.height);
+    ctx.clip();
+    drawDrawings(ctx, view.drawings, {
+      sansFamily: config.theme.fontFamily,
+      monoFamily: config.theme.monoFamily,
+      fontSize: config.theme.fontSize,
+      background: config.theme.background,
+      pixelRatio: view.pixelRatio,
+    });
     ctx.restore();
   }
 
@@ -229,6 +239,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   ctx.strokeStyle = config.theme.borderColor;
   ctx.lineWidth = 1;
   for (const pane of view.panes) {
+    ctx.globalAlpha = pane.opacity ?? 1;
     strokeHLine(ctx, 0, plotWidth, pane.layout.y);
   }
   ctx.restore();
@@ -241,13 +252,21 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     for (const pane of view.panes) {
+      ctx.save();
+      ctx.globalAlpha = pane.opacity ?? 1;
+      if (pane.opacity !== undefined && pane.opacity < 1) {
+        ctx.beginPath();
+        ctx.rect(axisX, pane.layout.y, axisWidth, pane.layout.height);
+        ctx.clip();
+      }
       for (const tick of pane.priceScale.ticks(config.priceAxis.tickCount)) {
         ctx.fillText(
-          config.formatters.price(tick),
-          plotWidth + 6,
+          pane.priceScale.format(tick, config.formatters.price, config.priceAxis.precision),
+          axisX + 6,
           pane.layout.y + pane.priceScale.priceToY(tick),
         );
       }
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -264,30 +283,54 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     );
   }
 
+  drawPriceReferences(ctx, view);
+  drawStatusLine(ctx, view);
+
   // Layer 8: crosshair with axis label boxes.
-  if (config.crosshair.visible && view.crosshair.active) {
+  const mode = config.crosshair.mode;
+  if (config.crosshair.visible && view.crosshair.active && mode !== 'arrow' &&
+      view.crosshair.x >= 0 && view.crosshair.x <= plotWidth && view.crosshair.y <= plotHeight) {
     ctx.save();
     ctx.strokeStyle = config.crosshair.color;
+    ctx.fillStyle = config.crosshair.color;
     ctx.lineWidth = 1;
-    ctx.setLineDash(config.crosshair.dashed ? [4, 4] : []);
-    strokeVLine(ctx, view.crosshair.x, 0, plotHeight);
-    strokeHLine(ctx, 0, plotWidth, view.crosshair.y);
-    ctx.setLineDash([]);
+    if (mode === 'cross') {
+      ctx.setLineDash(config.crosshair.dashed ? [4, 4] : []);
+      strokeVLine(ctx, view.crosshair.x, 0, plotHeight);
+      strokeHLine(ctx, 0, plotWidth, view.crosshair.y);
+      ctx.setLineDash([]);
+    } else {
+      // 'dot' marks the pointer; 'demonstration' adds a presenter halo.
+      if (mode === 'demonstration') {
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.ellipse(view.crosshair.x, view.crosshair.y, 18, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.beginPath();
+      ctx.ellipse(view.crosshair.x, view.crosshair.y, 3, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const pad = 4;
     const labelH = config.theme.fontSize + pad * 2;
+    const labelColor = config.crosshair.labelColor === 'auto'
+      ? contrastingTextColor(config.crosshair.labelBackground, config.theme.background)
+      : config.crosshair.labelColor;
     ctx.font = monoFont;
     ctx.textBaseline = 'middle';
     // Price label box on the price axis, clamped inside the plot vertically.
     if (config.priceAxis.visible && mainPane !== undefined) {
-      const text = config.formatters.price(mainPane.priceScale.yToPrice(view.crosshair.y));
+      const hoveredPane = view.panes.find((pane) => view.crosshair.y >= pane.layout.y && view.crosshair.y <= pane.layout.y + pane.layout.height) ?? mainPane;
+      const text = hoveredPane.priceScale.format(hoveredPane.priceScale.yToPrice(view.crosshair.y - hoveredPane.layout.y), config.formatters.price, config.priceAxis.precision);
       const w = ctx.measureText(text).width + pad * 2;
       const by = Math.min(Math.max(view.crosshair.y - labelH / 2, 0), plotHeight - labelH);
       ctx.fillStyle = config.crosshair.labelBackground;
-      ctx.fillRect(plotWidth, by, w, labelH);
-      ctx.fillStyle = config.crosshair.labelColor;
+      ctx.fillRect(axisX, by, w, labelH);
+      ctx.fillStyle = labelColor;
       ctx.textAlign = 'left';
-      ctx.fillText(text, plotWidth + pad, by + labelH / 2);
+      ctx.fillText(text, axisX + pad, by + labelH / 2);
     }
     // Time label box on the time axis, clamped inside the plot horizontally.
     if (config.timeAxis.visible && view.candles.length > 0) {
@@ -300,7 +343,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
       const bx = Math.min(Math.max(view.crosshair.x - w / 2, 0), plotWidth - w);
       ctx.fillStyle = config.crosshair.labelBackground;
       ctx.fillRect(bx, plotHeight, w, labelH);
-      ctx.fillStyle = config.crosshair.labelColor;
+      ctx.fillStyle = labelColor;
       ctx.textAlign = 'center';
       ctx.fillText(text, bx + w / 2, plotHeight + labelH / 2);
     }

@@ -169,3 +169,75 @@ export function withAlpha(input: string, alpha: number): string {
   if (parsed === null) return input;
   return serializeColor({ ...parsed, a: clamp01(alpha) });
 }
+
+type RGB = readonly [number, number, number];
+
+function linearChannel(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function encodedChannel(channel: number): number {
+  return channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055;
+}
+
+function channels(c: ParsedColor, space: ParsedColor['space']): RGB {
+  const divisor = c.space === 'srgb' ? 255 : 1;
+  const rgb: RGB = [clamp01(c.r / divisor), clamp01(c.g / divisor), clamp01(c.b / divisor)];
+  if (c.space === space) return rgb;
+  // Mixed-space transparency is composited in P3, which contains sRGB.
+  // CSS Color 4's sRGB -> XYZ -> Display-P3 matrices, multiplied together.
+  const [r, g, b] = rgb.map(linearChannel) as [number, number, number];
+  return [
+    encodedChannel(0.8224619687143623 * r + 0.1775380312856377 * g),
+    encodedChannel(0.0331941988509618 * r + 0.9668058011490382 * g),
+    encodedChannel(0.01708263072112 * r + 0.0723974406639635 * g + 0.9105199286149165 * b),
+  ];
+}
+
+function luminance(rgb: RGB, space: ParsedColor['space']): number {
+  const [r, g, b] = rgb.map(linearChannel) as [number, number, number];
+  // sRGB uses WCAG coefficients; P3 uses the Y row of its D65 XYZ matrix.
+  // https://www.w3.org/TR/css-color-4/#color-conversion-code
+  return space === 'srgb'
+    ? 0.2126 * r + 0.7152 * g + 0.0722 * b
+    : (35783 / 156275) * r + (247089 / 357200) * g + (198249 / 2500400) * b;
+}
+
+/** Relative luminance (0–1) of a supported color, ignoring alpha; null for unsupported syntax. */
+export function relativeLuminance(input: string): number | null {
+  const c = parseColor(input);
+  return c === null ? null : luminance(channels(c, c.space), c.space);
+}
+
+const textContrastCache = new Map<string, string>();
+
+/**
+ * Picks black or white text by the greater relative-luminance contrast ratio.
+ * Translucent fills are composited over the given opaque backdrop. Unsupported
+ * backgrounds retain white text; an unsupported backdrop ignores transparency.
+ * Results are bounded and cached to avoid color conversion during every frame.
+ */
+export function contrastingTextColor(background: string, backdrop = '#ffffff'): string {
+  const key = `${background}\0${backdrop}`;
+  const cached = textContrastCache.get(key);
+  if (cached !== undefined) return cached;
+  const c = parseColor(background);
+  let result = '#ffffff';
+  if (c !== null) {
+    let light = luminance(channels(c, c.space), c.space);
+    const base = c.a < 1 ? parseColor(backdrop) : null;
+    if (base !== null) {
+      const space = c.space === 'display-p3' || base.space === 'display-p3' ? 'display-p3' : 'srgb';
+      const top = channels(c, space);
+      const bottom = channels(base, space);
+      const blended = top.map((v, i) => v * c.a + bottom[i]! * (1 - c.a)) as [number, number, number];
+      light = luminance(blended, space);
+    }
+    const blackContrast = (light + 0.05) / 0.05;
+    const whiteContrast = 1.05 / (light + 0.05);
+    result = blackContrast >= whiteContrast ? '#000000' : '#ffffff';
+  }
+  if (textContrastCache.size >= 256) textContrastCache.clear();
+  textContrastCache.set(key, result);
+  return result;
+}

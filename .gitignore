@@ -3,3 +3,4 @@ dist/
 dist-test/
 coverage/
 *.tsbuildinfo
+.DS_Store

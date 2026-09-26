@@ -9,22 +9,52 @@ import type { IndicatorDef } from './types.js';
 import { smaValues } from './sma.js';
 
 /**
- * Population standard deviation over sliding windows of `period`,
- * aligned like {@link smaValues} (null during warmup).
+ * Population standard deviation in O(length) time and O(period) scratch space.
+ * Each window combines a suffix of the preceding block with the current
+ * block's prefix. Centered Welford moments avoid subtracting nearly equal
+ * squares (or subtracting an outgoing outlier from a rolling variance).
  */
 export function stddevValues(values: readonly number[], period: number): (number | null)[] {
-  const out: (number | null)[] = new Array<number | null>(values.length).fill(null);
-  if (period <= 0 || values.length < period) return out;
-  for (let i = period - 1; i < values.length; i++) {
-    let sum = 0;
-    for (let j = i - period + 1; j <= i; j++) sum += values[j];
-    const mean = sum / period;
-    let sq = 0;
-    for (let j = i - period + 1; j <= i; j++) {
-      const d = values[j] - mean;
-      sq += d * d;
+  const out = new Array<number | null>(values.length).fill(null);
+  if (!Number.isInteger(period) || period <= 0 || values.length < period) return out;
+  const suffixMean = new Float64Array(period);
+  const suffixM2 = new Float64Array(period);
+  let previousOrigin = 0;
+  let origin = 0;
+  let mean = 0;
+  let m2 = 0;
+  for (let i = 0; i < values.length; i++) {
+    const offset = i % period;
+    if (offset === 0) {
+      if (i >= period) {
+        previousOrigin = Number.isFinite(values[i - 1]) ? values[i - 1] : 0;
+        let suffixAvg = 0;
+        let suffixSq = 0;
+        for (let j = period - 1; j >= 0; j--) {
+          const value = values[i - period + j] - previousOrigin;
+          const delta = value - suffixAvg;
+          suffixAvg += delta / (period - j);
+          suffixSq += delta * (value - suffixAvg);
+          suffixMean[j] = suffixAvg;
+          suffixM2[j] = suffixSq;
+        }
+      }
+      origin = Number.isFinite(values[i]) ? values[i] : 0;
+      mean = 0;
+      m2 = 0;
     }
-    out[i] = Math.sqrt(sq / period);
+    const count = offset + 1;
+    const value = values[i] - origin;
+    const delta = value - mean;
+    mean += delta / count;
+    m2 += delta * (value - mean);
+    if (i < period - 1) continue;
+    let variance = m2;
+    if (count < period) {
+      const difference = (origin - previousOrigin) + mean - suffixMean[count];
+      variance += suffixM2[count] + difference * difference * count * (period - count) / period;
+    }
+    out[i] = Math.sqrt(Math.max(0, variance / period));
   }
   return out;
 }
@@ -38,8 +68,9 @@ export const bollIndicator: IndicatorDef = {
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = Math.max(1, Math.floor(params['period'] ?? 20));
     const mult = params['mult'] ?? 2;
-    const mid = smaValues(candles.map((c) => c.close), period);
-    const std = stddevValues(candles.map((c) => c.close), period);
+    const closes = candles.map((c) => c.close);
+    const mid = smaValues(closes, period);
+    const std = stddevValues(closes, period);
     const upper: (number | null)[] = new Array<number | null>(mid.length).fill(null);
     const lower: (number | null)[] = new Array<number | null>(mid.length).fill(null);
     // mid and std warm up together, so a non-null mid implies a non-null std.

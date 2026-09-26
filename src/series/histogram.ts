@@ -46,16 +46,16 @@ export const drawHistogram: SeriesDrawFn = (
   priceScale: PriceScale,
   config: SeriesConfig,
 ) => {
-  const values = candles.map((c) => c.volume ?? 0);
-  const up = candles.map((c) => c.close >= c.open);
-  drawHistogramBars(
-    ctx,
-    values,
-    up,
-    range,
-    timeScale,
-    priceScale,
-    config.upColor,
-    config.downColor === '' ? config.histogramColor : config.downColor,
-  );
+  const barWidth = Math.max(1, Math.floor(timeScale.barSpacing * 0.6));
+  const zeroY = priceScale.priceToY(Math.max(priceScale.minPrice, Math.min(priceScale.maxPrice, 0)));
+  const downColor = config.downColor === '' ? config.histogramColor : config.downColor;
+  for (let i = range.from; i < range.to; i++) {
+    const c = candles[i];
+    const volume = c.volume ?? 0;
+    if (Number.isNaN(volume)) continue;
+    ctx.fillStyle = c.close >= (config.colorByPreviousClose && i > 0 ? candles[i - 1].close : c.open) ? config.upColor : downColor;
+    const x = timeScale.indexToX(i, candles.length);
+    const y = priceScale.priceToY(volume);
+    ctx.fillRect(x - barWidth / 2, Math.min(y, zeroY), barWidth, Math.max(1, Math.abs(zeroY - y)));
+  }
 };

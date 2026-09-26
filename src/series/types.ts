@@ -17,4 +17,6 @@ export type SeriesDrawFn = (
   timeScale: TimeScale,
   priceScale: PriceScale,
   config: SeriesConfig,
+  /** Interpolated prices for the last candle only; the array stays authoritative. */
+  liveCandle?: Candle,
 ) => void;

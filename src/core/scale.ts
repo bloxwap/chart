@@ -8,6 +8,7 @@
 
 import type { Candle } from './data.js';
 import type { WasmKernels } from '../wasm/loader.js';
+import type { PriceScaleMode } from '../config.js';
 
 /** A half-open range of bar indices `[from, to)`. */
 export interface VisibleRange {
@@ -68,18 +69,20 @@ export class TimeScale {
 
   /**
    * Multiplies bar spacing by `factor`, keeping the bar under `anchorX`
-   * stationary when provided.
+   * stationary when provided. Returns whether the scale changed.
    */
-  zoom(factor: number, dataLength: number, anchorX?: number): void {
+  zoom(factor: number, dataLength: number, anchorX?: number): boolean {
+    if (!Number.isFinite(factor) || factor <= 0 ||
+        (anchorX !== undefined && !Number.isFinite(anchorX))) return false;
     const oldSpacing = this.barSpacing;
     const next = Math.min(MAX_BAR_SPACING, Math.max(MIN_BAR_SPACING, oldSpacing * factor));
-    if (next === oldSpacing) return;
+    if (next === oldSpacing) return false;
     if (anchorX !== undefined) {
-      const floatIndex = dataLength - 1 - this.scrollOffset - (this.width - anchorX - oldSpacing / 2) / oldSpacing;
-      this.scrollOffset = dataLength - 1 - floatIndex - (this.width - anchorX - next / 2) / next;
+      this.scrollOffset += (this.width - anchorX) * (1 / oldSpacing - 1 / next);
     }
     this.barSpacing = next;
     this.clampScroll(dataLength);
+    return true;
   }
 
   /** Scrolls by `bars` (positive moves toward history). */
@@ -91,6 +94,18 @@ export class TimeScale {
   /** Scrolls so that bar `index` becomes the rightmost visible bar. */
   scrollTo(index: number, dataLength: number): void {
     this.scrollOffset = dataLength - 1 - index;
+    this.clampScroll(dataLength);
+  }
+
+  /** Fits bars `[from, to]` (any order) edge to edge in the viewport. */
+  fitRange(from: number, to: number, dataLength: number): void {
+    const lo = Math.min(from, to);
+    const hi = Math.max(from, to);
+    const bars = Math.max(1, hi - lo + 1);
+    if (this.width > 0) {
+      this.barSpacing = Math.min(MAX_BAR_SPACING, Math.max(MIN_BAR_SPACING, this.width / bars));
+    }
+    this.scrollOffset = dataLength - 1 - hi;
     this.clampScroll(dataLength);
   }
 
@@ -111,6 +126,38 @@ export class PriceScale {
   topMargin = 0.08;
   /** Fraction of height reserved below the min price. */
   bottomMargin = 0.08;
+  mode: PriceScaleMode = 'regular';
+  inverted = false;
+  /** First visible close; a zero reference uses 1 to keep transforms finite. */
+  basePrice = 1;
+
+  /** Converts raw prices to the selected scale's units. */
+  toScale(price: number): number {
+    const base = this.basePrice || 1;
+    if (this.mode === 'percent') return (price - base) / Math.abs(base) * 100;
+    if (this.mode === 'indexed') return price / base * 100;
+    if (this.mode === 'logarithmic') {
+      return this.min > 0 ? Math.log10(Math.max(Number.MIN_VALUE, price))
+        : Math.sign(price) * Math.log10(1 + Math.abs(price));
+    }
+    return price;
+  }
+
+  fromScale(value: number): number {
+    const base = this.basePrice || 1;
+    if (this.mode === 'percent') return base + value / 100 * Math.abs(base);
+    if (this.mode === 'indexed') return value / 100 * base;
+    if (this.mode === 'logarithmic') return this.min > 0 ? 10 ** value : Math.sign(value) * (10 ** Math.abs(value) - 1);
+    return value;
+  }
+
+  format(price: number, formatter: (value: number) => string, precision: number | null = null): string {
+    const value = this.mode === 'percent' || this.mode === 'indexed' ? this.toScale(price) : price;
+    const digits = precision === null ? null : Math.max(0, Math.min(12, Math.round(precision)));
+    const text = digits !== null ? value.toFixed(digits)
+      : this.mode === 'percent' || this.mode === 'indexed' ? value.toFixed(2) : formatter(value);
+    return text + (this.mode === 'percent' ? '%' : '');
+  }
 
   /** Sets the displayed price range; degenerate ranges are padded. */
   setRange(min: number, max: number): void {
@@ -142,18 +189,23 @@ export class PriceScale {
   /** Y pixel for `price`. */
   priceToY(price: number): number {
     const usable = this.height * (1 - this.topMargin - this.bottomMargin);
-    return this.height * this.topMargin + ((this.max - price) / (this.max - this.min)) * usable;
+    const min = this.toScale(this.min), max = this.toScale(this.max);
+    const fraction = (this.toScale(price) - min) / (max - min);
+    return this.height * this.topMargin + (this.inverted ? fraction : 1 - fraction) * usable;
   }
 
   /** Price for y pixel `y`. */
   yToPrice(y: number): number {
     const usable = this.height * (1 - this.topMargin - this.bottomMargin);
-    return this.max - ((y - this.height * this.topMargin) / usable) * (this.max - this.min);
+    const min = this.toScale(this.min), max = this.toScale(this.max);
+    const fraction = usable > 0 ? (y - this.height * this.topMargin) / usable : 0.5;
+    return this.fromScale(min + (this.inverted ? fraction : 1 - fraction) * (max - min));
   }
 
   /** Roughly `count` "nice" tick prices spanning the range. */
   ticks(count = 6): number[] {
-    return priceTicks(this.min, this.max, count);
+    const a = this.toScale(this.min), b = this.toScale(this.max);
+    return priceTicks(Math.min(a, b), Math.max(a, b), count).map((value) => this.fromScale(value));
   }
 }
 

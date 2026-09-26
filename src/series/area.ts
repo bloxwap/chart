@@ -8,14 +8,14 @@ import { withAlpha } from '../color.js';
 import type { SeriesDrawFn } from './types.js';
 
 /** Draws the close line plus a filled area down to the pane bottom. */
-export const drawArea: SeriesDrawFn = (ctx, candles, range, timeScale, priceScale, config) => {
+export const drawArea: SeriesDrawFn = (ctx, candles, range, timeScale, priceScale, config, liveCandle) => {
   if (range.to <= range.from) return;
   const baseline = priceScale.priceToY(priceScale.minPrice);
   ctx.beginPath();
   let firstX = 0;
   let lastX = 0;
   for (let i = range.from; i < range.to; i++) {
-    const c = candles[i];
+    const c = (i === candles.length - 1 ? liveCandle : undefined) ?? candles[i];
     const x = timeScale.indexToX(i, candles.length);
     const y = priceScale.priceToY(c.close);
     if (i === range.from) {

@@ -17,6 +17,12 @@ export type SeriesType = 'candlestick' | 'line' | 'area' | 'bar' | 'histogram';
 /** Main series appearance. Colors accept hex, rgb(a), and `color(display-p3 ...)`. */
 export interface SeriesConfig {
   type: SeriesType;
+  colorByPreviousClose: boolean;
+  bodyVisible: boolean;
+  borderVisible: boolean;
+  wickVisible: boolean;
+  borderUpColor: string;
+  borderDownColor: string;
   upColor: string;
   downColor: string;
   /** Wick colors default to the body colors when empty. */
@@ -61,6 +67,14 @@ export interface DrawingConfig {
   points: DrawingPoint[];
   color: string;
   lineWidth: number;
+  /** Stroke style applied to every line of the drawing. */
+  lineStyle: 'solid' | 'dashed' | 'dotted';
+  /** Text payload for text-bearing tools (notes, labels, emoji, tables). */
+  text: string;
+  /** Image payload for the image tool. */
+  image: CanvasImageSourceLike | null;
+  /** Locked drawings cannot be selected, moved or erased interactively. */
+  locked: boolean;
   visible: boolean;
 }
 
@@ -79,12 +93,39 @@ export interface WatermarkConfig {
 }
 
 /** Price (vertical) axis options. */
+export type PriceScaleMode = 'regular' | 'percent' | 'indexed' | 'logarithmic';
+
 export interface PriceAxisConfig {
   visible: boolean;
-  /** Width reserved at the right edge for price labels. */
+  /** Minimum width reserved at the selected edge; grows to fit explicit precision. */
   width: number;
   /** Approximate number of ticks. */
   tickCount: number;
+  position: 'left' | 'right';
+  autoScale: boolean;
+  /** Exclude overlay indicators from the main pane's automatic range. */
+  scaleSeriesOnly: boolean;
+  inverted: boolean;
+  mode: PriceScaleMode;
+  lockPriceToBarRatio: boolean;
+  /** Scale units per bar; null captures the current ratio when locking. */
+  priceToBarRatio: number | null;
+  /** null preserves the host's price formatter. */
+  precision: number | null;
+  labels: { lastPrice: boolean; highLow: boolean; indicator: boolean };
+  lines: { lastPrice: boolean; previousClose: boolean; highLow: boolean };
+  plusButton: boolean;
+}
+
+/** Information displayed over the main chart pane. */
+export interface StatusLineConfig {
+  visible: boolean;
+  symbol: string;
+  symbolVisible: boolean;
+  ohlc: boolean;
+  change: boolean;
+  volume: boolean;
+  indicators: boolean;
 }
 
 /** Time (horizontal) axis options. */
@@ -103,13 +144,18 @@ export interface GridConfig {
   color: string;
 }
 
+/** Pointer rendering: full cross, a dot, nothing (plain arrow), or a presenter halo. */
+export type CrosshairMode = 'cross' | 'dot' | 'arrow' | 'demonstration';
+
 export interface CrosshairConfig {
   visible: boolean;
+  /** How the pointer is drawn; axis label boxes show in every mode except `'arrow'`. */
+  mode: CrosshairMode;
   color: string;
   dashed: boolean;
   /** Label box background; an accent color contrasts with both dark and light themes. */
   labelBackground: string;
-  /** Label text color drawn over {@link labelBackground}. */
+  /** Label text color; `'auto'` (default) selects black/white by background luminance. */
   labelColor: string;
 }
 
@@ -143,6 +189,7 @@ export interface ChartConfig {
   /** Enable WASM+SIMD acceleration with automatic JS fallback. */
   wasm: boolean;
   series: SeriesConfig;
+  statusLine: StatusLineConfig;
   indicators: IndicatorConfig[];
   drawings: DrawingConfig[];
   priceAxis: PriceAxisConfig;
@@ -168,7 +215,7 @@ export type DeepPartial<T> = T extends (...args: never[]) => unknown
 /** Formats a price with a magnitude-appropriate precision. */
 export function defaultPriceFormatter(value: number): string {
   const abs = Math.abs(value);
-  const digits = abs >= 100 ? 2 : abs >= 1 ? 4 : 6;
+  const digits = abs >= 100 || abs === 0 ? 2 : abs >= 1 ? 4 : 6;
   return value.toFixed(digits);
 }
 
@@ -187,6 +234,12 @@ export const DEFAULT_CONFIG: ChartConfig = {
   wasm: true,
   series: {
     type: 'candlestick',
+    colorByPreviousClose: false,
+    bodyVisible: true,
+    borderVisible: false,
+    wickVisible: true,
+    borderUpColor: '',
+    borderDownColor: '',
     upColor: '#26a69a',
     downColor: '#ef5350',
     wickUpColor: '',
@@ -199,10 +252,17 @@ export const DEFAULT_CONFIG: ChartConfig = {
   },
   indicators: [],
   drawings: [],
-  priceAxis: { visible: true, width: 64, tickCount: 6 },
+  statusLine: { visible: false, symbol: 'Symbol', symbolVisible: true, ohlc: true, change: true, volume: false, indicators: true },
+  priceAxis: {
+    visible: true, width: 64, tickCount: 6, position: 'right', autoScale: true,
+    scaleSeriesOnly: false, inverted: false, mode: 'regular', lockPriceToBarRatio: false,
+    priceToBarRatio: null, precision: null,
+    labels: { lastPrice: false, highLow: false, indicator: false },
+    lines: { lastPrice: false, previousClose: false, highLow: false }, plusButton: false,
+  },
   timeAxis: { visible: true, height: 24, tickCount: 6 },
   grid: { visible: true, horizontal: true, vertical: true, color: 'rgba(120, 130, 150, 0.15)' },
-  crosshair: { visible: true, color: '#758696', dashed: true, labelBackground: '#2962ff', labelColor: '#ffffff' },
+  crosshair: { visible: true, mode: 'cross', color: '#758696', dashed: true, labelBackground: '#2962ff', labelColor: 'auto' },
   theme: {
     background: '#ffffff',
     textColor: '#4a5568',

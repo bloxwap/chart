@@ -25,9 +25,11 @@ export function emaValues(values: readonly number[], period: number): (number | 
 }
 
 /** EMA via the WASM kernel: NaNs become `null`. */
-export function emaWasm(values: readonly number[], period: number, kernels: WasmKernels): (number | null)[] {
-  const out = kernels.ema(Float32Array.from(values), period);
-  return Array.from(out, (v) => (Number.isNaN(v) ? null : v));
+export function emaWasm(values: readonly number[] | Float32Array, period: number, kernels: WasmKernels): (number | null)[] {
+  const out = kernels.ema(values instanceof Float32Array ? values : Float32Array.from(values), period);
+  const valuesOut = new Array<number | null>(out.length);
+  for (let i = 0; i < out.length; i++) valuesOut[i] = Number.isNaN(out[i]) ? null : out[i];
+  return valuesOut;
 }
 
 /** EMA indicator definition (name `'ema'`, param `period`, default 20). */
@@ -43,8 +45,14 @@ export const emaIndicator: IndicatorDef = {
     kernels: WasmKernels | null,
   ) {
     const period = Math.max(1, Math.floor(params['period'] ?? 20));
-    const closes = candles.map((c) => c.close);
-    const values = kernels !== null ? emaWasm(closes, period, kernels) : emaValues(closes, period);
+    let values: (number | null)[];
+    if (kernels !== null) {
+      const closes = new Float32Array(candles.length);
+      for (let i = 0; i < candles.length; i++) closes[i] = candles[i].close;
+      values = emaWasm(closes, period, kernels);
+    } else {
+      values = emaValues(candles.map((c) => c.close), period);
+    }
     return {
       pane: 'main',
       lines: [{ key: 'value', values, color: colors[0] ?? '#ff6d00' }],
