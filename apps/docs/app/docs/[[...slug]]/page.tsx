@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { DocsBody, DocsDescription, DocsPage, DocsTitle, EditOnGitHub } from 'fumadocs-ui/layouts/docs/page';
+import { DocsBody, DocsDescription, DocsPage, DocsTitle, EditOnGitHub, PageFooter } from 'fumadocs-ui/layouts/docs/page';
+import { SiteFooter } from '@/components/site-footer';
 import { source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 import { repository } from '@/lib/site';
@@ -10,7 +11,8 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
   const page = source.getPage(slug);
   if (!page) notFound();
   const MDX = page.data.body;
-  return <DocsPage toc={page.data.toc}>
+  // The article is a full-height flex column, so the site footer after the prev/next links pins to the bottom of short pages.
+  return <DocsPage toc={page.data.toc} footer={{ component: <><PageFooter /><SiteFooter /></> }}>
     <DocsTitle>{page.data.title}</DocsTitle>
     <DocsDescription>{page.data.description}</DocsDescription>
     <DocsBody><MDX components={getMDXComponents()} /></DocsBody>

@@ -376,6 +376,9 @@ button[data-search-full] kbd {
 /* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
 /* The bloxwap.com footer (monorepo workers/www), inset to the header's box. margin-top: auto pins it to the bottom of short pages in the flex-column body. */
 .site-footer { margin-top: auto; padding: var(--space-5xl) max(var(--space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--space-lg))) var(--space-4xl); }
+/* Inside a docs article: pinned below the page content (margin-top: auto in the flex column), inset to the article's own padding. */
+#nd-page > .site-footer { padding: var(--space-5xl) 0 0; }
+#nd-page > .site-footer .footer-grid { column-gap: var(--space-xl); }
 .footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--space-2xl); row-gap: var(--space-4xl); }
 .footer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
 .footer-brand p { margin: 0; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); }
