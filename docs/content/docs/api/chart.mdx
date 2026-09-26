@@ -1,0 +1,95 @@
+---
+title: Chart API
+description: Construction, data updates, studies, drawings, rendering, and cleanup.
+---
+
+## createChart
+
+```ts
+import { createChart } from '@bloxwap/chart';
+
+const chart = createChart({
+  container: canvas,
+  config: { data: candles },
+  pixelRatio: window.devicePixelRatio,
+});
+```
+
+Provide either `container` or `document`. `container` takes precedence if both are supplied.
+
+| Option | Type | Meaning |
+| --- | --- | --- |
+| `container` | `ChartCanvas` | Existing canvas implementing the exported interface |
+| `document` | `ChartDocument` | Factory for a canvas when no container is supplied |
+| `config` | `DeepPartial<ChartConfig>` | Configuration merged with defaults |
+| `pixelRatio` | `number` | Backing pixels per CSS pixel; default 1 |
+| `animation` | `{ scheduler, duration? }` | Optional injected frame clock; default duration 240ms |
+| `registries` | `{ indicators?, drawings? }` | Custom registries; omitted registries include built-ins |
+
+## State and lifecycle
+
+| Member | Returns | Purpose |
+| --- | --- | --- |
+| `ready` | `Promise<Chart>` | Resolves after WASM setup or JS fallback |
+| `getConfig()` | `ChartConfig` | Current resolved configuration; treat as read-only |
+| `dataLength` | `number` | Number of candles in the internal store |
+| `plotArea` | `{ left, width, height }` | Main-pane bounds in canvas CSS pixels |
+| `resize(width, height, pixelRatio?)` | `void` | Resize using CSS dimensions |
+| `render()` | `void` | Force a full redraw |
+| `destroy()` | `void` | Dispose chart resources; does not remove the host canvas |
+
+## Data and configuration
+
+| Method | Behavior |
+| --- | --- |
+| `setData(candles)` | Replace history and redraw |
+| `appendData(candle)` | Insert a timestamp or replace its existing candle |
+| `updateConfig(partial)` | Merge a partial config and redraw |
+| `batch(callback)` | Group synchronous changes into one redraw and return the callback result |
+
+Config objects merge recursively. Arrays replace in full. Use the instance methods for adding/removing individual studies or drawings instead of replacing an array accidentally.
+
+## Indicators
+
+```ts
+const id = chart.addIndicator({
+  name: 'ema',
+  params: { period: 50 },
+  colors: ['#bcf582'],
+  pane: 'main',
+});
+chart.removeIndicator(id);
+```
+
+`addIndicator(input)` returns a string ID. It accepts `name`, optional `id`, `params`, `colors`, `pane`, and `visible`. Unknown names throw. `removeIndicator(id)` returns whether a matching instance existed.
+
+Register calculations using `chart.indicators.register(definition)`. See [indicators](/docs/guides/indicators).
+
+## Drawings
+
+| Method/property | Purpose |
+| --- | --- |
+| `addDrawing(input)` | Add a registered drawing and return its ID |
+| `getDrawing(id)` | Return its config or `undefined` |
+| `updateDrawing(id, patch)` | Edit points, appearance, text, image, visibility, or lock state |
+| `removeDrawing(id)` | Remove one drawing; return whether it existed |
+| `clearDrawings()` | Remove all drawings; return the number removed |
+| `setDrawingsHidden(hidden)` | Hide/show the entire drawing layer |
+| `drawingsHidden` | Read its current hidden state |
+| `setDraft(draft)` | Preview an in-progress drawing; pass `null` to clear |
+| `selectDrawing(id)` | Display handles; pass `null` to clear selection |
+| `selectedDrawing` | Selected ID or `null` |
+| `drawingAt(x, y, tolerance?)` | Hit-test the topmost visible drawing |
+| `handleAt(x, y, tolerance?)` | Selected handle index, or `-1` |
+| `pointFromPixel(x, y, name?)` | Convert a pixel to a data/anchored drawing point |
+| `snapPoint(x, y, magnet)` | Convert and apply OHLC magnet snapping |
+| `moveDrawingPoint(id, pointIndex, point)` | Move an anchor |
+| `translateDrawing(id, dx, dy)` | Move an entire drawing by a CSS-pixel delta |
+
+Drawing edits return `false` when the requested instance or point does not exist. Register custom models through `chart.drawings.register(definition)`.
+
+## Crosshair and navigation
+
+`setCrosshair(x, y)` accepts canvas-local CSS pixels. `clearCrosshair()` hides it. The optional toolbar handles these calls during pointer interaction.
+
+The stable `chart.scale` object exposes [navigation and coordinate conversion](/docs/api/scale).

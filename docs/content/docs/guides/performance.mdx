@@ -1,0 +1,63 @@
+---
+title: Rendering and performance
+description: Understand batching, calculation caches, animation, and the injected canvas boundary.
+---
+
+## Render lifecycle
+
+The renderer redraws the canvas in layers: background, watermark, grid, series, indicators, drawings, axes, labels, and crosshair. It does not create a DOM element for each candle.
+
+Indicator calculations are cached across panning, zooming, drawing edits, and theme changes. Changing data, parameters, colors, or a registered indicator definition invalidates the relevant calculation. Crosshair moves reuse prepared layout and drawing geometry.
+
+Use `chart.batch` for related synchronous mutations. Use `appendData` for a streaming candle update instead of replacing an entire history array.
+
+## WASM fallback
+
+WASM kernels are embedded in the package. The runtime attempts initialization when `wasm` is enabled and falls back to JavaScript when the kernels are unavailable. `chart.ready` resolves in either case.
+
+```ts
+const chart = createChart({ container: canvas, config: { wasm: false } });
+```
+
+Not every calculation uses WASM. The implementation keeps some scans in JavaScript to avoid memory-copy costs and preserve double-precision bounds. Benchmark your own workload rather than assuming every chart improves with WASM.
+
+## Opt into animation
+
+```ts
+import { createChart, type Chart } from '@bloxwap/chart';
+import { createFrameScheduler, createDrawingToolbar } from '@bloxwap/chart/ui';
+
+let chart: Chart;
+const scheduler = createFrameScheduler(window, (update) => chart.batch(update));
+chart = createChart({
+  container: canvas,
+  config: { data: candles },
+  animation: {
+    scheduler,
+    duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240,
+  },
+});
+const toolbar = createDrawingToolbar({
+  chart, document, canvas, rail, overlay, scheduler,
+});
+```
+
+The shared clock batches animation and interaction work into frames. Live candles, indicator presence, and automatic price ranges can ease to their new values; stored data and indicator calculations still use the actual incoming values.
+
+Before a host-controlled data or viewport change, call `toolbar.cancelNavigation()` to cancel pending navigation motion. Call `toolbar.refreshViewport()` afterward to update paging arrows.
+
+## Headless tests
+
+```ts
+import { createChart, MockDocument } from '@bloxwap/chart';
+
+const chart = createChart({
+  document: new MockDocument(),
+  config: { wasm: false, data: candles, width: 800, height: 500 },
+});
+chart.destroy();
+```
+
+`MockDocument` records canvas operations; it does not produce a rendered PNG. For an image or worker render, provide a canvas implementation that satisfies the exported interfaces.
+
+Measured benchmarks and instructions are in [PERFORMANCE.md](https://github.com/bloxwap/chart/blob/main/PERFORMANCE.md). Run `npm run bench` from the repository to measure the current implementation.

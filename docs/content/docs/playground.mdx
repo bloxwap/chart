@@ -1,0 +1,23 @@
+---
+title: Interactive playground
+description: Try the actual library with deterministic sample data.
+---
+
+<ChartPreview />
+
+This chart uses the local `@bloxwap/chart` package. It is a working integration, including the drawing rail and settings card.
+
+## Try the controls
+
+1. Drag the canvas to pan and scroll to zoom.
+2. Change the series to line, area, or OHLC bars.
+3. Toggle RSI to add a separate indicator pane.
+4. Choose a drawing tool in the rail and place its points on the chart.
+5. Open the gear to change candles, scales, labels, and canvas appearance.
+6. Use **Reset view** to return to the initial visible bars.
+
+Prices are generated sample data, not a live market feed. This embedded example disables document-wide drawing keyboard shortcuts so they do not interfere with reading and searching the docs. Host applications can enable them through `createDrawingToolbar`.
+
+## Build the same integration
+
+Follow the [toolbar and settings guide](/docs/guides/toolbar-settings), or inspect [the example component on GitHub](https://github.com/bloxwap/chart/blob/main/docs/components/chart-preview.tsx).

@@ -1,6 +1,31 @@
-# chart-ts
+# @bloxwap/chart
 
 Zero-dependency, WASM+SIMD-accelerated candlestick/financial charting library in strict TypeScript, with an injected DOM so it runs in browsers, workers, SSR, and tests.
+
+## Documentation
+
+The Fumadocs site in [`docs/`](docs/README.md) includes guides, an API reference,
+static search, and a working chart playground. It is configured for
+[GitHub Pages](https://bloxwap.github.io/chart/).
+
+```sh
+npm ci
+npm --prefix docs ci
+npm run docs:dev
+```
+
+Open http://localhost:3000. To validate the GitHub Pages project path locally:
+
+```sh
+NEXT_PUBLIC_BASE_PATH=/chart npm run docs:build
+npm run docs:preview
+```
+
+The static preview opens at http://localhost:3001/chart/. The documentation
+workflow builds pull requests and deploys pushes to `main` using GitHub Actions.
+
+`@bloxwap/chart` is not yet published to npm. Build with `npm run build`, package
+with `npm pack`, then install the resulting `bloxwap-chart-0.1.0.tgz` in your app.
 
 ## Features
 
@@ -20,7 +45,7 @@ Zero-dependency, WASM+SIMD-accelerated candlestick/financial charting library in
 ## Quick start
 
 ```ts
-import { createChart, defineConfig } from 'chart-ts';
+import { createChart, defineConfig } from '@bloxwap/chart';
 
 const config = defineConfig({
   data: candles, // [{ time, open, high, low, close, volume? }] — UNIX seconds
@@ -45,7 +70,7 @@ chart.destroy();
 Headless (SSR/tests/workers):
 
 ```ts
-import { createChart, MockDocument } from 'chart-ts';
+import { createChart, MockDocument } from '@bloxwap/chart';
 const chart = createChart({ document: new MockDocument(), config: { data: candles } });
 ```
 
@@ -62,7 +87,7 @@ The toolbar's SVG icons ship with the library and are available independently
 of the toolbar:
 
 ```ts
-import { ICONS, icon } from 'chart-ts/icons';
+import { ICONS, icon } from '@bloxwap/chart/icons';
 
 button.innerHTML = icon('trendline', 20);
 button.setAttribute('aria-label', 'Trend line');
@@ -70,7 +95,7 @@ button.setAttribute('aria-label', 'Trend line');
 ```
 
 Icons inherit their host's CSS `color` through `currentColor`. The same exports
-remain available from `chart-ts/ui`. Edit source SVGs in `assets/icons`; the
+remain available from `@bloxwap/chart/ui`. Edit source SVGs in `assets/icons`; the
 normal build validates them and regenerates the shared icon module.
 
 ## Chart settings
@@ -85,7 +110,7 @@ percent and logarithmic modes.
 Hosts can attach the same card to their own button:
 
 ```ts
-import { createChartSettings } from 'chart-ts/ui';
+import { createChartSettings } from '@bloxwap/chart/ui';
 
 const settings = createChartSettings({ chart, document, trigger: settingsButton,
   onOpen: () => toolbar.flyouts.close(),
@@ -119,7 +144,7 @@ flyout submenus straight from it.
 | Icons | emoji, sticker, icon |
 
 ```ts
-import { TOOL_GROUPS } from 'chart-ts';
+import { TOOL_GROUPS } from '@bloxwap/chart';
 
 // Placing a tool: preview while the pointer moves, commit on the last click.
 chart.setDraft({ name: 'pitchfork', points: [...placed, chart.snapPoint(x, y, 'weak')] });
@@ -169,7 +194,7 @@ host can call `batch` inside its own `requestAnimationFrame` callback.
 For smooth wheel/trackpad zoom, inject the host's animation clock:
 
 ```ts
-import { SmoothZoom } from 'chart-ts';
+import { SmoothZoom } from '@bloxwap/chart';
 
 const zoom = new SmoothZoom(chart.scale, {
   now: () => performance.now(),
@@ -200,7 +225,7 @@ Call `toolbar.cancelNavigation()` before replacing data or resizing.
 To animate indicator overlays and pane heights, share a clock with the toolbar:
 
 ```ts
-import { createDrawingToolbar, createFrameScheduler } from 'chart-ts/ui';
+import { createDrawingToolbar, createFrameScheduler } from '@bloxwap/chart/ui';
 
 const frames = createFrameScheduler(window, (update) => chart.batch(update));
 const chart = createChart({ container: canvas, config, animation: {
@@ -217,7 +242,7 @@ id reverses an unfinished transition. Indicator calculations remain cached
 throughout the animation. Replacing the dataset resets its scale immediately.
 Live candle bodies and wicks also ease toward incoming prices; rapid updates
 retarget the current visual position while stored data and indicators use the
-latest real values. The idle toolbar hint fades out after ten seconds.
+latest real values. The idle toolbar hint fades out after three seconds.
 
 See [PERFORMANCE.md](PERFORMANCE.md) for measured before/after results, remaining
 costs, and instructions for the real-canvas browser benchmark.

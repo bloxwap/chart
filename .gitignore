@@ -4,3 +4,7 @@ dist-test/
 coverage/
 *.tsbuildinfo
 .DS_Store
+docs/.next/
+docs/.source/
+docs/out/
+docs/next-env.d.ts
