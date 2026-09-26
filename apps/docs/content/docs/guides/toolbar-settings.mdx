@@ -50,6 +50,8 @@ Also wire resizing as in the [quick start](/docs/getting-started). The UI inject
 
 Changes apply immediately and remain selected when the card reopens. Reset restores the initial settings without replacing the chart data, indicator instances, drawings, chart type, or cursor selection.
 
+Search at the top of the card filters settings across all sections, including option names and help text. Partial names, abbreviations, and common typos work: try `gird`, `wick color`, or `log scale`. Matching controls still update the chart live. Clear the field or choose a section to restore the full list. Escape clears an active search; press it again to close the card.
+
 The scale's plus button is implemented by the toolbar and adds an undoable horizontal price line. Enable it using `priceAxis.plusButton` or the card.
 
 Settings are not automatically saved to storage. Persist your application's desired config fields explicitly. Toolbar favorites can use an injected `storage` implementing `getItem` and `setItem`.

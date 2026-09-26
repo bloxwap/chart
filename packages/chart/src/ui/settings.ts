@@ -6,8 +6,11 @@ import { CHART_THEMES, type ThemeName } from '../themes.js';
 import type { UIDocument, UIElement, UIEvent, UITextInput } from './host.js';
 import { el, iconButton } from './menu.js';
 import { injectStyles } from './styles.js';
+import { matchesSettingsSearch } from './settings-search.js';
 
 interface Control extends UITextInput { checked: boolean; disabled: boolean }
+interface SearchRow { element: UIElement; fields: string[] }
+interface SearchGroup { element: UIElement; fields: string[]; rows: SearchRow[]; groups: SearchGroup[] }
 
 export interface ChartSettingsOptions {
   chart: Chart;
@@ -66,19 +69,43 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   const closeButton = iconButton(doc, 'x', 'Close settings', 20);
   closeButton.setAttribute('aria-label', 'Close settings');
   head.append(heading, closeButton);
+  const searchBar = el(doc, 'div', 'cts-settings-search');
+  const search = el(doc, 'input', 'cts-settings-search-input') as UITextInput;
+  search.setAttribute('type', 'search');
+  search.setAttribute('aria-label', 'Search chart settings');
+  search.setAttribute('autocomplete', 'off');
+  search.setAttribute('autocapitalize', 'off');
+  search.setAttribute('spellcheck', 'false');
+  search.setAttribute('maxlength', '100');
+  search.setAttribute('aria-controls', `${id}-body`);
+  search.placeholder = 'Search settings…';
+  const clearSearchButton = iconButton(doc, 'x', 'Clear settings search', 16);
+  clearSearchButton.setAttribute('aria-label', 'Clear settings search');
+  clearSearchButton.setAttribute('hidden', '');
+  searchBar.append(search, clearSearchButton);
+  const searchStatus = el(doc, 'span', 'cts-settings-search-status');
+  searchStatus.setAttribute('role', 'status');
+  searchStatus.setAttribute('aria-live', 'polite');
+  searchStatus.setAttribute('aria-atomic', 'true');
   const nav = el(doc, 'nav', 'cts-settings-nav');
   nav.setAttribute('aria-label', 'Settings sections');
   const body = el(doc, 'div', 'cts-settings-body');
+  body.setAttribute('id', `${id}-body`);
+  const noResults = el(doc, 'div', 'cts-settings-empty');
+  noResults.append(el(doc, 'p', '', 'No settings found'), el(doc, 'small', '', 'Try “grid”, “wick”, or “log scale”.'));
   const footer = el(doc, 'footer', 'cts-settings-footer');
   const reset = el(doc, 'button', 'cts-settings-reset', 'Reset defaults');
   const done = el(doc, 'button', 'cts-settings-done', 'Done');
   for (const button of [reset, done]) button.setAttribute('type', 'button');
   footer.append(reset, done);
-  root.append(head, nav, body, footer);
+  root.append(head, searchBar, searchStatus, nav, body, footer);
   doc.body.append(root);
   let opened = false;
   let currentTheme = options.theme ?? 'dark';
   let syncers: (() => void)[] = [];
+  let searchGroups: SearchGroup[] = [];
+  const groupIndex = new Map<UIElement, SearchGroup>();
+  const rowIndex = new Map<UIElement, SearchRow>();
   const get = (): ChartConfig => chart.getConfig();
   const change = (patch: DeepPartial<ChartConfig>): void => {
     chart.updateConfig(patch);
@@ -86,16 +113,58 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     options.onChange?.();
   };
 
+  function show(element: UIElement, visible: boolean): void {
+    if (visible) element.removeAttribute('hidden');
+    else element.setAttribute('hidden', '');
+  }
+
+  function filterSettings(): void {
+    const query = search.value.trim();
+    const filterGroup = (group: SearchGroup, ancestors: string[] = []): boolean => {
+      const context = [...ancestors, ...group.fields];
+      let visible = false;
+      for (const item of group.rows) {
+        const match = matchesSettingsSearch(query, [...context, ...item.fields]);
+        show(item.element, match);
+        visible = visible || match;
+      }
+      for (const child of group.groups) visible = filterGroup(child, context) || visible;
+      show(group.element, visible);
+      return visible;
+    };
+    let count = 0;
+    for (const group of searchGroups) {
+      const visible = filterGroup(group);
+      group.element.classList.toggle('cts-settings-first', visible && count === 0);
+      if (visible) count++;
+    }
+    show(noResults, count === 0);
+    show(clearSearchButton, search.value.length > 0);
+    searchStatus.textContent = query ? count ? `Matches in ${count} settings section${count === 1 ? '' : 's'}.` : 'No settings found.' : '';
+    body.scrollTop = 0;
+  }
+
+  function clearSearch(): void { search.value = ''; filterSettings(); }
+
+  function indexGroup(element: UIElement, fields: string[], parent?: UIElement): void {
+    const group: SearchGroup = { element, fields, rows: [], groups: [] };
+    groupIndex.set(element, group);
+    if (parent) groupIndex.get(parent)!.groups.push(group);
+    else searchGroups.push(group);
+  }
+
   function section(title: string, name?: string): UIElement {
     const block = el(doc, 'section', 'cts-settings-section');
     block.setAttribute('aria-label', title);
     const h = el(doc, 'h3'); h.textContent = title;
     block.append(h); body.append(block);
+    indexGroup(block, [title, name ?? '']);
     if (name) {
       const jump = el(doc, 'button', 'cts-settings-tab');
       jump.textContent = name;
       jump.setAttribute('type', 'button');
       jump.addEventListener('click', () => {
+        clearSearch();
         body.scrollTop += block.getBoundingClientRect().top - body.getBoundingClientRect().top - 16;
         const first = block.querySelector('input, select, button') as UIElement | null;
         first?.focus();
@@ -112,11 +181,15 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     text.append(labelEl);
     if (hint) { const help = el(doc, 'small'); help.textContent = hint; text.append(help); }
     wrapper.append(text); parent.append(wrapper);
+    const record = { element: wrapper, fields: [label, hint ?? ''] };
+    groupIndex.get(parent)!.rows.push(record);
+    rowIndex.set(wrapper, record);
     return { row: wrapper, label: labelEl };
   }
 
   function checkbox(parent: UIElement, key: string, label: string, read: () => boolean, write: (value: boolean) => void, hint?: string): UIElement {
     const line = row(parent, label, hint);
+    rowIndex.get(line.row)!.fields.push(key);
     const input = el(doc, 'input', 'cts-settings-check') as Control;
     input.setAttribute('id', `${id}-${key}`); input.setAttribute('type', 'checkbox'); input.setAttribute('name', key);
     line.label.setAttribute('for', `${id}-${key}`);
@@ -128,6 +201,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
 
   function select(parent: UIElement, key: string, label: string, items: [string, string][], read: () => string, write: (value: string) => void): void {
     const line = row(parent, label);
+    rowIndex.get(line.row)!.fields.push(key, ...items.flat());
     const input = el(doc, 'select', 'cts-settings-select') as Control;
     input.setAttribute('id', `${id}-${key}`); input.setAttribute('name', key);
     line.label.setAttribute('for', `${id}-${key}`);
@@ -139,6 +213,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
 
   function textInput(parent: UIElement, key: string, label: string, read: () => string, write: (value: string) => void, numeric?: { min: number; max: number }, enabled = (): boolean => true): void {
     const line = row(parent, label);
+    rowIndex.get(line.row)!.fields.push(key);
     const input = el(doc, 'input', 'cts-settings-input') as Control;
     input.setAttribute('id', `${id}-${key}`); input.setAttribute('name', key);
     input.setAttribute('type', numeric ? 'number' : 'text');
@@ -155,6 +230,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   }
 
   function color(parent: UIElement, key: string, label: string, read: () => string, write: (value: string) => void, enabled = (): boolean => true): void {
+    rowIndex.get(parent)!.fields.push(key, label, 'color');
     const swatch = el(doc, 'label', 'cts-settings-color');
     const input = el(doc, 'input') as Control;
     input.setAttribute('type', 'color'); input.setAttribute('name', key); input.setAttribute('aria-label', label);
@@ -173,6 +249,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
 
   function build(): void {
     body.replaceChildren(); nav.replaceChildren(); syncers = [];
+    searchGroups = []; groupIndex.clear(); rowIndex.clear();
     const candles = section('Candles', 'Symbol');
     checkbox(candles, 'previous-close', 'Color bars based on previous close', () => get().series.colorByPreviousClose, (v) => change({ series: { colorByPreviousClose: v } }));
     for (const [label, visible, up, down] of [
@@ -182,6 +259,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     ] as const) {
       const line = checkbox(candles, visible, label, () => get().series[visible], (v) => change({ series: { [visible]: v } }));
       const pair = el(doc, 'div', 'cts-settings-colors');
+      rowIndex.set(pair, rowIndex.get(line)!);
       color(pair, up, `${label} up color`, () => get().series[up] || get().series.upColor, (v) => change({ series: { [up]: v } }), () => get().series[visible]);
       color(pair, down, `${label} down color`, () => get().series[down] || get().series.downColor, (v) => change({ series: { [down]: v } }), () => get().series[visible]);
       line.append(pair);
@@ -212,8 +290,10 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
       ['labels', 'Labels', [['lastPrice', 'Last price label'], ['highLow', 'High and low labels'], ['indicator', 'Indicator labels']]],
       ['lines', 'Lines', [['lastPrice', 'Last price line'], ['previousClose', 'Previous close line'], ['highLow', 'High and low lines']]],
     ] as const) {
-      const sub = el(doc, 'h4'); sub.textContent = title; scales.append(sub);
-      for (const [key, label] of fields) checkbox(scales, `${group}-${key}`, label,
+      const subgroup = el(doc, 'div', 'cts-settings-group');
+      const sub = el(doc, 'h4'); sub.textContent = title; subgroup.append(sub); scales.append(subgroup);
+      indexGroup(subgroup, [title], scales);
+      for (const [key, label] of fields) checkbox(subgroup, `${group}-${key}`, label,
         () => Boolean((get().priceAxis[group] as unknown as Record<string, boolean>)[key]), (v) => change({ priceAxis: { [group]: { [key]: v } } }));
     }
     checkbox(scales, 'plusButton', 'Plus button', () => get().priceAxis.plusButton, (v) => change({ priceAxis: { plusButton: v } }), 'Add a horizontal price line from the scale.');
@@ -233,8 +313,13 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     const crossColor = row(canvas, 'Crosshair color'); color(crossColor.row, 'crosshair-color', 'Crosshair color', () => get().crosshair.color, (v) => change({ crosshair: { color: v } }));
     checkbox(canvas, 'watermark', 'Watermark', () => get().watermark.visible, (v) => change({ watermark: { visible: v } }));
     textInput(canvas, 'watermark-text', 'Watermark text', () => get().watermark.text, (v) => change({ watermark: { text: v } }));
-    if (options.extraContent) { const extra = section('Playback and data'); extra.append(options.extraContent); }
+    if (options.extraContent) {
+      const extra = section('Playback and data'); extra.append(options.extraContent);
+      groupIndex.get(extra)!.rows.push({ element: options.extraContent, fields: [options.extraContent.textContent ?? ''] });
+    }
+    body.append(noResults);
     for (const sync of syncers) sync();
+    filterSettings();
   }
 
   function close(): void {
@@ -249,6 +334,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   function open(): void {
     if (opened) return;
     options.onOpen?.();
+    search.value = '';
     build();
     opened = true;
     root.style.display = 'flex';
@@ -262,7 +348,11 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   const outside = (event: UIEvent): void => { if (opened && !root.contains(event.target) && !trigger.contains(event.target)) close(); };
   const keyboard = (event: UIEvent): void => {
     event.stopPropagation();
-    if (event.key === 'Escape') { event.preventDefault(); close(); }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (search.value) { clearSearch(); search.focus(); }
+      else close();
+    }
   };
   const escape = (event: UIEvent): void => { if (opened && event.key === 'Escape') { event.preventDefault(); close(); } };
   const setTheme = (theme: ThemeName): void => {
@@ -279,6 +369,8 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   closeButton.addEventListener('click', close);
   done.addEventListener('click', close);
   reset.addEventListener('click', () => { change(defaults); build(); });
+  search.addEventListener('input', filterSettings);
+  clearSearchButton.addEventListener('click', () => { clearSearch(); search.focus(); });
   root.addEventListener('keydown', keyboard);
   doc.addEventListener('pointerdown', outside);
   doc.addEventListener('keydown', escape);

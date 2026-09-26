@@ -3,6 +3,7 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle, EditOnGitHub } from 'fu
 import { source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 import { repository } from '@/lib/site';
+import { socialImagePath, socialMetadata } from '@/lib/social';
 
 export default async function Page({ params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
@@ -21,5 +22,12 @@ export function generateStaticParams() { return source.generateParams(); }
 export async function generateMetadata({ params }: { params: Promise<{ slug?: string[] }> }) {
   const page = source.getPage((await params).slug);
   if (!page) notFound();
-  return { title: page.data.title, description: page.data.description };
+  return {
+    title: page.data.title,
+    description: page.data.description,
+    ...socialMetadata({
+      title: page.data.title, description: page.data.description ?? '',
+      path: `${page.url}/`, imagePath: socialImagePath(page.slugs),
+    }),
+  };
 }

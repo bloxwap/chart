@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
 import { Provider } from '@/components/provider';
 import { basePath, siteUrl } from '@/lib/site';
+import { homeSocial, socialImagePath, socialMetadata } from '@/lib/social';
 import './global.css';
 
 const sans = localFont({
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
   title: { default: '@bloxwap/chart — Financial charts for your interface', template: '%s · @bloxwap/chart' },
   description: 'Build financial charts with TypeScript, Canvas and WebAssembly. Guides, working examples and API documentation for @bloxwap/chart.',
   icons: { icon: `${basePath}/icon.svg` },
+  ...socialMetadata({ ...homeSocial, path: '/', imagePath: socialImagePath() }),
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

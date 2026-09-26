@@ -1,7 +1,15 @@
-# @bloxwap/chart
+<h1 align="center">Chart</h1>
 
-**Zero-dependency financial charts**
-**WASM + SIMD charting library in TypeScript**
+<p align="center">
+  <strong>Zero-dependency, WASM + SIMD-accelerated
+    <a href="https://bloxwap.github.io/chart/">financial charts</a> in TypeScript</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/bloxwap/chart/actions/workflows/docs.yml"><img alt="Docs build" src="https://img.shields.io/github/actions/workflow/status/bloxwap/chart/docs.yml?branch=main&style=flat-square"></a>
+  <a href="https://github.com/bloxwap/chart/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/bloxwap/chart?style=flat-square"></a>
+  <a href="packages/chart/package.json"><img alt="Zero runtime dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square"></a>
+</p>
 
 ## Features
 
@@ -23,6 +31,9 @@
 
 Browse the [documentation and interactive playground](https://bloxwap.github.io/chart/)
 for guides, an API reference, and the complete chart controls.
+
+The documentation uses [Fumadocs](https://www.fumadocs.dev/) and is hosted on GitHub Pages. Its Markdown source lives
+in [`apps/docs/`](apps/docs).
 
 ## Installation
 
