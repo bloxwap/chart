@@ -276,6 +276,8 @@ html > body[data-scroll-locked] {
 .window-dots { display: flex; gap: var(--space-xs); }
 .window-dots > i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--muted); }
 .code-language { color: color-mix(in oklab, var(--bloxwap-blue) 60%, var(--foreground)); }
+.code-actions { display: flex; align-items: center; gap: var(--space-xs); margin-right: calc(-1 * var(--space-md)); }
+.code-toolbar { min-height: var(--control-h-sm); }
 .code-window pre { margin: 0; overflow-x: auto; padding: var(--space-xl) var(--space-2xl); font: var(--text-xs) / 1.85 var(--font-mono); tab-size: 2; scrollbar-width: none; }
 .code-window pre::-webkit-scrollbar { display: none; }
 .syntax-keyword { color: color-mix(in oklab, var(--bloxwap-pink) 70%, var(--foreground)); }
@@ -321,6 +323,11 @@ button[data-search-full] kbd {
   padding-bottom: var(--space-6xl);
   scroll-margin-top: 5rem;
 }
+.preview-intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); margin-bottom: var(--space-2xl); }
+.preview-intro h2 { margin: 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 700; }
+.preview-intro > p:not(.eyebrow) { margin: 0; max-width: 25rem; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); line-height: 1.7; }
+.preview-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs); }
+.preview-intro > .preview-actions:not(:first-child) { margin-top: var(--space-xs); }
 .chart-preview {
   overflow: hidden;
   width: 100%;
@@ -330,21 +337,6 @@ button[data-search-full] kbd {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-lg);
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-xl);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-sm);
-}
-.preview-title, .preview-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-lg); }
-.preview-actions { gap: var(--space-xs); }
-.preview-title strong { font-weight: 700; }
-.demo-label { display: flex; align-items: center; gap: var(--space-sm); font-size: var(--text-xs); color: var(--muted-foreground); }
-.demo-label > span { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--bloxwap-green); }
 .chart-frame {
   display: block;
   width: 100%;
@@ -353,19 +345,8 @@ button[data-search-full] kbd {
   border: 0;
   background: var(--bloxwap-black);
 }
-.preview-footer {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  border-top: 1px solid var(--border);
-  padding: var(--space-md) var(--space-xl);
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
 .chart-preview:fullscreen { display: flex; flex-direction: column; height: 100%; border: 0; border-radius: 0; }
 .chart-preview:fullscreen .chart-frame { flex: 1; min-height: 0; height: 100%; }
-.chart-preview:fullscreen .preview-header, .chart-preview:fullscreen .preview-footer { flex: none; }
 /* Cards, not rules: zero-stroke fill cards (plain-UI .card fill, --radius-xl, --space-xl, no border); hover shifts the fill. */
 .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); padding: var(--space-lg) 0 var(--space-3xl); }
 .principles > div, .guide-links a {
@@ -416,7 +397,4 @@ button[data-search-full] kbd {
   .start-grid { grid-template-columns: 1fr; gap: var(--space-3xl); }
   .start-grid { padding: var(--space-4xl) 0; }
   .chart-frame { height: clamp(320px, 72svh, 600px); }
-  .preview-header { padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md); }
-  .preview-footer { padding: var(--space-md); }
-  .preview-title { gap: var(--space-xs) var(--space-md); }
 }

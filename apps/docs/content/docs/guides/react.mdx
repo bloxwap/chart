@@ -12,7 +12,7 @@ import { Chart } from '@bloxwap/chart/react';
 import type { Candle } from '@bloxwap/chart';
 
 export function PriceChart({ data }: { data: Candle[] }) {
-  return <Chart data={data} theme="dark" height={360} />;
+  return <Chart data={data} height={360} />;
 }
 ```
 
@@ -20,13 +20,13 @@ The component is marked `'use client'`, so it works in the Next.js App Router. I
 
 - creates the chart after mount and fills its box, following size and device pixel ratio changes;
 - calls `setData` when `data` changes, without recreating the chart;
-- applies `theme` changes live;
+- follows the system color scheme by default, switching live when it changes, and applies `theme` changes live;
 - destroys the chart on unmount, which also makes it safe under React Strict Mode.
 
 | Prop | Type | Meaning |
 | --- | --- | --- |
 | `data` | `readonly Candle[]` | Candles to display; a new array replaces the data |
-| `theme` | `'dark' \| 'light'` | Built-in color theme |
+| `theme` | `'system' \| 'dark' \| 'light'` | Color theme; default `'system'`, which follows `prefers-color-scheme` |
 | `config` | `DeepPartial<ChartConfig>` | Initial configuration, applied once at mount |
 | `height` | `number \| string` | Height of the chart box; default `400`. The width fills the parent |
 | `className`, `style` | | Passed to the chart box |
