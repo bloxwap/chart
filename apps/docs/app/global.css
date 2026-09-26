@@ -316,11 +316,10 @@ html > body[data-scroll-locked] {
 .chart-preview:fullscreen { display: flex; flex-direction: column; height: 100%; border: 0; border-radius: 0; }
 .chart-preview:fullscreen .chart-frame { flex: 1; min-height: 0; height: 100%; }
 .chart-preview:fullscreen .preview-header, .chart-preview:fullscreen .preview-footer { flex: none; }
-/* Cards, not rules: plain-UI .card (card fill, hairline border, --radius-xl, --space-xl) with workers/docs' hover tint. */
+/* Cards, not rules: zero-stroke fill cards (plain-UI .card fill, --radius-xl, --space-xl, no border); hover shifts the fill. */
 .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); padding: var(--space-lg) 0 var(--space-3xl); }
 .principles > div, .guide-links a {
   background: var(--card);
-  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
 }
@@ -333,9 +332,9 @@ html > body[data-scroll-locked] {
 .guide-links { display: grid; gap: var(--space-md); }
 .guide-links a {
   display: flex; align-items: center; gap: var(--space-xl);
-  transition: border-color var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) var(--ease-spring);
+  transition: background-color var(--duration-fast) var(--ease-spring);
 }
-.guide-links a:hover { border-color: color-mix(in srgb, var(--bloxwap-green) 40%, var(--border)); }
+.guide-links a:hover { background: var(--muted); }
 .guide-links a > span { font: var(--text-2xs) var(--font-mono); color: var(--color-fd-muted-foreground); }
 .guide-links a > svg { flex: none; margin-left: auto; width: var(--icon-md); height: var(--icon-md); color: var(--color-fd-muted-foreground); transition: color var(--duration-fast) var(--ease-spring), transform var(--duration-fast) var(--ease-spring); }
 .guide-links a:hover > svg { color: var(--color-fd-primary); transform: translateX(2px); }

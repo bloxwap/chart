@@ -96,8 +96,9 @@ All nine findings (M1–M9) are applied:
 - **Icons:** `lucide-react@0.545.0` (`ArrowDown`, `ArrowRight`, `ArrowUpRight`, `Maximize2`, `Minimize2`, `Copy`,
   `Check`) replaces every Unicode arrow and hand-drawn SVG.
 - **Nav:** the `links` array is gone; the sidebar footer gained the About / Contact / Privacy row.
-- **Cards, not rules (LAY-2, applied later):** the principles and guide rows are plain-UI cards (card fill, hairline
-  border, `--radius-xl`) with the `workers/docs` hover tint, replacing the rules that separated them.
+- **Cards, not rules (LAY-2, applied later):** the principles and guide rows are zero-stroke cards (card fill,
+  `--radius-xl`, no border; hover lightens the fill), replacing the rules that separated them. Bloxwap cards are
+  fill-only by team preference, overriding the border in plain-UI's `.card`.
 - **Mobile (390 px):** the two hero actions take their natural width and wrap to full-width pills when they don't fit,
   matching the app's full-width primary action.
 
