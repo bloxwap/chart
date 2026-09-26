@@ -141,3 +141,23 @@ describe('drawHistogram / drawHistogramBars', () => {
     assert.equal(ctx.countCalls('fillRect'), 2);
   });
 });
+
+describe('animated live price geometry', () => {
+  it('uses the visual last price across price series while keeping earlier bars unchanged', () => {
+    const { ts, ps } = makeScales();
+    const visual = { ...candles[2], open: 8.75, high: 12, low: 8.25, close: 10 };
+    const expected = [...candles.slice(0, 2), visual];
+    for (const draw of [drawCandlesticks, drawBars, drawLine, drawArea]) {
+      const animated = new MockContext2D(), reference = new MockContext2D();
+      draw(animated, candles, FULL, ts, ps, cfg(), visual);
+      draw(reference, expected, FULL, ts, ps, cfg());
+      assert.deepEqual(animated.calls, reference.calls);
+      animated.calls.length = 0; reference.calls.length = 0;
+      const history = { from: 0, to: 2 };
+      draw(animated, candles, history, ts, ps, cfg(), visual);
+      draw(reference, candles, history, ts, ps, cfg());
+      assert.deepEqual(animated.calls, reference.calls);
+    }
+    assert.equal(candles[2].close, 12);
+  });
+});

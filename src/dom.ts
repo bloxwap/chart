@@ -25,13 +25,15 @@ export interface CanvasImageSourceLike {
  * A real `CanvasRenderingContext2D` is structurally assignable to this type.
  */
 export interface Canvas2DLike {
-  fillStyle: string;
-  strokeStyle: string;
+  fillStyle: string | object;
+  strokeStyle: string | object;
   lineWidth: number;
   font: string;
   textAlign: 'left' | 'right' | 'center' | 'start' | 'end';
   textBaseline: 'top' | 'hanging' | 'middle' | 'alphabetic' | 'ideographic' | 'bottom';
   globalAlpha: number;
+  lineCap: 'butt' | 'round' | 'square';
+  lineJoin: 'bevel' | 'round' | 'miter';
   save(): void;
   restore(): void;
   clearRect(x: number, y: number, w: number, h: number): void;
@@ -41,12 +43,24 @@ export interface Canvas2DLike {
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
   rect(x: number, y: number, w: number, h: number): void;
+  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void;
+  ellipse(
+    x: number,
+    y: number,
+    radiusX: number,
+    radiusY: number,
+    rotation: number,
+    startAngle: number,
+    endAngle: number,
+  ): void;
+  bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void;
+  clip(): void;
   stroke(): void;
   fill(): void;
   setLineDash(segments: number[]): void;
   fillText(text: string, x: number, y: number): void;
   measureText(text: string): TextMetricsLike;
-  drawImage(image: CanvasImageSourceLike, dx: number, dy: number, dw: number, dh: number): void;
+  drawImage(image: unknown, dx: number, dy: number, dw: number, dh: number): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
   scale(x: number, y: number): void;
@@ -79,6 +93,8 @@ export class MockContext2D implements Canvas2DLike {
   textAlign: Canvas2DLike['textAlign'] = 'start';
   textBaseline: Canvas2DLike['textBaseline'] = 'alphabetic';
   globalAlpha = 1;
+  lineCap: Canvas2DLike['lineCap'] = 'butt';
+  lineJoin: Canvas2DLike['lineJoin'] = 'miter';
 
   private currentFont = '10px sans-serif';
 
@@ -134,6 +150,18 @@ export class MockContext2D implements Canvas2DLike {
   }
   rect(x: number, y: number, w: number, h: number): void {
     this.record('rect', [x, y, w, h]);
+  }
+  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void {
+    this.record('arcTo', [x1, y1, x2, y2, radius]);
+  }
+  ellipse(x: number, y: number, rx: number, ry: number, rotation: number, start: number, end: number): void {
+    this.record('ellipse', [x, y, rx, ry, rotation, start, end]);
+  }
+  bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void {
+    this.record('bezierCurveTo', [cp1x, cp1y, cp2x, cp2y, x, y]);
+  }
+  clip(): void {
+    this.record('clip', []);
   }
   stroke(): void {
     this.record('stroke', []);

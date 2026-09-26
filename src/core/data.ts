@@ -54,7 +54,12 @@ export class DataStore {
    */
   setData(candles: readonly Candle[]): void {
     this.candles = candles.slice();
-    this.candles.sort((a, b) => a.time - b.time);
+    for (let i = 1; i < this.candles.length; i++) {
+      if (this.candles[i - 1].time > this.candles[i].time) {
+        this.candles.sort((a, b) => a.time - b.time);
+        break;
+      }
+    }
   }
 
   /** Removes all candles. */
@@ -67,6 +72,16 @@ export class DataStore {
    * out-of-order times are inserted at the correct position via binary search.
    */
   append(candle: Candle): void {
+    const last = this.last();
+    if (last === undefined || candle.time > last.time) {
+      this.candles.push(candle);
+      return;
+    }
+    // Keep lowerBound's first-match behavior for duplicate timestamps.
+    if (candle.time === last.time && this.candles[this.candles.length - 2]?.time !== candle.time) {
+      this.candles[this.candles.length - 1] = candle;
+      return;
+    }
     const idx = this.lowerBound(candle.time);
     const existing = this.candles[idx];
     if (existing !== undefined && existing.time === candle.time) {

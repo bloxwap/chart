@@ -22,27 +22,27 @@ export const macdIndicator: IndicatorDef = {
     const emaFast = emaValues(closes, fast);
     const emaSlow = emaValues(closes, slow);
 
-    // DIF is defined once both EMAs exist.
-    const dif: (number | null)[] = closes.map((_, i) => {
-      const f = emaFast[i];
-      const s = emaSlow[i];
-      return f == null || s == null ? null : f - s;
-    });
-    const firstDif = dif.findIndex((v) => v !== null);
-
-    // DEA = EMA of the dense tail of DIF, re-indexed back.
-    const dea: (number | null)[] = new Array<number | null>(closes.length).fill(null);
-    if (firstDif >= 0) {
-      const tail = dif.slice(firstDif) as number[];
-      const deaTail = emaValues(tail, signal);
-      for (let i = 0; i < deaTail.length; i++) dea[firstDif + i] = deaTail[i];
+    const dif = new Array<number | null>(closes.length).fill(null);
+    const dea = new Array<number | null>(closes.length).fill(null);
+    const hist = new Array<number | null>(closes.length).fill(null);
+    const up = new Array<boolean>(closes.length).fill(true);
+    const weight = 2 / (signal + 1);
+    let signalSum = 0;
+    let previous = 0;
+    // Fuse DIF, the SMA-seeded signal EMA and histogram in one pass. No
+    // copied DIF tail or second full signal array is needed.
+    for (let i = slow - 1; i < closes.length; i++) {
+      const value = (emaFast[i] as number) - (emaSlow[i] as number);
+      dif[i] = value;
+      const count = i - slow + 2;
+      if (count <= signal) signalSum += value;
+      if (count < signal) continue;
+      previous = count === signal ? signalSum / signal : value * weight + previous * (1 - weight);
+      dea[i] = previous;
+      const bar = value - previous;
+      hist[i] = bar;
+      up[i] = bar >= 0;
     }
-
-    const hist: (number | null)[] = dif.map((d, i) => {
-      const e = dea[i];
-      return d === null || e == null ? null : d - e;
-    });
-    const up = hist.map((h) => (h ?? 0) >= 0);
 
     return {
       pane: 'sub',

@@ -5,17 +5,23 @@
  */
 
 import type { DrawingDef } from './types.js';
-import { trendlineDrawing } from './trendline.js';
-import { hlineDrawing } from './hline.js';
-import { rectDrawing } from './rect.js';
-import { fibDrawing } from './fib.js';
+import { LINE_DRAWINGS } from './lines.js';
+import { CHANNEL_DRAWINGS } from './channels.js';
+import { FIB_DRAWINGS } from './fibonacci.js';
+import { PATTERN_DRAWINGS } from './patterns.js';
+import { FORECAST_DRAWINGS } from './forecasting.js';
+import { SHAPE_DRAWINGS } from './shapes.js';
+import { ANNOTATION_DRAWINGS } from './annotations.js';
 
-/** The four built-in drawing models. */
+/** Every built-in drawing model (see `TOOL_GROUPS` for toolbar grouping). */
 export const BUILTIN_DRAWINGS: readonly DrawingDef[] = [
-  trendlineDrawing,
-  hlineDrawing,
-  rectDrawing,
-  fibDrawing,
+  ...LINE_DRAWINGS,
+  ...CHANNEL_DRAWINGS,
+  ...FIB_DRAWINGS,
+  ...PATTERN_DRAWINGS,
+  ...FORECAST_DRAWINGS,
+  ...SHAPE_DRAWINGS,
+  ...ANNOTATION_DRAWINGS,
 ];
 
 /** A mutable registry of drawing definitions keyed by name. */
@@ -50,7 +56,7 @@ export class DrawingRegistry {
 }
 
 /**
- * Creates a registry pre-loaded with the four built-in drawing models.
+ * Creates a registry pre-loaded with every built-in drawing model.
  *
  * @param withBuiltins - Pass `false` for an empty registry.
  */

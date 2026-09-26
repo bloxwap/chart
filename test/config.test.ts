@@ -51,7 +51,7 @@ describe('resolveConfig', () => {
     assert.equal(cfg.theme.fontSize, 12);
     assert.equal(cfg.watermark.fontFamily, ''); // inherits theme.fontFamily
     assert.equal(cfg.crosshair.labelBackground, '#2962ff');
-    assert.equal(cfg.crosshair.labelColor, '#ffffff');
+    assert.equal(cfg.crosshair.labelColor, 'auto');
   });
   it('deep-merges typography and crosshair label overrides', () => {
     const cfg = resolveConfig({
@@ -64,7 +64,7 @@ describe('resolveConfig', () => {
     assert.equal(cfg.theme.fontSize, 13);
     assert.equal(cfg.theme.background, DEFAULT_CONFIG.theme.background);
     assert.equal(cfg.crosshair.labelBackground, '#000000');
-    assert.equal(cfg.crosshair.labelColor, '#ffffff');
+    assert.equal(cfg.crosshair.labelColor, 'auto');
     assert.equal(cfg.watermark.fontFamily, '"Geist"');
   });
 });
@@ -107,6 +107,7 @@ describe('default formatters', () => {
   it('formats prices by magnitude', () => {
     assert.equal(defaultPriceFormatter(123.456), '123.46');
     assert.equal(defaultPriceFormatter(1.23456), '1.2346');
+    assert.equal(defaultPriceFormatter(0), '0.00');
     assert.equal(defaultPriceFormatter(0.00012345), '0.000123');
     assert.equal(defaultPriceFormatter(-250.5), '-250.50');
   });

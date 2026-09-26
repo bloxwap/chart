@@ -127,7 +127,7 @@ describe('Chart API', () => {
     chart.addDrawing({ name: 'rect', points: [{ index: 10, price: 95 }, { index: 30, price: 105 }], visible: false });
     assert.equal(chart.getConfig().drawings.length, 3);
     const ctx = doc.created[0]?.context;
-    assert.ok(ctx !== undefined && ctx.callsNamed('fillText').some((c) => c[1] === '0.618'));
+    assert.ok(ctx !== undefined && ctx.callsNamed('fillText').some((c) => String(c[1]).startsWith('0.618 (')));
     assert.equal(chart.removeDrawing(id), true);
     assert.equal(chart.removeDrawing('nope'), false);
     chart.destroy();
@@ -135,7 +135,7 @@ describe('Chart API', () => {
   it('skips drawings with too few points or unregistered leftovers', () => {
     const chart = createChart({ document: new MockDocument(), config: { wasm: false, data: candles(10) } });
     chart.addDrawing({ name: 'trendline', points: [{ index: 1, price: 100 }] });
-    chart.getConfig().drawings.push({ id: 'x', name: 'ghost', points: [], color: '#000', lineWidth: 1, visible: true });
+    chart.getConfig().drawings.push({ id: 'x', name: 'ghost', points: [], color: '#000', lineWidth: 1, lineStyle: 'solid', text: '', image: null, locked: false, visible: true });
     chart.render();
     chart.destroy();
   });

@@ -1,48 +1,35 @@
-/**
- * Render-loop benchmark: frames/sec drawing 5k visible candles (plus SMA, VOL,
- * and a Fibonacci drawing) into a recording MockDocument canvas.
- */
-import { performance } from 'node:perf_hooks';
-import { createChart } from '../dist/index.js';
-import { MockDocument } from '../dist/dom.js';
+/** CPU submission time on a recording canvas, NOT browser rasterization/FPS. */
+import { bench, candles, load } from './harness.mjs';
+const { createChart } = await load('index.js');
+const { MockDocument } = await load('dom.js');
+const data = candles(100_000);
+console.log('\nRender CPU benchmark (100k stored candles; bounded recording buffer):');
 
-const N = 5000;
-const candles = Array.from({ length: N }, (_, i) => {
-  const base = 100 + Math.sin(i / 25) * 20 + Math.cos(i / 7) * 3;
-  return { time: 1700000000 + i * 60, open: base, high: base + 1.5, low: base - 1.5, close: base + 0.4, volume: 1000 + (i % 500) };
-});
+for (const visible of [200, 5000]) {
+  // The minimum spacing is 0.5px/bar; 5000 bars need at least 2500px.
+  const doc = new MockDocument();
+  const chart = createChart({ document: doc, config: {
+    width: visible === 5000 ? 2564 : 1264, height: 900, data, wasm: true,
+    indicators: ['sma', 'boll', 'kdj', 'vol'].map((name) => ({
+      id: name, name, params: { period: 50 }, colors: [], visible: true,
+      pane: name === 'sma' || name === 'boll' ? 'main' : 'sub',
+    })),
+  } });
+  await chart.ready;
+  chart.scale.zoomToRange(data.length - visible, data.length - 1);
+  chart.addDrawing({ name: 'fib', points: [{ index: data.length - 100, price: 80 }, { index: data.length - 1, price: 125 }] });
+  const ctx = doc.created[0].context;
+  const range = chart.scale.visibleRange();
+  console.log(`  requested ${visible} bars; actual range ${range.from}..${range.to} (${range.to - range.from} including edge overscan)`);
+  const run = (fn) => () => { ctx.calls.length = 0; fn(); };
+  bench(`${visible} bars: full redraw + 4 indicators`, run(() => chart.render()));
+  let x = 0;
+  bench(`${visible} bars: crosshair + 4 indicators`, run(() => chart.setCrosshair(++x % 1000, 200)));
+  chart.destroy();
+}
 
 const doc = new MockDocument();
-const chart = createChart({
-  document: doc,
-  config: {
-    width: 1600,
-    height: 900,
-    wasm: true,
-    data: candles,
-    watermark: { visible: true, text: 'BENCH' },
-  },
-});
-await chart.ready;
-chart.addIndicator({ name: 'sma', params: { period: 50 } });
-chart.addIndicator({ name: 'vol' });
-chart.addDrawing({ name: 'fib', points: [{ index: 100, price: 80 }, { index: 4900, price: 125 }] });
-
-const FRAMES = 300;
-// warmup
-for (let i = 0; i < 10; i++) chart.render();
-const start = performance.now();
-for (let i = 0; i < FRAMES; i++) chart.render();
-const elapsed = performance.now() - start;
-const fps = (FRAMES / elapsed) * 1000;
-console.log(`render bench: ${N.toLocaleString()} visible candles at 1600x900\n`);
-console.log(`${'full frame (all layers)'.padEnd(28)} ${fps.toFixed(1).padStart(12)} frames/sec  (${FRAMES} frames in ${elapsed.toFixed(0)}ms)`);
-
-// zoomed render (200 bars) for comparison
-chart.scale.zoom(25);
-for (let i = 0; i < 10; i++) chart.render();
-const start2 = performance.now();
-for (let i = 0; i < FRAMES; i++) chart.render();
-const elapsed2 = performance.now() - start2;
-console.log(`${'200-bar zoomed frame'.padEnd(28)} ${((FRAMES / elapsed2) * 1000).toFixed(1).padStart(12)} frames/sec  (${FRAMES} frames in ${elapsed2.toFixed(0)}ms)`);
+const chart = createChart({ document: doc, config: { width: 1264, height: 900, data, wasm: false, series: { type: 'histogram' } } });
+const ctx = doc.created[0].context;
+bench('200 bars: volume series, 100k history', () => { ctx.calls.length = 0; chart.render(); });
 chart.destroy();

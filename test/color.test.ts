@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseColor, serializeColor, isValidColor, withAlpha } from '../dist/color.js';
+import { parseColor, serializeColor, isValidColor, withAlpha, relativeLuminance, contrastingTextColor } from '../dist/color.js';
 
 describe('parseColor: hex', () => {
   it('parses #rgb', () => {
@@ -114,5 +114,67 @@ describe('isValidColor / withAlpha', () => {
     assert.equal(withAlpha('#ff0000', 7), 'rgb(255, 0, 0)');
     assert.equal(withAlpha('#ff0000', -1), 'rgba(255, 0, 0, 0)');
     assert.equal(withAlpha('var(--x)', 0.5), 'var(--x)');
+  });
+});
+
+describe('relative luminance and label contrast', () => {
+  it('linearizes sRGB channels and uses the correct primary weights', () => {
+    assert.equal(relativeLuminance('#000'), 0);
+    assert.equal(relativeLuminance('#fff'), 1);
+    assert.equal(relativeLuminance('#f00'), 0.2126);
+    assert.equal(relativeLuminance('#0f0'), 0.7152);
+    assert.equal(relativeLuminance('#00f'), 0.0722);
+    assert.ok(Math.abs(relativeLuminance('#808080')! - 0.2158605001) < 1e-9);
+    assert.ok(Math.abs(relativeLuminance('rgb(10 10 10)')! - (10 / 255 / 12.92)) < 1e-12);
+    assert.equal(relativeLuminance('rgb(-100 300 0)'), 0.7152);
+    assert.equal(relativeLuminance('var(--accent)'), null);
+  });
+
+  it('uses Display-P3 primaries instead of treating them as sRGB', () => {
+    assert.ok(Math.abs(relativeLuminance('color(display-p3 1 0 0)')! - 0.2289745641) < 1e-9);
+    assert.ok(Math.abs(relativeLuminance('color(display-p3 0 1 0)')! - 0.6917385218) < 1e-9);
+    assert.ok(Math.abs(relativeLuminance('color(display-p3 0 0 1)')! - 0.0792869141) < 1e-9);
+    assert.equal(contrastingTextColor('color(display-p3 0 1 0.55)'), '#000000');
+    assert.equal(contrastingTextColor('color(display-p3 0 0 1)'), '#ffffff');
+    // This pair straddles the black/white contrast crossover in the two spaces.
+    assert.equal(contrastingTextColor('rgb(0 54% 0)'), '#000000');
+    assert.equal(contrastingTextColor('color(display-p3 0 0.54 0)'), '#ffffff');
+  });
+
+  it('chooses the greater contrast ratio, including near the crossover', () => {
+    for (const fill of ['#ffffff', '#00ff00', '#787b86', '#f23645', '#767676']) {
+      assert.equal(contrastingTextColor(fill), '#000000', fill);
+    }
+    for (const fill of ['#000000', '#2962ff', '#0000ff', '#757575']) {
+      assert.equal(contrastingTextColor(fill), '#ffffff', fill);
+    }
+    assert.equal(contrastingTextColor('var(--accent)'), '#ffffff');
+  });
+
+  it('composites translucent labels over the chart theme before choosing text', () => {
+    assert.equal(contrastingTextColor('#ffffff40', '#000000'), '#ffffff');
+    assert.equal(contrastingTextColor('#ffffff40', '#ffffff'), '#000000');
+    assert.equal(contrastingTextColor('#0000'), '#000000');
+    assert.equal(contrastingTextColor('#0000', '#000000'), '#ffffff');
+    assert.equal(contrastingTextColor('#ffffff40', 'unsupported'), '#000000');
+    assert.equal(contrastingTextColor('color(display-p3 1 1 1 / 0.2)', '#000'), '#ffffff');
+    assert.equal(contrastingTextColor('color(display-p3 0 0 0 / 0.2)', '#fff'), '#000000');
+    assert.equal(contrastingTextColor('#fff3', 'color(display-p3 0 0 0)'), '#ffffff');
+    assert.equal(contrastingTextColor('#0003', 'color(display-p3 1 1 1)'), '#000000');
+    assert.equal(contrastingTextColor('color(display-p3 1 1 1 / 0.2)', 'color(display-p3 0 0 0)'), '#ffffff');
+    assert.equal(contrastingTextColor('rgba(0,0,0,0.6)', '#ff0000'), '#ffffff');
+  });
+
+  it('keeps contrast correct across a changing palette and repeated frame reads', () => {
+    for (const backdrop of ['#000', '#fff']) {
+      for (let gray = 0; gray < 256; gray++) {
+        const fill = `rgb(${gray} ${gray} ${gray})`;
+        const text = contrastingTextColor(fill, backdrop);
+        const light = relativeLuminance(fill)!;
+        const ratio = text === '#000000' ? (light + 0.05) / 0.05 : 1.05 / (light + 0.05);
+        assert.ok(ratio >= 4.5, `gray ${gray} contrast ${ratio}`);
+        assert.equal(contrastingTextColor(fill, backdrop), text);
+      }
+    }
   });
 });

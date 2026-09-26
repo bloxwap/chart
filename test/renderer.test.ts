@@ -176,6 +176,23 @@ describe('renderChart layers', () => {
     renderChart(empty, { ...v4, candles: [], range: { from: 0, to: 0 } });
     assert.ok(empty.countCalls('fillRect') >= 1);
   });
+  it('automatically contrasts both crosshair badges and honors configured text colors', () => {
+    for (const [background, foreground, expected] of [
+      ['#2962ff', 'auto', '#ffffff'],
+      ['color(display-p3 0 1 0.55)', 'auto', '#000000'],
+      ['#fff', '#123456', '#123456'],
+      ['#ffffff20', 'auto', '#ffffff'],
+    ]) {
+      const ctx = new MockContext2D();
+      const colors: unknown[] = [];
+      ctx.fillText = () => { colors.push(ctx.fillStyle); };
+      renderChart(ctx, makeView({
+        config: { crosshair: { labelBackground: background, labelColor: foreground }, theme: { background: '#111' } },
+        crosshair: { active: true, x: 100, y: 50 },
+      }));
+      assert.deepEqual(colors.slice(-2), [expected, expected]);
+    }
+  });
   it('draws drawing primitives: lines, rects, text', () => {
     const ctx = new MockContext2D();
     renderChart(ctx, makeView({
