@@ -11,14 +11,18 @@ async function walk(path) {
   return (await Promise.all(entries.map(async (entry) => entry.isDirectory()
     ? walk(join(path, entry.name)) : [join(path, entry.name)]))).flat();
 }
-for (const required of ['index.html', '404.html', 'docs/index.html', 'search.json', 'icon.svg']) {
+for (const required of [
+  'index.html', '404.html', 'docs/index.html', 'search.json', 'icon.svg',
+  'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js',
+  'chart-demo/assets/fonts/Geist-Regular.woff2', 'chart-demo/assets/fonts/GeistMono-Regular.woff2',
+]) {
   if (!await exists(join(root, required))) failures.push(`Missing ${required}`);
 }
 const files = (await walk(root)).filter((file) => extname(file) === '.html');
 let checked = 0;
 for (const file of files) {
   const html = await readFile(file, 'utf8');
-  for (const match of html.matchAll(/<(?:a|link|script|img)\b[^>]*?\b(?:href|src)="([^"]+)"/g)) {
+  for (const match of html.matchAll(/<(?:a|link|script|img|iframe)\b[^>]*?\b(?:href|src)="([^"]+)"/g)) {
     const href = match[1].replaceAll('&amp;', '&');
     if (/^(?:[a-z]+:|\/\/|#)/i.test(href)) continue;
     const pathname = decodeURIComponent(href.split(/[?#]/)[0]);

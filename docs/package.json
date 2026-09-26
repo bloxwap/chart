@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "npm --prefix .. run build",
+    "predev": "npm --prefix .. run build && node scripts/prepare-demo.mjs",
     "dev": "next dev --port 3000",
-    "prebuild": "npm --prefix .. run build",
+    "prebuild": "npm --prefix .. run build && node scripts/prepare-demo.mjs",
     "build": "next build",
     "postbuild": "node scripts/check-export.mjs",
     "check": "next typegen && tsc --noEmit",

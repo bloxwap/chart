@@ -9,12 +9,16 @@ export default function Home() {
       <section className="hero">
         <div className="hero-copy"><p className="eyebrow"><span className="status-dot" /> DEVELOPER PREVIEW · v0.1</p>
           <h1>Financial charts.<br /><span>Your interface.</span></h1>
-          <p className="hero-description">Candles, indicators, and drawing tools for your next trading interface. Built in TypeScript. Rendered on Canvas. Yours to compose.</p>
-          <div className="hero-actions"><Link href="/docs/getting-started" className="primary-link">Start building <span>↗</span></Link><Link href="/docs/api/chart" className="secondary-link">Explore the API →</Link></div>
+        </div>
+        <div className="hero-intro">
+          <p className="hero-description">Your next trading interface starts here. Try the full chart below: draw a trend line, add indicators, change timeframes, and make it your own.</p>
+          <div className="hero-actions"><a href="#playground" className="primary-link">Play with the chart <span aria-hidden="true">↓</span></a><Link href="/docs/getting-started" className="secondary-link">Start building →</Link></div>
           <div className="install-command"><span>$</span><code>npm install @bloxwap/chart</code><span className="release-tag">coming to npm</span></div>
           <Link href="/docs/getting-started#install-from-source" className="source-install">Use the local package today →</Link>
         </div>
-        <div className="hero-preview"><div className="preview-eyebrow"><span>01 / TRY IT</span><span>THIS IS A REAL CHART ↙</span></div><ChartPreview /></div>
+      </section>
+      <section id="playground" className="hero-preview" aria-label="Interactive chart playground">
+        <ChartPreview />
       </section>
       <section className="principles" aria-label="Library features">
         <div><span className="feature-number">01</span><h2>One typed config.</h2><p>Data, series, scales, and styling live in one configuration. Update just the fields you need.</p></div>

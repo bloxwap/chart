@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>chart-ts playground</title>
+  <title>@bloxwap/chart playground</title>
   <style>
     @font-face { font-family: 'Geist'; src: url('../assets/fonts/Geist-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'Geist'; src: url('../assets/fonts/Geist-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
@@ -72,6 +72,7 @@
       { label: 'Gaps (1h)', make: () => genWalk(1500, 3600, { gapChance: 0.15 }) },
     ];
     let candles = genWalk(TIMEFRAMES[2].count, TIMEFRAMES[2].seconds);
+    let intervalSeconds = TIMEFRAMES[2].seconds;
 
     await Promise.all([document.fonts.load('12px "Geist"'), document.fonts.load('12px "Geist Mono"')]).catch(() => {});
 
@@ -104,6 +105,7 @@
     const loadData = (data) => {
       toolbar.cancelNavigation();
       candles = data;
+      intervalSeconds = data.length > 1 ? data[1].time - data[0].time : intervalSeconds;
       chart.setData(candles);
       chart.scale.scrollTo(candles.length - 1);
       toolbar.refreshViewport();
@@ -236,8 +238,28 @@
     $('ctrl-bottom').append(settingsBtn, railToggle);
     attachScrollableRail(document, $('ctrl-scroll'));
 
+    // Keep the chart usable in a narrow embed; drawing tools are one click away.
+    if (window.innerWidth < 600) railToggle.click();
+
     // ---------------- sizing + live feed ----------------
-    const resize = () => { toolbar.cancelNavigation(); chart.resize(stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1); toolbar.refreshViewport(); };
+    const fullTimeFormatter = chart.getConfig().formatters.time;
+    const shortTimeFormatter = (seconds) => {
+      const iso = new Date(seconds * 1000).toISOString();
+      return intervalSeconds >= 86400 ? iso.slice(5, 10) : iso.slice(11, 16);
+    };
+    const resize = () => {
+      toolbar.cancelNavigation();
+      const compact = stage.clientWidth < 560;
+      chart.batch(() => {
+        chart.updateConfig({
+          timeAxis: { tickCount: compact ? 2 : 6 },
+          priceAxis: { tickCount: compact ? 3 : 6 },
+          formatters: { time: compact ? shortTimeFormatter : fullTimeFormatter },
+        });
+        chart.resize(stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1);
+      });
+      toolbar.refreshViewport();
+    };
     new ResizeObserver(resize).observe(stage);
     resize();
     window.addEventListener('pagehide', () => toolbar.cancelNavigation());

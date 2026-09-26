@@ -155,7 +155,9 @@ export class Flyouts {
     const r = anchor.getBoundingClientRect();
     const viewport = this.win.innerHeight;
     const top = Math.max(8, Math.min(r.top, viewport - menu.offsetHeight - 8));
-    menu.style.left = `${r.right + 8}px`;
+    const left = this.win.innerWidth === undefined ? r.right + 8
+      : Math.max(8, Math.min(r.right + 8, this.win.innerWidth - menu.offsetWidth - 8));
+    menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
   }
 

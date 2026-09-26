@@ -8,3 +8,4 @@ docs/.next/
 docs/.source/
 docs/out/
 docs/next-env.d.ts
+docs/public/chart-demo/
