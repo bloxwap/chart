@@ -8,11 +8,7 @@ description: Construction, data updates, studies, drawings, rendering, and clean
 ```ts
 import { createChart } from '@bloxwap/chart';
 
-const chart = createChart({
-  container: canvas,
-  config: { data: candles },
-  pixelRatio: window.devicePixelRatio,
-});
+const chart = createChart({ container: canvas, autoResize: true, theme: 'dark', config: { data: candles } });
 ```
 
 Provide either `container` or `document`. `container` takes precedence if both are supplied.
@@ -22,7 +18,9 @@ Provide either `container` or `document`. `container` takes precedence if both a
 | `container` | `ChartCanvas` | Existing canvas implementing the exported interface |
 | `document` | `ChartDocument` | Factory for a canvas when no container is supplied |
 | `config` | `DeepPartial<ChartConfig>` | Configuration merged with defaults |
-| `pixelRatio` | `number` | Backing pixels per CSS pixel; default 1 |
+| `theme` | `'dark' \| 'light'` | Built-in color theme applied under `config`; fields in `config` win |
+| `autoResize` | `boolean` | Fill the canvas's parent and follow its size and the device pixel ratio; stops on `destroy()`. The canvas is placed out of flow (`position: absolute; inset: 0`), so give the parent a height |
+| `pixelRatio` | `number` | Backing pixels per CSS pixel; default 1 (managed for you with `autoResize`) |
 | `animation` | `{ scheduler, duration? }` | Optional injected frame clock; default duration 240ms |
 | `registries` | `{ indicators?, drawings? }` | Custom registries; omitted registries include built-ins |
 
