@@ -384,7 +384,8 @@ button[data-search-full] kbd {
 .footer-brand p { margin: 0; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); }
 .footer-lockup { display: flex; align-items: center; gap: var(--space-sm); }
 .footer-icon { width: 36px; height: 36px; border-radius: 10px; }
-.footer-wordmark { width: auto; height: 32px; }
+/* The wordmark's box reserves descender room for the "p"; shift it so the cap height (not the box) centers on the icon: (143/2 - (149-74.6)/2) / 223.6 of the viewBox. */
+.footer-wordmark { width: auto; height: 32px; transform: translateY(15.3%); }
 .footer-col h2 { margin: 0 0 var(--space-md); color: var(--color-fd-muted-foreground); font: 700 var(--text-2xs) / 1.5 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
 .footer-col a, .footer-base a { transition: color var(--duration-fast) var(--ease-spring), opacity var(--duration-fast) var(--ease-spring); }
 .footer-col a { display: block; width: fit-content; padding: var(--space-xs) 0; color: var(--color-fd-foreground); font-size: var(--text-sm); opacity: .8; }
