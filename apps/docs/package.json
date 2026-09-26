@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "npm --workspace @bloxwap/chart run build && node scripts/prepare-demo.mjs",
-    "dev": "next dev --port 3901",
+    "dev": "next dev --port 3902",
     "prebuild": "npm --workspace @bloxwap/chart run build && node scripts/prepare-demo.mjs",
     "build": "next build",
     "postbuild": "node scripts/check-export.mjs",
