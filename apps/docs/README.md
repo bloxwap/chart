@@ -11,7 +11,7 @@ npm ci
 npm run docs:dev
 ```
 
-Local development: http://localhost:3901
+Local development: http://localhost:3902
 
 ```sh
 npm run docs:check
@@ -19,8 +19,8 @@ NEXT_PUBLIC_BASE_PATH=/chart npm run docs:build
 npm run docs:preview
 ```
 
-Static preview: http://localhost:3901/chart/ for a `/chart` build, or
-http://localhost:3901/ for a build without a base path. The preview reads the
+Static preview: http://localhost:3902/chart/ for a `/chart` build, or
+http://localhost:3902/ for a build without a base path. The preview reads the
 path from the built artifact. It does not run Next.js or a search backend.
 
 Edit MDX in `content/docs/` and sidebar order in each `meta.json`. The build
@@ -61,7 +61,7 @@ New pages receive a card automatically. No image server is needed after export.
 URLs using `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_BASE_PATH`. The postbuild
 checker validates all page image URLs, preview metadata, and PNG dimensions.
 For a `/chart` build, preview the homepage image at
-`http://localhost:3901/chart/og/home.png` after `npm run docs:preview`.
+`http://localhost:3902/chart/og/home.png` after `npm run docs:preview`.
 
 The `predev` and `prebuild` scripts compile the library and run
 `scripts/prepare-demo.mjs`. It copies `apps/playground/index.html`,

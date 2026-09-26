@@ -24,5 +24,5 @@ const server = createServer(async (request, response) => {
     response.end(await readFile(join(root, '404.html')));
   }
 });
-const port = Number(process.env.PORT ?? 3901);
+const port = Number(process.env.PORT ?? 3902);
 server.listen(port, '127.0.0.1', () => console.log(`Static docs preview → http://localhost:${port}${basePath}/`));

@@ -13,7 +13,7 @@ for guides, an API reference, and the complete chart controls.
 
 The library lives in `packages/chart`, the Fumadocs app in `apps/docs`, and the
 standalone playground in `apps/playground`. Run `npm run docs:dev` from the
-repository root to open the docs at http://localhost:3901, or `npm run demo`
+repository root to open the docs at http://localhost:3902, or `npm run demo`
 to open the playground at http://localhost:8641/demo/ (requires Bun).
 
 ## Features

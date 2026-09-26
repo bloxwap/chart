@@ -103,7 +103,7 @@ npm ci
 npm run docs:dev
 ```
 
-Open http://localhost:3901. For the standalone playground, run `npm run demo`
+Open http://localhost:3902. For the standalone playground, run `npm run demo`
 (requires Bun) and open http://localhost:8641/demo/.
 
 | Command | Purpose |
@@ -129,7 +129,7 @@ NEXT_PUBLIC_BASE_PATH=/chart npm run docs:build
 npm run docs:preview
 ```
 
-The static preview opens at http://localhost:3901/chart/. Stop the docs dev server
+The static preview opens at http://localhost:3902/chart/. Stop the docs dev server
 first, or use `PORT=3902 npm run docs:preview` to preview alongside it. See
 [the docs development guide](apps/docs/README.md) for editing and deployment details.
 
