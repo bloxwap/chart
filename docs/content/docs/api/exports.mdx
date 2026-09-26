@@ -1,0 +1,41 @@
+---
+title: Package exports
+description: Import the chart core or the specific integration layer you need.
+---
+
+The package ships ESM and TypeScript declarations. There is no CommonJS export. It declares no runtime dependencies; the docs app's React and Fumadocs dependencies are separate from the chart package.
+
+| Import path | Main exports |
+| --- | --- |
+| `@bloxwap/chart` | `createChart`, `Chart`, config helpers, scales, data types, built-in registries, themes, canvas abstractions |
+| `@bloxwap/chart/config` | `defineConfig`, `resolveConfig`, `DEFAULT_CONFIG`, config types |
+| `@bloxwap/chart/color` | Color parsing, serialization, alpha and contrast helpers |
+| `@bloxwap/chart/dom` | Canvas/document interfaces and recording mocks |
+| `@bloxwap/chart/indicators` | Indicator registry, built-ins, and calculation helpers |
+| `@bloxwap/chart/drawings` | Drawing registry, catalog, built-ins, and geometry types |
+| `@bloxwap/chart/wasm` | WASM initialization and kernel interface |
+| `@bloxwap/chart/ui` | Drawing toolbar, settings, controller, history, UI primitives, and frame scheduler |
+| `@bloxwap/chart/icons` | `ICONS` and `icon(name, size?)` |
+
+## Icons
+
+```ts
+import { icon } from '@bloxwap/chart/icons';
+
+const button = document.createElement('button');
+button.innerHTML = icon('chart-candlestick', 20);
+button.setAttribute('aria-label', 'Candlestick chart');
+```
+
+Library icons use `currentColor` to inherit their host's color. Provide accessible labels when an icon is the only button content.
+
+## Configuration helpers
+
+```ts
+import { defineConfig, resolveConfig } from '@bloxwap/chart/config';
+
+const partial = defineConfig({ series: { type: 'area' } });
+const complete = resolveConfig(partial);
+```
+
+Use exported types rather than duplicating the schema. The declarations in each published build follow the implementation in this repository.

@@ -1,10 +1,12 @@
 {
-  "name": "chart-ts",
+  "name": "@bloxwap/chart",
   "version": "0.1.0",
   "description": "Zero-dependency, WASM-accelerated candlestick/financial charting library in TypeScript with injected DOM",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/bloxwap/chart.git" },
+  "homepage": "https://bloxwap.github.io/chart/",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -61,6 +63,10 @@
     "coverage": "npm run build && npm run build:ts-test && node scripts/check-coverage.mjs",
     "bench": "npm run build && node bench/indicators.bench.mjs && node bench/rolling.bench.mjs && node bench/render.bench.mjs",
     "demo": "bun run demo/serve.ts",
+    "docs:dev": "npm --prefix docs run dev",
+    "docs:build": "npm --prefix docs run build",
+    "docs:check": "npm --prefix docs run check",
+    "docs:preview": "npm --prefix docs run preview",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [

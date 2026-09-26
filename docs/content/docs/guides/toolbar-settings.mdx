@@ -1,0 +1,85 @@
+---
+title: Toolbar and settings
+description: Add the drawing rail, chart navigation, and a single settings card.
+---
+
+## Prepare the containers
+
+The toolbar is an optional browser UI. Supply a rail container and a positioned overlay wrapping the canvas:
+
+```html
+<div style="display: flex; height: 500px;">
+  <div id="drawing-tools" style="width: 52px; flex: none;"></div>
+  <div id="stage" style="position: relative; flex: 1; min-width: 0;">
+    <canvas id="chart" style="width: 100%; height: 100%; display: block;"></canvas>
+  </div>
+</div>
+<button id="settings" type="button">Chart settings</button>
+```
+
+## Create the UI
+
+```ts
+import { createChart } from '@bloxwap/chart';
+import { createDrawingToolbar, createChartSettings } from '@bloxwap/chart/ui';
+
+const canvas = document.querySelector<HTMLCanvasElement>('#chart')!;
+const rail = document.querySelector<HTMLElement>('#drawing-tools')!;
+const overlay = document.querySelector<HTMLElement>('#stage')!;
+const trigger = document.querySelector<HTMLButtonElement>('#settings')!;
+const chart = createChart({ container: canvas, config: { data: candles } });
+
+const toolbar = createDrawingToolbar({
+  chart, document, canvas, rail, overlay, theme: 'dark',
+});
+const settings = createChartSettings({
+  chart, document, trigger, theme: 'dark',
+  onOpen: () => { toolbar.cancelNavigation(); toolbar.flyouts.close(); },
+  onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
+});
+```
+
+Also wire resizing as in the [quick start](/docs/getting-started). The UI injects its own scoped stylesheet. Your application controls the surrounding layout and where its gear button appears.
+
+## What the card controls
+
+- **Symbol:** previous-close coloring, body/border/wick visibility and colors, and numeric precision.
+- **Status line:** symbol name, OHLC, price change, volume, and indicator values.
+- **Scales and lines:** autoscale, ratio lock, scale mode, inversion, axis side, labels, reference lines, and the plus button.
+- **Canvas:** background, text, grid, crosshair, and watermark.
+
+Changes apply immediately and remain selected when the card reopens. Reset restores the initial settings without replacing the chart data, indicator instances, drawings, chart type, or cursor selection.
+
+The scale's plus button is implemented by the toolbar and adds an undoable horizontal price line. Enable it using `priceAxis.plusButton` or the card.
+
+Settings are not automatically saved to storage. Persist your application's desired config fields explicitly. Toolbar favorites can use an injected `storage` implementing `getItem` and `setItem`.
+
+## Themes and keyboard shortcuts
+
+```ts
+toolbar.setTheme('light');
+settings.setTheme('light');
+```
+
+By default the toolbar listens for keyboard shortcuts on the document. Set `keyboard: false` for an embedded example or a page where other controls own those keys.
+
+| Shortcut | Action |
+| --- | --- |
+| Alt/Option + I | Invert the main price scale |
+| Alt/Option + P | Toggle percent/regular mode |
+| Alt/Option + L | Toggle logarithmic/regular mode |
+| Escape | Cancel the active tool or close settings |
+| Cmd/Ctrl + Z | Undo a toolbar edit |
+| Shift + Cmd/Ctrl + Z | Redo a toolbar edit |
+
+The idle navigation hint fades after three seconds. Active drawing instructions remain visible.
+
+## Cleanup
+
+```ts
+settings.destroy();
+toolbar.destroy();
+chart.destroy();
+```
+
+Disconnect your resize observer and application subscriptions too. UI destruction removes the owned DOM and listeners.

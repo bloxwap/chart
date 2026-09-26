@@ -1,0 +1,73 @@
+---
+title: Indicators
+description: Add built-in studies or register a calculation of your own.
+---
+
+## Built-in studies
+
+| Name | Study | Default placement |
+| --- | --- | --- |
+| `sma` | Simple moving average | Main pane |
+| `ema` | Exponential moving average | Main pane |
+| `boll` | Bollinger Bands | Main pane |
+| `macd` | Moving average convergence/divergence | Sub-pane |
+| `rsi` | Relative strength index | Sub-pane |
+| `kdj` | KDJ oscillator | Sub-pane |
+| `vol` | Volume | Sub-pane |
+
+```ts
+const smaId = chart.addIndicator({ name: 'sma', params: { period: 20 } });
+const rsiId = chart.addIndicator({ name: 'rsi', params: { period: 14 } });
+chart.addIndicator({ name: 'vol' });
+
+// Remove a specific instance, rather than all instances with the same name.
+chart.removeIndicator(smaId);
+```
+
+`addIndicator` merges parameter and color overrides with the registered defaults. It returns an instance ID. Supply your own stable `id` when an application needs to refer to a study later.
+
+## Configure existing indicators
+
+There is no dedicated `updateIndicator` method. Replace the `indicators` array through `updateConfig`, keeping each unchanged instance intact:
+
+```ts
+chart.updateConfig({
+  indicators: chart.getConfig().indicators.map((indicator) =>
+    indicator.id === rsiId
+      ? { ...indicator, params: { ...indicator.params, period: 21 } }
+      : indicator,
+  ),
+});
+```
+
+Arrays in `updateConfig` replace the existing array. Use `visible: false` to hide a study while retaining its configuration.
+
+## Register a custom indicator
+
+```ts
+import type { IndicatorDef } from '@bloxwap/chart';
+
+const reference: IndicatorDef = {
+  name: 'close-offset',
+  defaultParams: { offset: 5 },
+  defaultColors: ['#bcf582'],
+  defaultPane: 'main',
+  compute(candles, params, colors) {
+    return {
+      pane: 'main',
+      lines: [{
+        key: 'reference',
+        color: colors[0],
+        values: candles.map((candle) => candle.close + params.offset),
+      }],
+    };
+  },
+};
+
+chart.indicators.register(reference);
+chart.addIndicator({ name: 'close-offset', params: { offset: 10 } });
+```
+
+Calculations must be pure. Return values aligned to the input candles, using `null` for unavailable values such as a moving average's warmup period. Results are cached; do not mutate them after returning them.
+
+To keep an outlying overlay from expanding the price range, set `priceAxis.scaleSeriesOnly: true`.

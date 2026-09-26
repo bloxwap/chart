@@ -1,0 +1,77 @@
+---
+title: Series and appearance
+description: Choose a renderer and configure colors, labels, scales, and themes.
+---
+
+## Series types
+
+| Type | Renders |
+| --- | --- |
+| `candlestick` | Candle bodies, optional borders, and wicks |
+| `line` | Closing prices connected by a line |
+| `area` | Closing-price line with a filled area |
+| `bar` | OHLC bars with open and close ticks |
+| `histogram` | Candle volumes as histogram bars |
+
+```ts
+chart.updateConfig({
+  series: {
+    type: 'candlestick',
+    upColor: '#bcf582',
+    downColor: '#ee7992',
+    bodyVisible: true,
+    borderVisible: false,
+    wickVisible: true,
+    colorByPreviousClose: false,
+  },
+});
+```
+
+Wick and border colors inherit the body colors when their configured strings are empty. `colorByPreviousClose` compares a candle's close to the preceding close; the first candle falls back to its own open.
+
+For a separate volume pane alongside price candles, add the built-in `vol` indicator instead of changing the main series to `histogram`.
+
+## Colors and themes
+
+Colors accept hex, RGB/RGBA, and `color(display-p3 ...)` strings. The core's built-in presets are partial configs:
+
+```ts
+import { CHART_THEMES } from '@bloxwap/chart';
+
+chart.updateConfig(CHART_THEMES.dark);
+chart.updateConfig({
+  theme: { fontFamily: 'system-ui, sans-serif', monoFamily: 'monospace' },
+  grid: { horizontal: true, vertical: false },
+});
+```
+
+When using the toolbar, call `toolbar.setTheme('dark')` to synchronize its UI and the chart. A separate settings handle has `settings.setTheme('dark')` for its UI.
+
+## Scale modes
+
+```ts
+chart.updateConfig({
+  priceAxis: { mode: 'percent', position: 'left', precision: 2 },
+});
+```
+
+- `regular` uses the original prices.
+- `percent` shows percentage change from the first visible close.
+- `indexed` rebases that reference close to 100.
+- `logarithmic` uses logarithmic spacing. Ranges that include zero or negative values use a signed log transform.
+
+Percent and indexed references follow the visible range while autoscaling. With Auto disabled, the current price range and its reference stay fixed.
+
+## Formatting
+
+```ts
+chart.updateConfig({
+  priceAxis: { precision: null },
+  formatters: {
+    price: (price) => price.toFixed(2),
+    time: (seconds) => new Date(seconds * 1000).toISOString().slice(0, 16),
+  },
+});
+```
+
+Explicit price-axis precision overrides the normal price formatter for numeric labels. Set it back to `null` to use default/custom formatting. See the [configuration reference](/docs/api/configuration) for all groups.

@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: Compose a financial chart workspace with TypeScript, Canvas, and an optional UI layer.
+---
+
+`@bloxwap/chart` is a financial charting library with no runtime dependencies. It renders into a canvas supplied by your application and keeps data, series, indicators, drawings, and appearance in one typed configuration.
+
+The library is in development. These docs describe the code in this repository. The first npm release is still pending; use the [source installation](/docs/getting-started#install-from-source) to try it today.
+
+## Start here
+
+| Your goal | Guide |
+| --- | --- |
+| Render your first chart | [Quick start](/docs/getting-started) |
+| Try the controls | [Interactive playground](/docs/playground) |
+| Integrate a component | [React](/docs/guides/react) |
+| Stream prices | [Data and updates](/docs/guides/data) |
+| Add the complete chart UI | [Toolbar and settings](/docs/guides/toolbar-settings) |
+| Look up a method | [Chart API](/docs/api/chart) |
+
+## How the pieces fit
+
+The **core** owns the data, scales, and rendering. You provide a canvas or a small document abstraction. It has no dependency on React and does not access the global browser document.
+
+The **UI layer** is an optional import from `@bloxwap/chart/ui`. It adds pointer navigation, drawing controls, the settings card, and theme styling. You provide the browser document and the containers where that UI should appear.
+
+The **registries** hold indicator calculations and drawing models. Built-in models work immediately; applications can register their own implementations.
+
+## What is included
+
+- Candlestick, line, area, OHLC bar, and volume histogram series.
+- SMA, EMA, Bollinger Bands, MACD, RSI, KDJ, and volume indicators.
+- Drawing tools for lines, patterns, Fibonacci, annotations, measurements, and more.
+- Regular, percent, indexed, and logarithmic price scales.
+- A shared configuration for themes, labels, crosshair, grid, watermark, and formatters.
+- Optional WASM/SIMD calculation kernels with a JavaScript fallback.
+- Mock canvas and document implementations for tests.
+
+The package renders supplied data. Market feeds, symbol lookup, exchange connections, and trading actions belong to your application.

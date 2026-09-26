@@ -1,0 +1,63 @@
+---
+title: Drawings
+description: Place, edit, and manage annotations in data coordinates.
+---
+
+## Add a drawing
+
+Drawing points use **bar indices** and **prices**, not timestamps or pixels:
+
+```ts
+const id = chart.addDrawing({
+  name: 'trendline',
+  points: [{ index: 10, price: 100 }, { index: 30, price: 120 }],
+  color: '#bcf582',
+  lineWidth: 2,
+});
+
+chart.updateDrawing(id, { lineStyle: 'dashed', locked: true });
+chart.removeDrawing(id);
+```
+
+Use the [scale API](/docs/api/scale) to convert between pixels and these coordinates. Replacing or inserting history changes index positions; your application should remap drawing anchors when its data model requires timestamp-stable annotations.
+
+## Discover tools
+
+```ts
+import { TOOL_GROUPS } from '@bloxwap/chart';
+
+for (const group of TOOL_GROUPS) {
+  for (const section of group.sections) {
+    for (const tool of section.tools) console.log(tool.name, tool.label);
+  }
+}
+```
+
+The catalog includes trend lines, channels, pitchforks, Fibonacci and Gann tools, chart and Elliott patterns, positions and measurements, geometric shapes, text annotations, and icons. Use the catalog as the source of truth for the current tool list.
+
+## Select and edit
+
+```ts
+const hit = chart.drawingAt(pointerX, pointerY);
+chart.selectDrawing(hit);
+
+const point = chart.snapPoint(pointerX, pointerY, 'weak');
+chart.moveDrawingPoint(id, 0, point);
+chart.translateDrawing(id, 20, -10); // CSS-pixel delta
+```
+
+`snapPoint` supports `off`, `weak`, and `strong` magnet modes. A weak magnet snaps only near OHLC values. `handleAt` returns the selected drawing's anchor index, or `-1` when no handle is hit.
+
+Anchored text and similar tools use screen fractions. Pass the tool name to `pointFromPixel(x, y, name)` to obtain the right coordinate type.
+
+## Visibility and history
+
+```ts
+chart.setDrawingsHidden(true);
+chart.setDrawingsHidden(false);
+chart.clearDrawings();
+```
+
+The core drawing methods do not automatically create undo checkpoints. The optional toolbar's controller supplies interaction history; use it for user-driven placement and edits, or call `controller.history.checkpoint()` before your own undoable mutation.
+
+For a complete interactive rail, use [the toolbar](/docs/guides/toolbar-settings) instead of implementing placement and hit-testing yourself.

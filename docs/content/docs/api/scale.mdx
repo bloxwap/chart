@@ -1,0 +1,58 @@
+---
+title: Scale and coordinates
+description: Control the visible bars and convert between data and canvas pixels.
+---
+
+## Navigation
+
+```ts
+chart.scale.scrollBy(10);        // move toward older bars
+chart.scale.scrollTo(120);       // put this bar at the right edge
+chart.scale.zoom(1.2, 300);      // zoom around canvas x = 300
+chart.scale.zoomToRange(50, 150); // fit this inclusive index interval
+```
+
+`zoom` multiplies bar spacing. Values above 1 zoom in; values below 1 zoom out. The optional anchor is in **canvas CSS pixels**, including any left-side price axis.
+
+Bar spacing is clamped between 0.5 and 500 CSS pixels, so a very large history may exceed the viewport even after `zoomToRange`.
+
+## Coordinate conversion
+
+| Method | Input → output |
+| --- | --- |
+| `xToIndex(x)` | Canvas x → fractional bar index |
+| `indexToX(index)` | Bar index → canvas x |
+| `yToPrice(y)` | Main-pane canvas y → raw price |
+| `priceToY(price)` | Raw price → main-pane canvas y |
+| `visibleRange()` | Half-open index interval `{ from, to }` used for rendering |
+| `priceToBarRatio()` | Current scale units per horizontal bar |
+
+The render range includes boundary padding. Fractional indices may fall outside your dataset; clamp or round them as appropriate for your interaction.
+
+Pixel coordinates are local to the canvas, not the viewport:
+
+```ts
+const rect = canvas.getBoundingClientRect();
+const x = event.clientX - rect.left;
+const y = event.clientY - rect.top;
+const point = { index: chart.scale.xToIndex(x), price: chart.scale.yToPrice(y) };
+```
+
+The `scale` API converts prices on the main pane. An indicator sub-pane has its own internal price scale. When the main pane does not exist, price conversion returns `NaN`.
+
+## Fit, hold, and lock
+
+`priceAxis.autoScale: true` fits the visible data on redraw. Set it to `false` to hold the current main price range while data or the horizontal view changes.
+
+`lockPriceToBarRatio: true` preserves a geometric relationship between the vertical scale and horizontal bar spacing. It takes priority over a purely automatic fit and can place data outside the visible vertical range.
+
+```ts
+chart.updateConfig({
+  priceAxis: {
+    lockPriceToBarRatio: true,
+    priceToBarRatio: chart.scale.priceToBarRatio(),
+  },
+});
+```
+
+The ratio uses the selected scale's units. It is raw price units in regular mode and transformed units in percent, indexed, and logarithmic modes.
