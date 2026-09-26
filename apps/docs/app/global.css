@@ -239,14 +239,14 @@ html > body[data-scroll-locked] {
 }
 /* Same box as the Fumadocs header (max-w --fd-layout-width, 16px padding), so content lines up with the nav. */
 .home { width: 100%; max-width: var(--fd-layout-width, 1400px); padding: var(--space-5xl) var(--space-lg) 0; margin: 0 auto; }
-.hero { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: var(--space-6xl); padding-bottom: var(--space-4xl); }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--space-6xl); padding-bottom: var(--space-5xl); }
+.hero-copy { min-width: 0; }
 .eyebrow { display: flex; align-items: center; gap: var(--space-sm); color: var(--color-fd-muted-foreground); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
 .status-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--color-fd-primary); }
 .hero h1 { margin: var(--space-xl) 0 0; font-size: clamp(var(--text-5xl), 4.4vw, 4rem); line-height: 1.07; font-weight: 700; letter-spacing: -.04em; }
 .hero h1 span { color: var(--color-fd-foreground); }
-.hero-description { max-width: 35rem; color: var(--color-fd-muted-foreground); line-height: 1.75; font-size: var(--text-base); }
+.hero-description { max-width: 35rem; margin-top: var(--space-xl); color: var(--color-fd-muted-foreground); line-height: 1.75; font-size: var(--text-lg); }
 .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); margin: var(--space-2xl) 0 var(--space-xl); }
-.hero-intro { min-width: 0; }
 .package-install { width: fit-content; max-width: 100%; margin-top: var(--space-2xl); }
 .install-tabs { display: inline-flex; max-width: 100%; gap: var(--space-xs); padding: var(--space-xs); border-radius: var(--radius-full); background: var(--card); }
 .install-tabs button {
@@ -266,6 +266,56 @@ html > body[data-scroll-locked] {
 .install-command .btn { margin-left: auto; }
 .install-platforms, .install-feedback { margin-top: var(--space-lg); color: var(--muted-foreground); font-size: var(--text-sm); line-height: 1.5; }
 .install-feedback { display: block; }
+
+/* Hero code window: zero-stroke fill card with the Bloxwap code palette (as on the Hyperliquid SDK site). */
+.code-window { min-width: 0; margin: 0; overflow: hidden; border-radius: var(--radius-xl); background: var(--card); color: var(--foreground); }
+.code-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
+  padding: var(--space-lg) var(--space-2xl) 0; font: var(--text-2xs) / 1.5 var(--font-mono); color: var(--muted-foreground);
+}
+.window-dots { display: flex; gap: var(--space-xs); }
+.window-dots > i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--muted); }
+.code-language { color: color-mix(in oklab, var(--bloxwap-blue) 60%, var(--foreground)); }
+.code-window pre { margin: 0; overflow-x: auto; padding: var(--space-xl) var(--space-2xl); font: var(--text-xs) / 1.85 var(--font-mono); tab-size: 2; scrollbar-width: none; }
+.code-window pre::-webkit-scrollbar { display: none; }
+.syntax-keyword { color: color-mix(in oklab, var(--bloxwap-pink) 70%, var(--foreground)); }
+.syntax-string { color: var(--bloxwap-green); }
+.syntax-type { color: color-mix(in oklab, var(--bloxwap-blue) 60%, var(--foreground)); }
+.syntax-muted { color: var(--muted-foreground); }
+.code-status {
+  display: flex; align-items: center; gap: var(--space-sm); margin: 0;
+  padding: 0 var(--space-2xl) var(--space-lg); font: var(--text-2xs) / 1.5 var(--font-mono); color: var(--muted-foreground);
+}
+.code-status > span { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--bloxwap-green); }
+
+/*
+ * Entrance: three attention layers ~200 ms apart on one curve (MOT-2), as on the Hyperliquid SDK site:
+ * headline, then its copy and actions, then the code window, then the playground.
+ */
+@keyframes landing-rise {
+  from { opacity: 0; translate: 0 8px; }
+}
+.hero-copy > *, .code-window, .hero-preview { animation: landing-rise 600ms var(--ease-spring) both; }
+.hero-copy > h1 { animation-delay: 60ms; }
+.hero-copy > :not(.eyebrow, h1) { animation-delay: 200ms; }
+.code-window { animation-delay: 360ms; }
+.hero-preview { animation-delay: 520ms; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy > *, .code-window, .hero-preview { animation: none; }
+}
+
+/* Search: a zero-stroke filled pill at the small control height, with filled key chips. */
+button[data-search-full] {
+  height: var(--control-h-sm); gap: var(--space-sm); padding: 0 var(--space-xs) 0 var(--space-md);
+  border: 0; background: var(--card); color: var(--muted-foreground); font-size: var(--text-sm);
+  transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
+}
+button[data-search-full]:hover { background: var(--muted); color: var(--foreground); }
+button[data-search-full] kbd {
+  display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 var(--space-xs);
+  border: 0; border-radius: var(--radius-full); background: var(--background); color: var(--muted-foreground);
+  font: var(--text-2xs) / 1 var(--font-mono);
+}
 .hero-preview {
   min-width: 0;
   padding-bottom: var(--space-6xl);
@@ -353,7 +403,7 @@ html > body[data-scroll-locked] {
 .not-found .btn { margin-top: var(--space-3xl); }
 @media (max-width: 800px) {
   .home { padding-top: var(--space-3xl); }
-  .hero { grid-template-columns: 1fr; gap: var(--space-2xl); padding-bottom: var(--space-3xl); }
+  .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-3xl); padding-bottom: var(--space-3xl); }
   .hero h1 { font-size: var(--text-6xl); }
 }
 @media (max-width: 600px) {

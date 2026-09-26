@@ -4,6 +4,7 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { baseOptions } from '@/lib/layout.shared';
 import { ChartPreview } from '@/components/chart-preview';
 import { InstallCommand } from '@/components/install-command';
+import { HeroCode } from '@/components/hero-code';
 import { homeStructuredData, organization } from '@/lib/structured-data';
 
 export default function Home() {
@@ -11,14 +12,14 @@ export default function Home() {
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData()) }} />
     <main className="home">
       <section className="hero">
-        <div className="hero-copy"><p className="eyebrow"><span className="status-dot" /> DEVELOPER PREVIEW · v0.1</p>
+        <div className="hero-copy">
+          <p className="eyebrow"><span className="status-dot" /> DEVELOPER PREVIEW · v0.1</p>
           <h1>Financial charts.<br /><span>Your interface.</span></h1>
-        </div>
-        <div className="hero-intro">
           <p className="hero-description">Your next trading interface starts here. Try the full chart below: draw a trend line, add indicators, change timeframes, and make it your own.</p>
           <div className="hero-actions"><a href="#playground" className="btn">Play with the chart <ArrowDown aria-hidden="true" /></a><Link href="/docs/getting-started" className="btn btn--secondary">Start building <ArrowRight aria-hidden="true" /></Link></div>
           <InstallCommand />
         </div>
+        <HeroCode />
       </section>
       <section id="playground" className="hero-preview" aria-label="Interactive chart playground">
         <ChartPreview />
