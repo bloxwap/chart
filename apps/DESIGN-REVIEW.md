@@ -34,7 +34,7 @@ monorepo's control and token system as a whole: one `.btn` family, the plain-UI 
 | M5 | P2 | TYPE-4 | `app/global.css` | Sizes sit off the type scale, and the eyebrow and feature numbers are 10 px. | Map every size to `--text-*`; raise the 10 px labels to `--text-2xs` (11 px). |
 | M6 | P2 | LAY-3 | `app/global.css` | Spacing is off the 4 px grid (7, 13, 14, 18, 22, 38, 70 px). | Use `--space-*`. |
 | M7 | P2 | MOT-4 | `app/global.css` | Transitions use ad hoc linear-ish timings rather than the shared motion tokens. | `--duration-fast` with `--ease-spring`, as `.btn` does. |
-| M8 | P2 | LAY-6 | `app/global.css` `.home` | The landing column is 1600 px wide, against 73 rem (1168 px) for full-width `workers/docs` pages. | `max-width: 73rem`. |
+| M8 | P2 | LAY-6 | `app/global.css` `.home`, `.site-footer` | The landing column (1600 px) and the footer (40 px inset) do not line up with the header, which uses Fumadocs' `--fd-layout-width` box with 16 px padding. | Give `.home` and the footer content the header's box: `max-width: var(--fd-layout-width)` with `--space-lg` padding, so every edge aligns with the nav. |
 | M9 | P2 | HIER-3 | `app/docs/layout.tsx` sidebar footer | The sidebar footer has "Open Bloxwap" but not the quiet link row that `workers/docs` shows under it. | Add the same row. GitHub already has an icon button in this sidebar, so the row is About, Contact, Privacy. |
 
 No P0 findings. **Verified clean:** TYPE-1, TYPE-2, TYPE-3, COL-2 (dark forced by brand decision, as in `workers/docs`),
@@ -90,7 +90,7 @@ navigation systems and two simultaneous active states.
 All nine findings (M1–M9) are applied:
 
 - **`app/global.css`:** the plain-UI scale layer and `.btn` family; every landing size, space, radius and transition moved
-  onto it; the landing column is 73 rem.
+  onto it; the landing column and footer content share the header's box, so their edges line up with the nav.
 - **Components:** the hero pair is `.btn` + `.btn--secondary`; the playground actions are `.btn--ghost` and
   `.btn--secondary .btn--sm`; copy is `.btn--ghost .btn--icon`; install tabs and command are pills.
 - **Icons:** `lucide-react@0.545.0` (`ArrowDown`, `ArrowRight`, `ArrowUpRight`, `Maximize2`, `Minimize2`, `Copy`,

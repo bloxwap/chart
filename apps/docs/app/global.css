@@ -237,7 +237,8 @@ html > body[data-scroll-locked] {
 .hero h1, .principles h2, .start-grid h2, .guide-links h3, .not-found h1 {
   font-family: var(--font-docs-display), var(--font-sans);
 }
-.home { width: 100%; max-width: 73rem; padding: var(--space-5xl) var(--space-3xl) 0; margin: 0 auto; }
+/* Same box as the Fumadocs header (max-w --fd-layout-width, 16px padding), so content lines up with the nav. */
+.home { width: 100%; max-width: var(--fd-layout-width, 1400px); padding: var(--space-5xl) var(--space-lg) 0; margin: 0 auto; }
 .hero { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: var(--space-6xl); padding-bottom: var(--space-4xl); }
 .eyebrow { display: flex; align-items: center; gap: var(--space-sm); color: var(--color-fd-muted-foreground); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
 .status-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--color-fd-primary); }
@@ -333,7 +334,8 @@ html > body[data-scroll-locked] {
 .guide-links h3 { font-size: var(--text-sm); margin-bottom: var(--space-xs); font-weight: 700; transition: color var(--duration-fast) var(--ease-spring); }
 .guide-links a:hover h3 { color: var(--color-fd-primary); }
 .guide-links p { color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
-.site-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-2xl) var(--space-4xl); border-top: 1px solid var(--color-fd-border); color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
+/* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
+.site-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-2xl) max(var(--space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--space-lg))); border-top: 1px solid var(--color-fd-border); color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
 .site-footer a { transition: color var(--duration-fast) var(--ease-spring); }
 .site-footer a:hover { color: var(--color-fd-primary); }
 .docs-sidebar-links { display: flex; align-items: center; gap: var(--space-lg); padding-top: var(--space-lg); font-size: var(--text-xs); color: var(--color-fd-muted-foreground); }
@@ -360,5 +362,4 @@ html > body[data-scroll-locked] {
   .preview-header { padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md); }
   .preview-footer { padding: var(--space-md); }
   .preview-title { gap: var(--space-xs) var(--space-md); }
-  .site-footer { padding: var(--space-2xl) var(--space-xl); }
 }
