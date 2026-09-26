@@ -600,6 +600,17 @@ describe('UI primitives', () => {
     assert.equal(targetWithin(ev({}), 'div'), false);
     assert.equal(targetWithin(ev({ closest: () => ({}) }), 'div'), true);
   });
+  it('keeps drawing flyouts inside a narrow embedded viewport', () => {
+    const m = mount({}, (win) => Object.defineProperty(win, 'innerWidth', { value: 320 }));
+    const menu = m.tb.flyouts.create();
+    Object.defineProperty(menu, 'offsetWidth', { value: 232 });
+    const anchor = iconButton(m.doc as unknown as UIDocument, 'trendline', 'Trend line');
+    Object.defineProperty(anchor, 'getBoundingClientRect', { value: () => ({ right: 100, top: 20 }) });
+    m.tb.flyouts.show(menu, anchor);
+    assert.equal(menu.style.left, '80px');
+    assert.equal(Number.parseFloat(menu.style.left) + menu.offsetWidth, 312);
+    m.tb.destroy();
+  });
 });
 
 

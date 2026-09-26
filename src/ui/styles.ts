@@ -147,7 +147,7 @@ export const TOOLBAR_CSS = `
 
 /* ---- flyout menus ---- */
 .cts-menu {
-  position: fixed; z-index: 1000; min-width: 232px; max-height: calc(100vh - 16px); overflow-y: auto;
+  position: fixed; z-index: 1000; min-width: min(232px, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
   background: var(--cts-panel); border: 1px solid var(--cts-edge); border-radius: var(--cts-radius-md);
   box-shadow: var(--cts-shadow); padding: 4px; display: none;
   animation: cts-fade-in 140ms var(--cts-ease);

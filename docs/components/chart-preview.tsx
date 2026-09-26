@@ -1,90 +1,68 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, type Candle, type Chart, type SeriesType } from '@bloxwap/chart';
-import { createDrawingToolbar, createChartSettings, type DrawingToolbar } from '@bloxwap/chart/ui';
+import { assetUrl } from '@/lib/site';
 
-function sampleCandles(): Candle[] {
-  let price = 64200;
-  return Array.from({ length: 180 }, (_, index) => {
-    const open = price;
-    price += Math.sin(index * 1.7) * 120 + Math.cos(index * 0.31) * 65 + 8;
-    return { time: 1700000000 + index * 3600, open, close: price,
-      high: Math.max(open, price) + 40 + (index % 5) * 9,
-      low: Math.min(open, price) - 40 - (index % 7) * 8,
-      volume: 500 + (index * 137) % 2000 };
-  });
-}
-
+/** Embed the actual demo, including its controls, styling, and keyboard shortcuts. */
 export function ChartPreview() {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const stage = useRef<HTMLDivElement>(null);
-  const rail = useRef<HTMLDivElement>(null);
-  const gear = useRef<HTMLButtonElement>(null);
-  const chart = useRef<Chart | null>(null);
-  const toolbar = useRef<DrawingToolbar | null>(null);
-  const [type, setType] = useState<SeriesType>('candlestick');
-  const [rsi, setRsi] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  const demoUrl = assetUrl('/chart-demo/demo/');
 
   useEffect(() => {
-    if (!canvas.current || !stage.current || !rail.current || !gear.current) return;
-    const instance = createChart({ container: canvas.current, config: {
-      data: sampleCandles(),
-      // sRGB counterparts of the shared Bloxwap tokens, also used by color inputs.
-      series: {
-        upColor: '#00ff3f', downColor: '#ff479c', lineColor: '#00ff3f', areaFillColor: '#00ff3f',
-        wickUpColor: '#00ff3f', wickDownColor: '#ff479c', borderUpColor: '#00ff3f', borderDownColor: '#ff479c',
-      },
-      theme: {
-        background: '#0a0a0a', textColor: '#a1a1a1', borderColor: '#242424',
-        fontFamily: getComputedStyle(document.body).fontFamily,
-        monoFamily: getComputedStyle(document.body).getPropertyValue('--font-docs-mono').trim(), fontSize: 11,
-      },
-      grid: { color: 'rgba(255, 255, 255, 0.05)' },
-      crosshair: { color: '#a1a1a1' },
-      statusLine: { symbol: 'BTC / USD' },
-      priceAxis: { width: 76, labels: { lastPrice: true }, lines: { lastPrice: true } },
-      timeAxis: { tickCount: 3 },
-      formatters: { time: (seconds) => new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(seconds * 1000)) },
-    } });
-    const tools = createDrawingToolbar({ chart: instance, document, canvas: canvas.current, rail: rail.current, overlay: stage.current, keyboard: false, favorites: [], applyChartTheme: false });
-    const settings = createChartSettings({ chart: instance, document, trigger: gear.current,
-      onOpen: () => { tools.cancelNavigation(); tools.flyouts.close(); },
-      onChange: () => tools.refreshViewport(),
-    });
-    chart.current = instance; toolbar.current = tools;
-    const resize = () => {
-      if (!stage.current) return;
-      tools.cancelNavigation();
-      instance.resize(stage.current.clientWidth, stage.current.clientHeight, window.devicePixelRatio || 1);
-      tools.refreshViewport();
+    setCanFullscreen(document.fullscreenEnabled);
+    const syncFullscreen = () => setFullscreen(document.fullscreenElement === container.current);
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  useEffect(() => {
+    const frame = iframe.current;
+    if (!frame) return;
+    let content: Document | null = null;
+    const revealControls = (event: MouseEvent) => {
+      if (!event.isTrusted) return;
+      // A bottom-rail click can leave the top of a fixed settings card above
+      // the page viewport. Reveal the frame after the button has handled it.
+      const target = event.target as Element | null;
+      if (target?.closest('button')) frame.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     };
-    const observer = new ResizeObserver(resize); observer.observe(stage.current); resize();
-    instance.scale.zoomToRange(85, 179);
+    const listen = () => {
+      content?.removeEventListener('click', revealControls);
+      content = frame.contentDocument;
+      content?.addEventListener('click', revealControls);
+    };
+    frame.addEventListener('load', listen);
+    listen();
     return () => {
-      observer.disconnect(); settings.destroy(); tools.destroy(); instance.destroy();
-      chart.current = null; toolbar.current = null;
+      frame.removeEventListener('load', listen);
+      content?.removeEventListener('click', revealControls);
     };
   }, []);
 
-  function selectType(value: SeriesType) { setType(value); chart.current?.updateConfig({ series: { type: value } }); }
-  function toggleRsi() {
-    if (!chart.current) return;
-    if (rsi) chart.current.removeIndicator('preview-rsi');
-    else chart.current.addIndicator({ id: 'preview-rsi', name: 'rsi' });
-    setRsi(!rsi);
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement === container.current) await document.exitFullscreen();
+      else await container.current?.requestFullscreen();
+    } catch {
+      // Browsers that deny fullscreen can still open the full-window playground.
+      setCanFullscreen(false);
+    }
   }
-  return <div className="chart-preview not-prose">
-    <div className="preview-header"><div><strong>BTC / USD</strong><span className="preview-interval">1h</span></div><span className="demo-label"><span /> Sample data</span></div>
-    <div className="preview-controls">
-      <label>Series<select aria-label="Chart series" value={type} onChange={(event) => selectType(event.target.value as SeriesType)}>
-        <option value="candlestick">Candlestick</option><option value="line">Line</option><option value="area">Area</option><option value="bar">OHLC bars</option>
-      </select></label>
-      <button type="button" aria-pressed={rsi} onClick={toggleRsi}>RSI {rsi ? '−' : '+'}</button>
-      <button type="button" onClick={() => { toolbar.current?.cancelNavigation(); chart.current?.scale.zoomToRange(85, 179); toolbar.current?.refreshViewport(); }}>Reset view</button>
-      <button ref={gear} type="button" className="preview-settings" title="Chart settings" aria-label="Chart settings">⚙</button>
+
+  return <div ref={container} className="chart-preview not-prose">
+    <div className="preview-header">
+      <div className="preview-title"><strong>Chart playground</strong><span className="demo-label"><span /> Simulated live data</span></div>
+      <div className="preview-actions">
+        <a href={demoUrl} target="_blank" rel="noreferrer">Open playground <span aria-hidden="true">↗</span></a>
+        {canFullscreen && <button type="button" onClick={toggleFullscreen} aria-pressed={fullscreen}>
+          {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        </button>}
+      </div>
     </div>
-    <div className="preview-body"><div ref={rail} className="preview-rail" /><div ref={stage} className="preview-stage"><canvas ref={canvas} aria-label="Interactive candlestick chart with sample Bitcoin prices" /></div></div>
-    <div className="preview-footer"><span>Drag to pan · scroll to zoom</span><span>Rendered by @bloxwap/chart</span></div>
+    <iframe ref={iframe} className="chart-frame" src={demoUrl} title="Interactive Bloxwap chart playground" allowFullScreen />
+    <div className="preview-footer"><span>Draw, zoom, add indicators, and make it yours.</span><span>Powered by @bloxwap/chart</span></div>
   </div>;
 }

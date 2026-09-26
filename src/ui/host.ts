@@ -124,6 +124,7 @@ export interface UITimers {
 
 /** The window surface the toolbar uses. */
 export interface UIWindow extends UITimers {
+  readonly innerWidth?: number;
   readonly innerHeight: number;
   readonly performance: { now(): number };
   requestAnimationFrame(callback: (time: number) => void): number;

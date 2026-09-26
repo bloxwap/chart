@@ -3,9 +3,9 @@ name: Documentation
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'demo/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['docs/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'demo/**', 'src/**', 'assets/**', 'scripts/**', 'package.json', 'package-lock.json', 'tsconfig.json', '.github/workflows/docs.yml']
   workflow_dispatch:
 
 permissions:
