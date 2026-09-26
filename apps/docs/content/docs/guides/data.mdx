@@ -1,0 +1,55 @@
+---
+title: Data and updates
+description: Supply candles, stream the current bar, and group related changes.
+---
+
+## Candle shape
+
+```ts
+import type { Candle } from '@bloxwap/chart';
+
+const candle: Candle = {
+  time: 1700000000, // UNIX seconds
+  open: 100,
+  high: 105,
+  low: 98,
+  close: 103,
+  volume: 2400, // optional
+};
+```
+
+Provide finite numeric prices and valid OHLC bounds: `low` should not exceed the open/close, and `high` should not be below them. The library expects usable market data rather than performing feed validation.
+
+## Replace history
+
+`chart.setData(candles)` replaces the history, sorts timestamps when needed, invalidates indicator calculations, and redraws. Supply one candle per timestamp. The array is copied, but treat candle objects as immutable after handing them to the chart.
+
+Time on the horizontal axis is indexed by bars. Missing timestamps do not automatically reserve empty columns; aggregate your feed into your desired interval before passing it in.
+
+## Append or update a candle
+
+```ts
+chart.appendData({ time: 1700003600, open: 103, high: 108, low: 102, close: 107 });
+
+// Same timestamp replaces that bar as its price changes.
+chart.appendData({ time: 1700003600, open: 103, high: 110, low: 102, close: 109 });
+```
+
+`appendData` appends a new latest timestamp, replaces an existing timestamp, or inserts an earlier candle in timestamp order. It does not open a WebSocket or subscribe to an exchange. The playground (`apps/playground/index.html`) shows a complete example: it seeds the chart from Hyperliquid's `candleSnapshot` REST endpoint and streams live BTC perpetual candles from the `candle` WebSocket subscription into `appendData`.
+
+Your application owns symbol changes, interval aggregation, retries, feed validation, and subscription cleanup.
+
+## Group updates into one redraw
+
+```ts
+chart.batch(() => {
+  chart.appendData(nextCandle);
+  chart.updateConfig({ statusLine: { visible: true, symbol: 'BTC / USD' } });
+});
+```
+
+Batching is synchronous and supports nesting. Avoid passing an async callback if you expect updates after an `await` to remain in the same batch.
+
+## Reading state
+
+`chart.dataLength` gives the current number of candles. `getConfig().data` describes configured input; it is not a live data feed snapshot after `setData` or `appendData`. Keep your authoritative dataset in your application.
