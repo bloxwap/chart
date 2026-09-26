@@ -106,8 +106,5 @@
     "react-dom": "^19.3.0",
     "typescript": "^6.0.3",
     "wabt": "^1.0.39"
-  },
-  "engines": {
-    "node": ">=24"
   }
 }
