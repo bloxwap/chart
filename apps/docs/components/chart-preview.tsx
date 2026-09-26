@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react';
 import { assetUrl } from '@/lib/site';
 
-/** Embed the actual demo, including its controls, styling, and keyboard shortcuts. */
-export function ChartPreview() {
+/**
+ * Embed the actual demo, including its controls, styling, and keyboard shortcuts. `children` is the
+ * section copy shown above the actions; without it only the actions and the chart render.
+ */
+export function ChartPreview({ children }: { children?: ReactNode }) {
   const container = useRef<HTMLDivElement>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -54,18 +57,19 @@ export function ChartPreview() {
     }
   }
 
-  return <div ref={container} className="chart-preview not-prose">
-    <div className="preview-header">
-      <div className="preview-title"><strong>Chart playground</strong><span className="demo-label"><span /> Simulated live data</span></div>
+  return <div className="chart-preview-section not-prose">
+    <div className="preview-intro">
+      {children}
       <div className="preview-actions">
-        <a href={demoUrl} target="_blank" rel="noreferrer" className="btn btn--ghost btn--sm">Open playground <ArrowUpRight aria-hidden="true" /></a>
-        {canFullscreen && <button type="button" className="btn btn--secondary btn--sm" onClick={toggleFullscreen} aria-pressed={fullscreen}>
+        <a href={demoUrl} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm">Open playground <ArrowUpRight aria-hidden="true" /></a>
+        {canFullscreen && <button type="button" className="btn btn--ghost btn--sm" onClick={toggleFullscreen} aria-pressed={fullscreen}>
           {fullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
           {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         </button>}
       </div>
     </div>
-    <iframe ref={iframe} className="chart-frame" src={demoUrl} title="Interactive Bloxwap chart playground" allowFullScreen />
-    <div className="preview-footer"><span>Draw, zoom, add indicators, and make it yours.</span><span>Powered by @bloxwap/chart</span></div>
+    <div ref={container} className="chart-preview">
+      <iframe ref={iframe} className="chart-frame" src={demoUrl} title="Interactive Bloxwap chart playground" allowFullScreen />
+    </div>
   </div>;
 }

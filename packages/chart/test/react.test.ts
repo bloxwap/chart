@@ -77,13 +77,47 @@ describe('<Chart />', () => {
     assert.equal(chart.dataLength, 25);
     m.render({ data: candles(25, 20), theme: 'light', config: { wasm: false } });
     assert.equal(chart.getConfig().theme.background, '#ffffff');
-    m.render({ data: candles(25, 20), config: { wasm: false } }); // theme removed: keeps the current colors
-    assert.equal(chart.getConfig().theme.background, '#ffffff');
     m.unmount();
   });
 
-  it('defaults the height, passes className and style through, and works without a theme', () => {
-    const m = mount({ data: candles(5), className: 'price', style: { borderRadius: '12px' }, config: { wasm: false } });
+  it("follows the system color scheme by default, live, and stops listening when pinned", () => {
+    const listeners = new Set<() => void>();
+    const scheme = { matches: true, addEventListener: (_: string, l: () => void) => listeners.add(l), removeEventListener: (_: string, l: () => void) => listeners.delete(l) };
+    const view = globalThis as unknown as { matchMedia: unknown };
+    const original = view.matchMedia;
+    view.matchMedia = (query: string) => { assert.equal(query, '(prefers-color-scheme: dark)'); return scheme; };
+    try {
+      const m = mount({ data: candles(5), config: { wasm: false } });
+      const chart = m.ref.current!;
+      assert.equal(chart.getConfig().theme.background, '#0a0a0a', 'dark system scheme');
+      assert.equal(listeners.size, 1);
+      scheme.matches = false;
+      for (const l of listeners) l();
+      assert.equal(chart.getConfig().theme.background, '#ffffff', 'follows a live change');
+      m.render({ data: candles(5), theme: 'dark', config: { wasm: false } });
+      assert.equal(listeners.size, 0, 'a fixed theme stops listening');
+      assert.equal(chart.getConfig().theme.background, '#0a0a0a');
+      m.unmount();
+    } finally {
+      view.matchMedia = original;
+    }
+  });
+
+  it('falls back to the light theme when the color scheme cannot be read', () => {
+    const view = globalThis as unknown as { matchMedia: unknown };
+    const original = view.matchMedia;
+    view.matchMedia = undefined;
+    try {
+      const m = mount({ data: candles(5), theme: 'system', config: { wasm: false } });
+      assert.equal(m.ref.current!.getConfig().theme.background, '#ffffff');
+      m.unmount();
+    } finally {
+      view.matchMedia = original;
+    }
+  });
+
+  it('defaults the height and passes className and style through', () => {
+    const m = mount({ data: candles(5), theme: 'light', className: 'price', style: { borderRadius: '12px' }, config: { wasm: false } });
     const box = m.host.firstElementChild as Box;
     assert.equal(box.className, 'price');
     assert.equal(box.style.height, '400px');

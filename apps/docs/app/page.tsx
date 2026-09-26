@@ -21,8 +21,12 @@ export default function Home() {
         </div>
         <HeroCode />
       </section>
-      <section id="playground" className="hero-preview" aria-label="Interactive chart playground">
-        <ChartPreview />
+      <section id="playground" className="hero-preview" aria-labelledby="playground-title">
+        <ChartPreview>
+          <p className="eyebrow"><span className="status-dot" /> SIMULATED LIVE DATA</p>
+          <h2 id="playground-title">Chart playground</h2>
+          <p>Draw, zoom, add indicators, and make it yours.</p>
+        </ChartPreview>
       </section>
       <section className="principles" aria-label="Library features">
         <div><span className="feature-number">01</span><h2>One typed config.</h2><p>Data, series, scales, and styling live in one configuration. Update just the fields you need.</p></div>

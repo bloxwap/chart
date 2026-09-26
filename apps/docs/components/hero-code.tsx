@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReactNode } from 'react';
+import { CopyButton } from './copy-button';
 
 /*
  * The homepage snippet is read from snippets/price-chart.tsx at build time. That file is part of
@@ -10,7 +11,7 @@ const SNIPPET_FILE = 'price-chart.tsx';
 
 const KEYWORDS = new Set(['import', 'from', 'export', 'function', 'const', 'return', 'type', 'new']);
 // Comments, strings, identifiers, then any single other character.
-const TOKEN = /(\/\/[^\n]*)|('[^'\n]*')|([A-Za-z_$][\w$]*)|([\s\S])/g;
+const TOKEN = /(\/\/[^\n]*)|('[^'\n]*'|"[^"\n]*")|([A-Za-z_$][\w$]*)|([\s\S])/g;
 
 /** A tiny highlighter for this one snippet, in the Bloxwap code palette (keyword, string, type). */
 function highlight(code: string): ReactNode[] {
@@ -42,9 +43,9 @@ export function HeroCode() {
     <figcaption className="code-toolbar">
       <span className="window-dots" aria-hidden="true"><i /><i /><i /></span>
       <span>{SNIPPET_FILE}</span>
-      <span className="code-language">TSX</span>
+      <span className="code-actions"><span className="code-language">TSX</span><CopyButton text={`${source}\n`} label="Copy code" /></span>
     </figcaption>
     <pre><code>{highlight(source)}</code></pre>
-    <p className="code-status"><span aria-hidden="true" /> A dark candlestick chart that fills its box</p>
+    <p className="code-status"><span aria-hidden="true" /> A candlestick chart that follows the system theme and fills its box</p>
   </figure>;
 }

@@ -38,7 +38,7 @@ In React:
 ```tsx
 import { Chart } from '@bloxwap/chart/react';
 
-<Chart data={candles} theme="dark" height={360} />;
+<Chart data={candles} height={360} />; // follows the system theme
 ```
 
 Anywhere else:
