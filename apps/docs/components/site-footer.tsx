@@ -2,7 +2,7 @@ import { assetUrl } from '@/lib/site';
 
 /** Link columns mirror the bloxwap.com footer (monorepo workers/www), so both sites point at the same places. */
 const COLUMNS: [string, [string, string][]][] = [
-  ['Product', [['Web', 'https://bloxwap.com'], ['Pro', 'https://bloxwap.pro'], ['App', 'https://bloxwap.com/#app']]],
+  ['Product', [['Home', 'https://bloxwap.com'], ['Web', 'https://bloxwap.com'], ['Pro', 'https://bloxwap.pro'], ['App', 'https://bloxwap.com/#app']]],
   ['Social', [['X', 'https://x.com/bloxwap'], ['Telegram', 'https://t.me/bloxwap'], ['Discord', 'https://discord.com/invite/cEfkcg6JHT'], ['Reddit', 'https://www.reddit.com/r/Bloxwap/']]],
   ['Company', [['Blog', 'https://bloxwap.com/blog'], ['Docs', 'https://bloxwap.com/docs'], ['GitHub', 'https://github.com/bloxwap'], ['Contact', 'mailto:support@bloxwap.com']]],
 ];
