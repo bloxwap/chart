@@ -10,3 +10,4 @@ apps/docs/out/
 apps/docs/next-env.d.ts
 apps/docs/public/chart-demo/
 *.tgz
+packages/chart/assets/icons/preview.html
