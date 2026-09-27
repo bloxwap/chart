@@ -8,12 +8,9 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@bloxwap/chart"><img alt="npm version" src="https://img.shields.io/npm/v/@bloxwap/chart?color=blue&style=flat-square"></a>
   <a href="https://www.npmjs.com/package/@bloxwap/chart"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@bloxwap/chart.svg?style=flat-square"></a>
-  <a href="https://bundlejs.com/?q=@bloxwap/chart"><img alt="Bundle size" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdeno.bundlejs.com%2F%3Fq%3D%40bloxwap%2Fchart&amp;query=%24.size.compressedSize&amp;label=minzipped+size&amp;style=flat-square&amp;color=blue"></a>
-  <a href="https://github.com/bloxwap/chart/actions/workflows/docs.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/bloxwap/chart/docs.yml?branch=main&style=flat-square"></a>
   <!-- Line coverage snapshot from npm run coverage; refresh after source or test changes. -->
-  <a href="packages/chart/scripts/check-coverage.mjs"><img alt="Line coverage: 99.65%" src="https://img.shields.io/badge/line_coverage-99.65%25-brightgreen?style=flat-square"></a>
-  <a href="https://github.com/bloxwap/chart/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/bloxwap/chart?style=flat-square"></a>
-  <a href="packages/chart/package.json"><img alt="Zero runtime dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square"></a>
+  <a href="packages/chart/scripts/check-coverage.mjs"><img alt="Coverage: 99.65%" src="https://img.shields.io/badge/coverage-99.65%25-brightgreen?style=flat-square"></a>
+  <a href="https://bundlejs.com/?q=@bloxwap/chart"><img alt="Bundle size" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdeno.bundlejs.com%2F%3Fq%3D%40bloxwap%2Fchart&amp;query=%24.size.compressedSize&amp;label=minzipped+size&amp;style=flat-square&amp;color=blue"></a>
 </p>
 
 ## Features
