@@ -8,8 +8,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@bloxwap/chart"><img alt="npm version" src="https://img.shields.io/npm/v/@bloxwap/chart?color=blue&style=flat-square"></a>
   <a href="https://www.npmjs.com/package/@bloxwap/chart"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@bloxwap/chart.svg?style=flat-square"></a>
-  <!-- Line coverage snapshot from npm run coverage; refresh after source or test changes. -->
-  <a href="packages/chart/scripts/check-coverage.mjs"><img alt="Coverage: 99.65%" src="https://img.shields.io/badge/coverage-99.65%25-brightgreen?style=flat-square"></a>
+  <a href="https://codecov.io/gh/bloxwap/chart"><img alt="Codecov coverage" src="https://img.shields.io/codecov/c/github/bloxwap/chart?branch=main&style=flat-square"></a>
   <a href="https://bundlejs.com/?q=@bloxwap/chart"><img alt="Bundle size" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdeno.bundlejs.com%2F%3Fq%3D%40bloxwap%2Fchart&amp;query=%24.size.compressedSize&amp;label=minzipped+size&amp;style=flat-square&amp;color=blue"></a>
 </p>
 
@@ -33,9 +32,6 @@
 
 Browse the [documentation and interactive playground](https://bloxwap.github.io/chart/)
 for guides, an API reference, and the complete chart controls.
-
-The documentation uses [Fumadocs](https://www.fumadocs.dev/) and is hosted on GitHub Pages. Its Markdown source lives
-in [`apps/docs/`](apps/docs).
 
 ## Installation
 
