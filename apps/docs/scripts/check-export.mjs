@@ -13,11 +13,41 @@ async function walk(path) {
     ? walk(join(path, entry.name)) : [join(path, entry.name)]))).flat();
 }
 for (const required of [
-  'index.html', '404.html', 'docs/index.html', 'search.json', 'icon.svg',
+  'index.html', '404.html', 'docs/index.html', 'developers/index.html', 'search.json', 'icon.svg',
+  'llms.txt', 'robots.txt', 'openapi.json', '404.md',
   'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js',
   'chart-demo/assets/fonts/Geist-Regular.woff2', 'chart-demo/assets/fonts/GeistMono-Regular.woff2',
 ]) {
   if (!await exists(join(root, required))) failures.push(`Missing ${required}`);
+}
+
+// Agent-readiness contract: every machine-readable file the site advertises must exist
+// and behave the way llms.txt, the 404 page, and the OpenAPI spec claim it does.
+const spec = JSON.parse(await readFile(join(root, 'openapi.json'), 'utf8'));
+if (spec.openapi !== '3.1.0') failures.push(`openapi.json: expected OpenAPI 3.1.0, got ${spec.openapi}`);
+if (!spec.info?.title || !spec.info?.description) failures.push('openapi.json: info needs a title and description');
+const operationIds = new Set();
+for (const [path, item] of Object.entries(spec.paths ?? {})) {
+  for (const [method, operation] of Object.entries(item)) {
+    if (!operation.operationId) failures.push(`openapi.json: ${method} ${path} has no operationId`);
+    else if (operationIds.has(operation.operationId)) failures.push(`openapi.json: duplicate operationId ${operation.operationId}`);
+    operationIds.add(operation.operationId);
+    if (!operation.description) failures.push(`openapi.json: ${operation.operationId ?? `${method} ${path}`} has no description`);
+    if (!Object.keys(operation.responses ?? {}).length) failures.push(`openapi.json: ${method} ${path} has no responses`);
+    // Each advertised path must really exist in the export.
+    const served = path.endsWith('/') ? join(root, path, 'index.html') : join(root, path);
+    if (!await exists(served)) failures.push(`openapi.json: ${path} is not served by the export`);
+  }
+}
+const llms = await readFile(join(root, 'llms.txt'), 'utf8');
+for (const reference of ['openapi.json', '/developers/', 'sitemap.xml', 'search.json']) {
+  if (!llms.includes(reference)) failures.push(`llms.txt does not reference ${reference}`);
+}
+const robots = await readFile(join(root, 'robots.txt'), 'utf8');
+if (!/^sitemap:\s*https:\/\/\S+\/sitemap\.xml\s*$/im.test(robots)) failures.push('robots.txt: missing absolute Sitemap directive');
+const notFoundMarkdown = await readFile(join(root, '404.md'), 'utf8');
+if (notFoundMarkdown.length < 20 || !/llms\.txt|sitemap|docs/.test(notFoundMarkdown)) {
+  failures.push('404.md must explain the error (20+ chars) and link to the docs, sitemap, or llms.txt');
 }
 const files = (await walk(root)).filter((file) => extname(file) === '.html');
 let checked = 0;
@@ -56,6 +86,18 @@ for (const file of files) {
       }
     } catch { failures.push(`${name}: missing social card ${imagePath}`); }
     socialCards++;
+  }
+  if (name === '404.html') {
+    // The 404 must explain the error in the HTML body and point agents at the indexes.
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    if (!/does not exist/i.test(text)) failures.push('404.html: body must explain that the page does not exist');
+    for (const target of [`${basePath}/llms.txt`, `${basePath}/sitemap.xml`, `${basePath}/404.md`]) {
+      if (!html.includes(`href="${target}"`)) failures.push(`404.html: missing link to ${target}`);
+    }
+    if (!html.includes('type="text/markdown"')) failures.push('404.html: missing rel="alternate" text/markdown link');
+  }
+  if (name === 'index.html' && !html.includes(`rel="service-desc"`) ) {
+    failures.push('index.html: missing rel="service-desc" link to openapi.json');
   }
   for (const match of html.matchAll(/<(?:a|link|script|img|iframe)\b[^>]*?\b(?:href|src)="([^"]+)"/g)) {
     const href = match[1].replaceAll('&amp;', '&');

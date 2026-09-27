@@ -75,7 +75,11 @@ Add the toolbar with `createDrawingToolbar({ chart, document, canvas, rail, over
 
 ## Optional
 
+- [Developer portal](https://bloxwap.github.io/chart/developers/): Quickstart, machine-readable resources, and the sandbox in one place.
 - [Interactive playground](https://bloxwap.github.io/chart/docs/playground/): The complete chart with drawing tools and a simulated live feed.
+- [OpenAPI specification](https://bloxwap.github.io/chart/openapi.json): OpenAPI 3.1 description of this site's machine-readable endpoints (this index, the sitemap, the search index).
+- [Search index](https://bloxwap.github.io/chart/search.json): Full-text index over all documentation for question answering without crawling.
+- [Sitemap](https://bloxwap.github.io/chart/sitemap.xml): Every public page with last modification dates.
 - [Development](https://bloxwap.github.io/chart/docs/development/): Run the library and edit these docs.
 - [Source code](https://github.com/bloxwap/chart): MIT-licensed repository and issue tracker.
 - [Bloxwap](https://bloxwap.github.io/about/): About Bloxwap, Inc., contact, and privacy.
