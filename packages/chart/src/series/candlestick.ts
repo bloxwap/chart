@@ -14,6 +14,7 @@ export const drawCandlesticks: SeriesDrawFn = (ctx, candles, range, timeScale, p
   const bodyWidth = Math.max(1, Math.floor(timeScale.barSpacing * 0.7));
   const wickUp = config.wickUpColor !== '' ? config.wickUpColor : config.upColor;
   const wickDown = config.wickDownColor !== '' ? config.wickDownColor : config.downColor;
+  let fill: string | undefined;
   for (let i = range.from; i < range.to; i++) {
     const c = (i === candles.length - 1 ? liveCandle : undefined) ?? candles[i];
     const up = c.close >= (config.colorByPreviousClose && i > 0 ? candles[i - 1].close : c.open);
@@ -25,14 +26,14 @@ export const drawCandlesticks: SeriesDrawFn = (ctx, candles, range, timeScale, p
     const yOpen = priceScale.priceToY(c.open);
     const yClose = priceScale.priceToY(c.close);
     if (config.wickVisible) {
-      ctx.fillStyle = wickColor;
+      if (fill !== wickColor) ctx.fillStyle = fill = wickColor;
       ctx.fillRect(x, Math.min(yHigh, yLow), 1, Math.max(1, Math.abs(yLow - yHigh)));
     }
     const bodyTop = Math.min(yOpen, yClose);
     const left = x - Math.floor(bodyWidth / 2);
     const height = Math.max(1, Math.abs(yClose - yOpen));
     if (config.bodyVisible) {
-      ctx.fillStyle = color;
+      if (fill !== color) ctx.fillStyle = fill = color;
       ctx.fillRect(left, bodyTop, bodyWidth, height);
     }
     if (config.borderVisible) {

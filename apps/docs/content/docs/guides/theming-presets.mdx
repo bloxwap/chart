@@ -1,0 +1,127 @@
+---
+title: Theming and presets
+description: Apply brand presets, layer themes and config, size scale text, and restyle the UI with CSS variables.
+---
+
+The canvas and the optional UI are themed separately. The **canvas** takes its colors and fonts from the chart config. The **UI** (toolbar, header, menus, settings, dialogs) takes them from CSS custom properties. A brand look sets both.
+
+## Presets, themes, and config
+
+`createChart` layers three sources, each overriding the one before it field by field:
+
+```text
+preset  <  theme  <  config
+```
+
+```ts
+import { createChart } from '@bloxwap/chart';
+
+const chart = createChart({
+  container: canvas,
+  preset: 'bloxwapDark',            // a named preset or any config partial
+  theme: 'dark',                    // CHART_THEMES.dark over the preset (optional)
+  config: { data, grid: { vertical: false } }, // wins over both
+});
+```
+
+- `preset` accepts a name from `CHART_PRESETS` or any `DeepPartial<ChartConfig>`. An unknown name throws.
+- `theme` applies `CHART_THEMES.dark` or `CHART_THEMES.light`. Leave it out to keep a preset's colors: a theme sets background, text, border, grid, crosshair, and candle colors.
+- `config` is your own partial. It always wins.
+
+To apply a preset later, merge it like any partial: `chart.updateConfig(bloxwapDark)`. `withPreset(preset, partial)` performs the same layering for your own code.
+
+## The bloxwap.pro preset
+
+`bloxwapDark` reproduces the bloxwap.pro chart. It is exported by name and in `CHART_PRESETS`.
+
+| Group | Values |
+| --- | --- |
+| `theme` | `#171717` background and pane separators, `#a1a1a1` text, one system-ui family for UI text, the status line, drawing labels, and scales, 11px scale text |
+| `grid` | `rgba(255, 255, 255, 0.05)` |
+| `crosshair` | `#737373` lines, `#262626` label fill, `#fafafa` label text |
+| `series` | `#00ff3f` up and `#ff479c` down bodies and wicks, no borders |
+| `statusLine` | Visible, without volume |
+| `priceAxis` | Last-price line and badge, colored by the bar's direction |
+| `volume` | A 50% opacity volume overlay in the candle colors |
+
+## Keep a preset across theme changes
+
+The drawing toolbar applies `CHART_THEMES[theme]` to the chart when it mounts and on every `toolbar.setTheme`, on top of any preset. You have two options:
+
+```ts
+import { createChart, presetChartTheme } from '@bloxwap/chart';
+import { createDrawingToolbar, createChartSettings } from '@bloxwap/chart/ui';
+
+const chart = createChart({ container: canvas, preset: 'bloxwapDark', config: { data } });
+
+// 1. Keep the preset's colors on dark and use the light theme on light.
+const chartTheme = presetChartTheme('bloxwapDark');
+const toolbar = createDrawingToolbar({ chart, document, canvas, rail, overlay, chartTheme });
+const settings = createChartSettings({ chart, document, trigger, chartTheme }); // so Reset defaults agrees
+
+// 2. Or never let the UI touch the chart's colors.
+// createDrawingToolbar({ ..., applyChartTheme: false });
+// createChartSettings({ ..., applyChartTheme: false });
+```
+
+`presetChartTheme(preset, presetTheme = 'dark')` returns a `(theme) => DeepPartial<ChartConfig>` mapping that contains **colors only**: on `presetTheme` it applies the preset's colors over that built-in theme; on the other theme it applies the built-in theme and resets the colors only the preset sets (wicks, borders, crosshair labels) to their defaults. It never re-applies fonts, sizes, or feature toggles, so a theme toggle never undoes the user's settings. If you write your own `chartTheme`, return colors only for the same reason.
+
+After `settings.setTheme(theme)`, the settings card's **Reset defaults** restores that theme's colors.
+
+In React, `<Chart preset="bloxwapDark" />` keeps the preset's colors. Without a `theme` prop, a chart with a preset doesn't follow the system color scheme. See [React integration](/docs/guides/react).
+
+## Scale text
+
+Price and time scale labels, crosshair labels, and price badges share one font, which can differ from the status line and drawing labels, as in TradingView:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `theme.fontFamily` | `system-ui, sans-serif` | UI text and the watermark |
+| `theme.monoFamily` | `ui-monospace, monospace` | Status line and drawing labels; scale text too unless `scaleFontFamily` is set |
+| `theme.fontSize` | `12` | Status line and drawing labels; scale text too unless `scaleFontSize` is set |
+| `theme.scaleFontSize` | `null` | Scale text size in CSS pixels; `null` follows `fontSize` |
+| `theme.scaleFontFamily` | `''` | Scale text family; empty follows `monoFamily` |
+
+```ts
+chart.updateConfig({ theme: { scaleFontSize: 11, scaleFontFamily: 'system-ui, sans-serif' } });
+```
+
+`scaleFontSize(theme)` and `scaleFont(theme)` return the resolved size and CSS font shorthand for custom layers. The settings card's **Scale text size** control edits `scaleFontSize`; its **Text size** control still resizes everything.
+
+## UI custom properties
+
+The UI injects one scoped stylesheet. Every class starts with `cts-`, and colors come from custom properties set on each `.cts-theme` element: dark by default, with a `.cts-light` variant. `setTheme('light')` on a toolbar, header, dialog, or settings handle toggles that class.
+
+| Property | Dark | Light | Styles |
+| --- | --- | --- | --- |
+| `--cts-bg` | `#0a0a0a` | `#f5f7fa` | Rail and input backgrounds |
+| `--cts-panel` | `#171717` | `#ffffff` | Menus, cards, and dialogs |
+| `--cts-panel-raised` | `#262626` | `#f0f3fa` | Raised rows and fields |
+| `--cts-edge` | `#262626` | `#d8dee6` | Dividers and outlines |
+| `--cts-idle` | `#a1a1a1` | `#5a6472` | Idle text and icons |
+| `--cts-muted` | `#737373` | `#8a93a3` | Secondary text |
+| `--cts-hover` | `#fafafa` | `#131722` | Hovered and active text |
+| `--cts-accent` | `#2962ff` | `#2962ff` | Selection, focus, and primary buttons |
+| `--cts-accent-soft` | 18% accent | 12% accent | Hover fills |
+| `--cts-on-accent` | `#ffffff` | `#ffffff` | Text on the accent |
+| `--cts-favorite` | `#f7b500` | `#f7b500` | Favorite stars |
+| `--cts-overlay`, `--cts-shadow` | | | Floating surfaces |
+| `--cts-radius-sm`, `--cts-radius-md` | `4px`, `8px` | | Corners |
+| `--cts-font`, `--cts-mono` | Geist, Geist Mono | | UI text |
+
+Because the theme classes set these properties on each `.cts-theme` element, an override on an ancestor doesn't reach them. Target the elements with a selector that outranks `.cts-theme.cts-light`, so your values win whatever order the stylesheets load in:
+
+```css
+/* bloxwap.pro chrome: fill-only surfaces, no strokes. */
+html .cts-theme,
+html .cts-theme.cts-light {
+  --cts-bg: #171717; --cts-panel: #171717; --cts-panel-raised: #262626; --cts-edge: transparent;
+  --cts-idle: #a1a1a1; --cts-muted: #737373; --cts-hover: #fafafa;
+  --cts-accent: #00ff3f; --cts-accent-soft: #262626; --cts-on-accent: #0a0a0a;
+  --cts-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+```
+
+Drop the `.cts-light` selector if light mode should keep the default palette. The header and the on-chart scale buttons add their own `--cts-header-*` properties, which the theme classes never set, so those work on any ancestor. See [header theming](/docs/guides/header#theming), `BLOXWAP_HEADER_TOKENS`, and the dark-only `BLOXWAP_HEADER_THEME`.
+
+`TOOLBAR_CSS` and `injectStyles(doc)` are exported for shadow-DOM and server-rendered hosts. The injected style element carries the `data-chart-ts-ui` attribute (`STYLE_MARKER`).

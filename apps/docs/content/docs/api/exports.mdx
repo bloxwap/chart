@@ -7,16 +7,48 @@ The package ships ESM and TypeScript declarations. There is no CommonJS export. 
 
 | Import path | Main exports |
 | --- | --- |
-| `@bloxwap/chart` | `createChart`, `Chart`, config helpers, scales, data types, built-in registries, themes, canvas abstractions |
+| `@bloxwap/chart` | `createChart`, `Chart`, config helpers, scales, data types, built-in registries, themes and presets, events, snapshots, canvas abstractions |
 | `@bloxwap/chart/config` | `defineConfig`, `resolveConfig`, `DEFAULT_CONFIG`, config types |
 | `@bloxwap/chart/color` | Color parsing, serialization, alpha and contrast helpers |
 | `@bloxwap/chart/dom` | Canvas/document interfaces and recording mocks |
 | `@bloxwap/chart/indicators` | Indicator registry, built-ins, and calculation helpers |
 | `@bloxwap/chart/drawings` | Drawing registry, catalog, built-ins, and geometry types |
 | `@bloxwap/chart/wasm` | WASM initialization and kernel interface |
-| `@bloxwap/chart/ui` | Drawing toolbar, settings, controller, history, UI primitives, and frame scheduler |
+| `@bloxwap/chart/ui` | Drawing toolbar, settings, header, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker, controller, history, UI primitives, and frame scheduler |
 | `@bloxwap/chart/icons` | `ICONS` and `icon(name, size?)` |
 | `@bloxwap/chart/react` | `<Chart>` React component (`'use client'`), `ChartProps`, `ChartInstance` |
+| `@bloxwap/chart/datafeed` | `createDatafeedChart`, `attachDatafeed`, `loadHistory`, `createLiveBarFolder`, paging and bucket helpers |
+
+## Main entry additions
+
+Beyond `createChart`, the root entry exports:
+
+| Area | Exports |
+| --- | --- |
+| Presets and themes | `CHART_THEMES`, `CHART_PRESETS`, `bloxwapDark`, `withPreset`, `presetChartTheme`, `scaleFont`, `scaleFontSize` |
+| Events | `Emitter`; types `VisibleRangeChangeEvent`, `CrosshairMoveEvent`, `DataLoadEvent`, `DataLoadReason`, `LayoutChangeEvent`, `ConfigChangeEvent` |
+| Price lines and markers | `DEFAULT_PRICE_LINE_COLOR`, `MARKER_MIN_SIZE`, `MARKER_MAX_SIZE`; types `SeriesApi`, `PriceLine`, `PriceLineOptions`, `PriceLineStyle`, `SeriesMarker`, `SeriesMarkerPosition`, `SeriesMarkerShape` |
+| Snapshots | `renderSnapshot`, `createSnapshotCanvas`, `canvasToBlob`, `canvasToDataURL`, `snapshotToBlob`, `snapshotToDataURL`; types `SnapshotOptions`, `SnapshotImageOptions`, `SnapshotBlob` |
+| Countdown | `formatCountdown`, `barIntervalMs`, `barCloseMs`, `barCountdownMs`, `countdownText` |
+| Time scale | `computeTimeSlots`, `inferIntervalMs`; types `TimeScaleConfig`, `SlotRange` |
+| Series | `heikinAshi`, `heikinAshiBar`, `updateHeikinAshi` |
+| Indicators | All 20 built-in definitions (`smaIndicator` … `psarIndicator`), calculation helpers such as `smaValues`, `atrValues`, and `ichimokuValues`, the `vwapMeta`, `adxMeta`, `cciMeta`, `mfiMeta`, `obvMeta`, and `maRibbonMeta` display metadata, `indicatorLineKeys`, `indicatorStyleColors`, `indicatorLineLabels`, `indicatorStyleLabel`, `applyIndicatorPatch`; types `IndicatorFill`, `IndicatorLevel`, `IndicatorInputDef`, `IndicatorStyleDef`, `IndicatorPatch`, `ResolvedIndicatorConfig` |
+| Data | `DataStore`, `Candle`, `IndicatorHit` |
+
+## UI entry additions
+
+| Area | Exports |
+| --- | --- |
+| Header | `createChartHeader`, `DEFAULT_TIMEFRAMES`, `DEFAULT_HEADER_INTERVAL_MS`, `DEFAULT_CHART_TYPES`, `CHART_TYPE_LABELS`, `HEADER_CSS`, `HEADER_STYLE_MARKER`, `injectHeaderStyles`, `BLOXWAP_HEADER_TOKENS`, `BLOXWAP_HEADER_THEME`; types `HeaderTokens`, `ThemedHeaderTokens` |
+| Scale buttons | `createScaleButtons`, `toggleScale`, `scaleToggleState`, `syncScaleToggles`, `SCALE_TOGGLES` |
+| Indicator dialog | `createIndicatorsDialog`, `indicatorInputs`, `indicatorStyleGroups`, `INDICATORS_DIALOG_CSS`, `INDICATORS_DIALOG_STYLE_MARKER` |
+| Context menu | `createChartContextMenu`; types `ChartContextMenuHooks`, `ContextMenuTarget`, `ContextMenuAction`, `ContextMenuEntry` |
+| Touch | `attachTouchGestures`, `GestureRecognizer`, `LONG_PRESS_MS`, `TAP_SLOP_PX`, `TOUCH_HIT_PX`, `TOUCH_HANDLE_HIT_PX`, `DOUBLE_TAP_MS`, `FLING_MIN_VELOCITY`, `FLING_DURATION_MS`, `TOUCH_POINTER_TYPES` |
+| Countdown | `startCountdownTicker` |
+
+## Datafeed entry
+
+`@bloxwap/chart/datafeed` exports `createDatafeedChart`, `attachDatafeed`, `loadHistory`, `pageWindow`, `barsInWindow`, `mergeCandles`, `normalizeCandles`, `createLiveBarFolder`, `bucketStartMs`, `candleTimeMs`, `applyTick`, `hasMissedBucket`, `seedBarFromTick`, and the constants `DEFAULT_PAGE_SIZE`, `DEFAULT_MAX_EMPTY_PAGES`, `DEFAULT_INITIAL_BARS`, `DEFAULT_PAGE_BARS`, `MIN_LAZY_LOAD_THRESHOLD`, `RETRY_BACKOFF_MS`, `MAX_RETRY_BACKOFF_MS`, `MAX_GAP_BARS`, `GAP_SILENCE_MS`, `ROLL_SILENCE_MS`, and `MAX_PENDING_TICKS`. See [paging datafeed](/docs/guides/datafeed).
 
 ## Icons
 

@@ -25,6 +25,8 @@ export interface CanvasImageSourceLike {
  * A real `CanvasRenderingContext2D` is structurally assignable to this type.
  */
 export interface Canvas2DLike {
+  isContextLost?(): boolean;
+  getContextAttributes?(): { colorSpace?: 'srgb' | 'display-p3' };
   fillStyle: string | object;
   strokeStyle: string | object;
   lineWidth: number;
@@ -74,7 +76,15 @@ export interface Canvas2DLike {
 export interface ChartCanvas {
   width: number;
   height: number;
-  getContext(contextId: '2d'): Canvas2DLike | null;
+  getContext(contextId: '2d', options?: { colorSpace?: 'srgb' | 'display-p3' }): Canvas2DLike | null;
+  addEventListener?(type: 'contextrestored', listener: () => void): void;
+  removeEventListener?(type: 'contextrestored', listener: () => void): void;
+  /** Optional browser document used to lazily allocate the crosshair's raster cache. */
+  readonly ownerDocument?: { createElement?(tag: 'canvas'): ChartCanvas; readonly defaultView?: unknown } | null;
+  /** Encodes the bitmap (e.g. a `Blob`); the callback receives `null` when encoding fails. Used by snapshots. */
+  toBlob?(callback: (blob: unknown) => void, type?: string, quality?: number): void;
+  /** Encodes the bitmap as a data URL. Used by snapshots. */
+  toDataURL?(type?: string, quality?: number): string;
 }
 
 /** A `ResizeObserver` as the canvas's own window provides it. */
@@ -102,7 +112,7 @@ export interface AutoResizeParent {
  * it; the core reads it structurally so it still never touches the global `document` or `window`.
  */
 export interface AutoResizeCanvas extends ChartCanvas {
-  readonly ownerDocument?: { readonly defaultView: AutoResizeWindow | null } | null;
+  readonly ownerDocument?: { createElement?(tag: 'canvas'): ChartCanvas; readonly defaultView: AutoResizeWindow | null } | null;
   readonly parentElement?: AutoResizeParent | null;
   readonly style?: { position: string; inset: string; width: string; height: string; display: string };
 }
@@ -223,6 +233,13 @@ export class MockContext2D implements Canvas2DLike {
   }
 }
 
+/** The deterministic stand-in for a `Blob` that {@link MockCanvas.toBlob} produces. */
+export interface MockBlob {
+  /** Uncompressed RGBA byte count of the encoded bitmap. */
+  readonly size: number;
+  readonly type: string;
+}
+
 /** A {@link ChartCanvas} whose 2D context records all calls. */
 export class MockCanvas implements ChartCanvas {
   width: number;
@@ -236,6 +253,16 @@ export class MockCanvas implements ChartCanvas {
 
   getContext(contextId: '2d'): Canvas2DLike | null {
     return contextId === '2d' ? this.context : null;
+  }
+
+  /** Synchronously yields a {@link MockBlob}, or `null` for an empty bitmap like browsers do. */
+  toBlob(callback: (blob: MockBlob | null) => void, type = 'image/png'): void {
+    callback(this.width > 0 && this.height > 0 ? { size: this.width * this.height * 4, type } : null);
+  }
+
+  /** `data:<type>;mock,<width>x<height>`, or `data:,` for an empty bitmap like browsers do. */
+  toDataURL(type = 'image/png'): string {
+    return this.width > 0 && this.height > 0 ? `data:${type};mock,${this.width}x${this.height}` : 'data:,';
   }
 }
 

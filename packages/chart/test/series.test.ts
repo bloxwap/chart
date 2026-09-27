@@ -36,8 +36,8 @@ const FULL = { from: 0, to: 3 };
 const EMPTY = { from: 0, to: 0 };
 
 describe('SERIES_RENDERERS', () => {
-  it('registers all five types', () => {
-    assert.deepEqual(Object.keys(SERIES_RENDERERS).sort(), ['area', 'bar', 'candlestick', 'histogram', 'line']);
+  it('registers every built-in type', () => {
+    assert.deepEqual(Object.keys(SERIES_RENDERERS).sort(), ['area', 'bar', 'candlestick', 'heikin-ashi', 'histogram', 'hollow-candlestick', 'line']);
   });
 });
 

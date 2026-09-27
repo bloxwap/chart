@@ -12,7 +12,7 @@ import type { Candle } from './core/data.js';
 import type { CanvasImageSourceLike } from './dom.js';
 
 /** Built-in main-series renderers. */
-export type SeriesType = 'candlestick' | 'line' | 'area' | 'bar' | 'histogram';
+export type SeriesType = 'candlestick' | 'line' | 'area' | 'bar' | 'histogram' | 'heikin-ashi' | 'hollow-candlestick';
 
 /** Main series appearance. Colors accept hex, rgb(a), and `color(display-p3 ...)`. */
 export interface SeriesConfig {
@@ -51,6 +51,15 @@ export interface IndicatorConfig {
   /** Line color overrides merged over the indicator's defaults. */
   colors: string[];
   visible: boolean;
+  /**
+   * Stroke width per output line: indexed like `indicatorLineKeys(def)` when
+   * the definition declares style rows (so a width stays with its plot when
+   * a study omits some lines), else by output line order. Missing or
+   * non-positive entries keep the indicator's own width (1px). Default `[]`.
+   */
+  lineWidths?: number[];
+  /** Keys of output lines, bars, fills or levels to hide. Default `[]`. */
+  hiddenLines?: string[];
 }
 
 /** A point of a drawing in data coordinates. */
@@ -112,7 +121,8 @@ export interface PriceAxisConfig {
   priceToBarRatio: number | null;
   /** null preserves the host's price formatter. */
   precision: number | null;
-  labels: { lastPrice: boolean; highLow: boolean; indicator: boolean };
+  /** `countdown` adds the bar-close countdown under the last-price badge. */
+  labels: { lastPrice: boolean; highLow: boolean; indicator: boolean; countdown: boolean };
   lines: { lastPrice: boolean; previousClose: boolean; highLow: boolean };
   plusButton: boolean;
 }
@@ -126,6 +136,8 @@ export interface StatusLineConfig {
   change: boolean;
   volume: boolean;
   indicators: boolean;
+  /** Time left until the latest bar closes (needs a known interval, see {@link TimeAxisConfig.intervalMs}). */
+  countdown: boolean;
 }
 
 /** Time (horizontal) axis options. */
@@ -135,6 +147,34 @@ export interface TimeAxisConfig {
   height: number;
   /** Approximate number of ticks. */
   tickCount: number;
+  /**
+   * Bar interval in ms for the countdown; null uses {@link TimeScaleConfig.intervalMs}
+   * when that is set, else infers it from the last two candles.
+   */
+  intervalMs: number | null;
+}
+
+/**
+ * Horizontal scale layout (label options live in {@link TimeAxisConfig}).
+ *
+ * By default the axis is bar-indexed: every candle takes one bar width and time
+ * gaps (weekends, halts, missing candles) collapse, like TradingView and
+ * lightweight-charts. That suits 24x7 crypto, but session-based markets then show
+ * Friday's close right beside Monday's open. `continuous: true` places each candle
+ * at its time slot instead, `round((time - firstTime) * 1000 / intervalMs)`, so gaps
+ * appear as empty space; bar spacing, scrolling and zoom are then measured in slots.
+ * Drawings, indicators and the {@link import('./core/chart.js').ScaleApi} still use
+ * candle indices; indices beyond the data extend one slot per bar.
+ */
+export interface TimeScaleConfig {
+  /** Lay candles out by time so gaps show as empty space. Default false (bar-indexed). */
+  continuous: boolean;
+  /**
+   * Slot width in milliseconds. `null` (default), zero, negative or non-finite values
+   * infer it as the most common positive delta between consecutive candle times.
+   * The bar-close countdown also uses it when {@link TimeAxisConfig.intervalMs} is null.
+   */
+  intervalMs: number | null;
 }
 
 export interface GridConfig {
@@ -165,10 +205,28 @@ export interface ThemeConfig {
   borderColor: string;
   /** Sans family for UI text (and the watermark unless overridden). System fallbacks by default. */
   fontFamily: string;
-  /** Monospace/tabular family for numeric text: axis and crosshair labels. */
+  /** Monospace/tabular family for the status line and drawing labels; also scale text unless `scaleFontFamily` is set. */
   monoFamily: string;
-  /** Axis and crosshair label size in CSS pixels. */
+  /** Status line and drawing label size in CSS pixels; also scale text unless `scaleFontSize` is set. */
   fontSize: number;
+  /** Price/time scale text size (ticks, crosshair and price labels); null inherits `fontSize`. */
+  scaleFontSize: number | null;
+  /** Price/time scale text family; empty string (the default) inherits `monoFamily`. */
+  scaleFontFamily: string;
+}
+
+/** Volume histogram pinned to the bottom of the main pane, drawn under the series. */
+export interface VolumeConfig {
+  /** Draw the overlay. Independent of the `vol` sub-pane indicator. */
+  overlay: boolean;
+  /** Rising-bar color; the `'up'` token (default) follows `series.upColor`. */
+  upColor: string;
+  /** Falling-bar color; the `'down'` token (default) follows `series.downColor`. */
+  downColor: string;
+  /** 0-1; multiplies the bar color alpha. */
+  opacity: number;
+  /** 0-1 fraction of the main pane height reached by the tallest visible bar. */
+  height: number;
 }
 
 /** Label formatting hooks. */
@@ -194,10 +252,13 @@ export interface ChartConfig {
   drawings: DrawingConfig[];
   priceAxis: PriceAxisConfig;
   timeAxis: TimeAxisConfig;
+  /** Bar-indexed (default) or time-continuous horizontal layout. */
+  timeScale: TimeScaleConfig;
   grid: GridConfig;
   crosshair: CrosshairConfig;
   theme: ThemeConfig;
   watermark: WatermarkConfig;
+  volume: VolumeConfig;
   formatters: FormattersConfig;
   /** Relative height of each indicator sub-pane (main pane weighs 3). */
   indicatorPaneWeight: number;
@@ -252,15 +313,16 @@ export const DEFAULT_CONFIG: ChartConfig = {
   },
   indicators: [],
   drawings: [],
-  statusLine: { visible: false, symbol: 'Symbol', symbolVisible: true, ohlc: true, change: true, volume: false, indicators: true },
+  statusLine: { visible: false, symbol: 'Symbol', symbolVisible: true, ohlc: true, change: true, volume: false, indicators: true, countdown: false },
   priceAxis: {
     visible: true, width: 64, tickCount: 6, position: 'right', autoScale: true,
     scaleSeriesOnly: false, inverted: false, mode: 'regular', lockPriceToBarRatio: false,
     priceToBarRatio: null, precision: null,
-    labels: { lastPrice: false, highLow: false, indicator: false },
+    labels: { lastPrice: false, highLow: false, indicator: false, countdown: false },
     lines: { lastPrice: false, previousClose: false, highLow: false }, plusButton: false,
   },
-  timeAxis: { visible: true, height: 24, tickCount: 6 },
+  timeAxis: { visible: true, height: 24, tickCount: 6, intervalMs: null },
+  timeScale: { continuous: false, intervalMs: null },
   grid: { visible: true, horizontal: true, vertical: true, color: 'rgba(120, 130, 150, 0.15)' },
   crosshair: { visible: true, mode: 'cross', color: '#758696', dashed: true, labelBackground: '#2962ff', labelColor: 'auto' },
   theme: {
@@ -270,6 +332,8 @@ export const DEFAULT_CONFIG: ChartConfig = {
     fontFamily: 'system-ui, sans-serif',
     monoFamily: 'ui-monospace, monospace',
     fontSize: 12,
+    scaleFontSize: null,
+    scaleFontFamily: '',
   },
   watermark: {
     visible: false,
@@ -280,6 +344,7 @@ export const DEFAULT_CONFIG: ChartConfig = {
     fontSize: 48,
     fontFamily: '',
   },
+  volume: { overlay: false, upColor: 'up', downColor: 'down', opacity: 0.5, height: 0.2 },
   formatters: { price: defaultPriceFormatter, time: defaultTimeFormatter },
   indicatorPaneWeight: 1,
 };

@@ -5,15 +5,30 @@ description: Add built-in studies or register a calculation of your own.
 
 ## Built-in studies
 
-| Name | Study | Default placement |
-| --- | --- | --- |
-| `sma` | Simple moving average | Main pane |
-| `ema` | Exponential moving average | Main pane |
-| `boll` | Bollinger Bands | Main pane |
-| `macd` | Moving average convergence/divergence | Sub-pane |
-| `rsi` | Relative strength index | Sub-pane |
-| `kdj` | KDJ oscillator | Sub-pane |
-| `vol` | Volume | Sub-pane |
+| Name | Study | Default placement | Default params |
+| --- | --- | --- | --- |
+| `sma` | Simple moving average | Main pane | `period: 20` |
+| `ema` | Exponential moving average | Main pane | `period: 20` |
+| `boll` | Bollinger Bands | Main pane | `period: 20, mult: 2` |
+| `vwap` | Volume weighted average price, with optional bands | Main pane | `anchor: 0, bands: 0` |
+| `ma-ribbon` | Moving average ribbon, up to eight averages | Main pane | `type: 1, len1: 20, len2: 50, len3: 100, len4: 200` |
+| `supertrend` | Supertrend | Main pane | `period: 10, multiplier: 3` |
+| `ichimoku` | Ichimoku Cloud | Main pane | `conversion: 9, base: 26, span: 52, displacement: 26` |
+| `donchian` | Donchian Channels | Main pane | `period: 20` |
+| `psar` | Parabolic SAR | Main pane | `start: 0.02, increment: 0.02, max: 0.2` |
+| `macd` | Moving average convergence/divergence | Sub-pane | `fast: 12, slow: 26, signal: 9` |
+| `rsi` | Relative strength index | Sub-pane | `period: 14` |
+| `kdj` | KDJ oscillator | Sub-pane | `period: 9` |
+| `vol` | Volume | Sub-pane | None |
+| `adx` | Average directional index with +DI and -DI | Sub-pane | `adxSmoothing: 14, diLength: 14` |
+| `cci` | Commodity channel index, with ±100 bands | Sub-pane | `period: 20` |
+| `mfi` | Money flow index, with 80/20 bands | Sub-pane | `period: 14` |
+| `obv` | On balance volume | Sub-pane | None |
+| `atr` | Average true range | Sub-pane | `period: 14` |
+| `stoch` | Stochastic, with 80/20 bands | Sub-pane | `period: 14, smoothK: 1, smoothD: 3` |
+| `stochrsi` | Stochastic RSI, with 80/20 bands | Sub-pane | `rsi: 14, stoch: 14, k: 3, d: 3` |
+
+The newer studies follow TradingView's definitions. Choice inputs are numbers: VWAP's `anchor` is `0` (session), `1` (week), or `2` (month), and a positive `bands` multiplier adds bands with a fill. The MA ribbon's `type` is `0` (SMA) or `1` (EMA), and a length of `0` turns that average off. Ichimoku's spans are displaced into the whitespace after the last bar.
 
 ```ts
 const smaId = chart.addIndicator({ name: 'sma', params: { period: 20 } });
@@ -24,23 +39,66 @@ chart.addIndicator({ name: 'vol' });
 chart.removeIndicator(smaId);
 ```
 
-`addIndicator` merges parameter and color overrides with the registered defaults. It returns an instance ID. Supply your own stable `id` when an application needs to refer to a study later.
+`addIndicator` merges parameter overrides with the registered defaults; `colors` replaces the default color list. It returns an instance ID. Supply your own stable `id` when an application needs to refer to a study later.
 
 ## Configure existing indicators
 
-There is no dedicated `updateIndicator` method. Replace the `indicators` array through `updateConfig`, keeping each unchanged instance intact:
+```ts
+chart.updateIndicator(rsiId, { params: { period: 21 } }); // params merge per key
+chart.updateIndicator(rsiId, { visible: false });          // hide, keeping the config
+chart.getIndicator(rsiId);                                 // the config, or undefined
+```
+
+`updateIndicator(id, patch)` returns whether the instance exists. `params` merge over the current values; `colors`, `lineWidths`, and `hiddenLines` replace. Only parameter and color changes recompute; widths, hidden plots, pane, and visibility just repaint. Replacing the whole `indicators` array through `updateConfig` still works.
+
+## Style an instance
+
+Each instance can restyle its plots without a new definition:
 
 ```ts
-chart.updateConfig({
-  indicators: chart.getConfig().indicators.map((indicator) =>
-    indicator.id === rsiId
-      ? { ...indicator, params: { ...indicator.params, period: 21 } }
-      : indicator,
-  ),
+chart.addIndicator({
+  name: 'macd',
+  colors: ['#00ff3f', '#ff479c', 'up', 'down'], // MACD, signal, histogram positive and negative
+  lineWidths: [2, 1],                  // per line plot
+  hiddenLines: ['hist'],               // keys of lines, bars, fills, or levels to hide
 });
 ```
 
-Arrays in `updateConfig` replace the existing array. Use `visible: false` to hide a study while retaining its configuration.
+- **Colors** replace the definition's `defaultColors` and are indexed the same way, so pass one per entry. The `'up'` and `'down'` tokens follow the series colors, so direction-colored bars always match the candles.
+- **Widths** are indexed by the definition's line plots, in the order of `indicatorLineKeys(def)`, so a width stays with its plot when a study omits some lines. Missing or non-positive entries keep 1px.
+- **Hidden plots** hide lines, histogram bars, fills, or levels by key. A band fill stays when you hide one of its boundary lines, as in TradingView; hide the fill by its own key.
+
+The keys and color slots of each built-in are in its `styles` metadata (below). For example, CCI and MFI have `upperBand` and `lowerBand` levels (colors 1 and 2), and VWAP's band fill is `bandsFill` (color 3, default `rgba(76, 175, 80, 0.1)`).
+
+## Indicators dialog
+
+`createIndicatorsDialog` from `@bloxwap/chart/ui` adds TradingView's indicator picker and per-study settings:
+
+```ts
+import { createIndicatorsDialog } from '@bloxwap/chart/ui';
+
+const indicators = createIndicatorsDialog({
+  chart,
+  document,                 // injected, never a global
+  theme: 'dark',            // change later with setTheme()
+  settingsOnAdd: true,      // open a study's settings right after adding it (default false)
+  onOpen: () => settings.close(),
+  onChange: () => save(chart.getConfig().indicators),
+});
+
+indicatorsButton.onclick = () => indicators.openPicker();
+legendGear.onclick = () => indicators.openSettings(studyId); // false if there is no such study
+```
+
+- **Picker:** search every registered indicator by name, short name, or group. Overlays go on the price pane; oscillators get their own pane. Click a result, or type and press Enter, to add it. The **On chart** list shows each study's short name and inputs (for example `MACD 12 26 9`) with settings, show/hide, and remove buttons.
+- **Settings:** **Inputs** are number fields that honor each input's min, max, step, and whole-number rules, or selects for choice inputs. **Style** has one row per plot with a visibility checkbox, a color per series (the MACD histogram and Supertrend have two), and a 1 to 4px width for lines and dots. Translucent colors keep their opacity when you pick a new color; their swatches show the color at full opacity, and the tooltip gives the stored value. **Visibility** chooses the pane and shows or hides the study.
+- **Buttons:** changes apply live. **OK** keeps them. **Cancel**, Escape, or the close button restores the study as it was when its settings opened. **Defaults** restores the definition's inputs, colors, widths, visible plots, and pane.
+- **Accessibility:** it is a labelled, modal `role="dialog"`. Focus moves in on open and returns on close, Tab stays inside, arrow keys move through the list, and Escape clears the search, then closes. After a finger press, focus goes to the dialog itself rather than the search or the first input, so the on-screen keyboard doesn't cover it; tap a field to type.
+- **Outside changes:** the dialog follows studies added, changed, hidden, or removed anywhere (the context menu, the toolbar, your own code) as soon as they render, through [`subscribeConfigChange`](/docs/guides/events#config-changes). The open picker relists **On chart** (keeping the search and the focused row button), open settings resync their controls and candle-following colors when their study or the candle colors change (a value you are typing survives changes to other studies), and settings whose study is removed go back to the picker they were opened from, or close. `indicators.refresh()` is only needed inside a `chart.batch` or after editing indicator configs in place. `setTheme(theme)` refreshes too.
+
+Custom indicators registered without metadata work as well: each `defaultParams` key becomes a number field (`smoothK` is labelled "Smooth K"), and each default color becomes a "Plot n" row. `indicatorInputs(def)` and `indicatorStyleGroups(def)` return the same input and style-row model for your own UI. `INDICATORS_DIALOG_CSS` is exported for shadow-DOM or server-rendered hosts.
+
+The chart's [context menu](/docs/guides/toolbar-settings#context-menus) adds Settings…, Hide, and Remove for the indicator under the pointer, found with `chart.indicatorAt(x, y)`, and for the study owning a sub-pane when you right-click its empty space, found with `chart.paneAt(y)`.
 
 ## Register a custom indicator
 
@@ -69,5 +127,30 @@ chart.addIndicator({ name: 'close-offset', params: { offset: 10 } });
 ```
 
 Calculations must be pure. Return values aligned to the input candles, using `null` for unavailable values such as a moving average's warmup period. Results are cached; do not mutate them after returning them.
+
+## Output shapes
+
+`compute` returns an `IndicatorOutput`:
+
+| Field | Draws |
+| --- | --- |
+| `lines` | Lines with `key`, `values`, and `color`; optional `lineWidth`, `style` (`'line'`, `'step'`, or `'dots'`), `dash`, `offset` (bars to shift the plot, e.g. Ichimoku), and per-bar `colors` (Supertrend) |
+| `bars` | Direction-colored histogram bars (VOL, the MACD histogram) with an optional `key` |
+| `fills` | Bands filled between two lines by `upperKey` and `lowerKey`, with `color` and an optional `colorBelow` |
+| `fillLines` | Boundary lines used only by fills, never stroked |
+| `levels` | Horizontal reference lines with `value`, `color`, and an optional `dash` (default `[4, 4]`) |
+
+## Metadata
+
+Definitions can describe themselves for settings UIs. The built-ins all do.
+
+| Field | Purpose |
+| --- | --- |
+| `label` | Display name, such as `'Ichimoku Cloud'` |
+| `shortName` | Legend name, such as `'Ichimoku'`; the status line uses it for single-line studies |
+| `inputs` | Editable params in display order: `key`, `label`, and optional `min`, `max`, `step`, `integer`, and `options` (a choice list of `{ value, label }`) |
+| `styles` | Styleable plots in display order: `key`, `label`, `colorIndex`, and `kind` (`'line'`, `'dots'`, `'histogram'`, `'fill'`, or `'level'`). A plot with several colors has one row per color sharing its key |
+
+The status line labels each line with the study's short name, or with the line's style label for multi-line studies. Without metadata it falls back to the key in capitals.
 
 To keep an outlying overlay from expanding the price range, set `priceAxis.scaleSeriesOnly: true`.

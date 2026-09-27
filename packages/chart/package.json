@@ -56,6 +56,10 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
+    },
+    "./datafeed": {
+      "types": "./dist/datafeed/index.d.ts",
+      "import": "./dist/datafeed/index.js"
     }
   },
   "files": [
@@ -75,9 +79,10 @@
     "test": "npm run build && npm run build:ts-test && node --test \"dist-test/**/*.test.js\"",
     "coverage": "npm run build && npm run build:ts-test && node scripts/check-coverage.mjs",
     "coverage:lcov": "npm run build && npm run build:ts-test && mkdir -p coverage && node --enable-source-maps --test --experimental-test-coverage --test-coverage-exclude='**/kernels.base64.*' --test-coverage-exclude='dist-test/**' --test-coverage-exclude='test/**' --test-reporter=dot --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/lcov.info \"dist-test/**/*.test.js\" && node scripts/lcov-sanitize.mjs",
-    "bench": "npm run build && node bench/indicators.bench.mjs && node bench/rolling.bench.mjs && node bench/render.bench.mjs",
+    "bench": "npm run build && node bench/indicators.bench.mjs && node bench/rolling.bench.mjs && node bench/render.bench.mjs && node bench/workloads.bench.mjs",
     "prepublishOnly": "npm test",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "bench:browser": "npm run build && node bench/run-browser.mjs"
   },
   "keywords": [
     "chart",
@@ -103,6 +108,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "happy-dom": "^20.14.5",
+    "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "typescript": "^6.0.3",

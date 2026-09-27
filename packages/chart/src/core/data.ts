@@ -62,6 +62,14 @@ export class DataStore {
     }
   }
 
+  /**
+   * Inserts `older` in front of the dataset. The caller guarantees it is
+   * sorted, unique and strictly earlier than the first candle.
+   */
+  prepend(older: readonly Candle[]): void {
+    this.candles = older.concat(this.candles);
+  }
+
   /** Removes all candles. */
   clear(): void {
     this.candles = [];

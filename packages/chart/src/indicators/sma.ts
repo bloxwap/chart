@@ -32,9 +32,13 @@ export function smaWasm(values: readonly number[] | Float32Array, period: number
 /** SMA indicator definition (name `'sma'`, param `period`, default 20). */
 export const smaIndicator: IndicatorDef = {
   name: 'sma',
+  label: 'Moving Average Simple',
+  shortName: 'SMA',
   defaultParams: { period: 20 },
   defaultColors: ['#2962ff'],
   defaultPane: 'main',
+  inputs: [{ key: 'period', label: 'Length', min: 1, step: 1, integer: true }],
+  styles: [{ key: 'value', label: 'MA', colorIndex: 0 }],
   compute(
     candles: readonly Candle[],
     params: Record<string, number>,

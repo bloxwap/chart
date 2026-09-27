@@ -1,4 +1,21 @@
 {
   "title": "Guides",
-  "pages": ["react", "data", "series", "indicators", "drawings", "toolbar-settings", "performance"]
+  "pages": [
+    "react",
+    "data",
+    "datafeed",
+    "series",
+    "theming-presets",
+    "price-lines-markers",
+    "indicators",
+    "drawings",
+    "toolbar-settings",
+    "header",
+    "touch",
+    "time-scale",
+    "events",
+    "snapshots-countdown",
+    "performance",
+    "tradingview-migration"
+  ]
 }

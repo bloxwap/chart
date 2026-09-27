@@ -16,7 +16,8 @@ import { DEFAULT_DRAWING_COLOR, type Chart, type DrawingPatch, type MagnetMode }
 import type { CanvasImageSourceLike } from '../dom.js';
 import { findTool, TOOL_GROUPS } from '../drawings/catalog.js';
 import type { DrawingDef } from '../drawings/types.js';
-import { DrawingHistory } from './history.js';
+import { DrawingHistory, followPrepends } from './history.js';
+import { shiftPoints } from '../core/prepend.js';
 
 /** Pointer modes: the crosshair styles plus the eraser. */
 export type CursorMode = CrosshairMode | 'eraser';
@@ -61,6 +62,9 @@ export interface Hint {
   readonly quiet: boolean;
 }
 
+/** The idle {@link DrawingController.hint} after touch input. */
+const TOUCH_IDLE_HINT = 'Drag to scroll · pinch to zoom · long-press for crosshair';
+
 /** Current box-zoom selection in canvas pixels. */
 export interface ZoomBox {
   readonly x0: number;
@@ -69,7 +73,7 @@ export interface ZoomBox {
 
 type Drag =
   | { kind: 'pan'; lastX: number }
-  | { kind: 'handle'; id: string; index: number }
+  | { kind: 'handle'; id: string; index: number; checkpointed: boolean }
   | { kind: 'move'; id: string; lastX: number; lastY: number; checkpointed: boolean }
   | { kind: 'zoom'; x0: number; x1: number }
   | { kind: 'erase' }
@@ -87,7 +91,11 @@ export function groupOf(name: string): string | undefined {
   return TOOL_GROUPS.find((g) => g.sections.some((s) => s.tools.some((t) => t.name === name)))?.id;
 }
 
-/** Interaction state machine for drawing tools on one chart. */
+/**
+ * Interaction state machine for drawing tools on one chart. It follows the
+ * chart's data loads (prepended history shifts its points and undo steps), so
+ * call {@link dispose} when discarding it while the chart lives on.
+ */
 export class DrawingController {
   readonly history: DrawingHistory;
   cursor: CursorMode = 'cross';
@@ -102,18 +110,40 @@ export class DrawingController {
   locked = false;
   drawingsHidden = false;
   indicatorsHidden = false;
+  /** Studies {@link setHidden} hid, shown again when indicators are shown. */
+  private hiddenStudies: readonly string[] = [];
   /** Color for new drawings (follows the last color picked). */
   color = DEFAULT_DRAWING_COLOR;
   /** Text for the next drawing (glyph tools). */
   pendingText = '';
   /** Image for the next image drawing. */
   pendingImage: CanvasImageSourceLike | null = null;
+  /**
+   * Reach (CSS px) of pointer hit tests on drawings and handles; `undefined`
+   * uses the chart's mouse defaults. The toolbar widens it for fingers.
+   */
+  hitTolerance: number | undefined = undefined;
+  /**
+   * Reach (CSS px) of pointer hit tests on the selected drawing's handles;
+   * `undefined` uses {@link hitTolerance}. The toolbar widens it for fingers.
+   */
+  handleTolerance: number | undefined = undefined;
+  /**
+   * The idle {@link hint} names touch gestures. The toolbar seeds it from
+   * `(pointer: coarse)` at mount (with touch gestures on), then keeps it on the
+   * latest press's input (finger or not) through {@link setTouch}.
+   */
+  touch = false;
 
   private readonly navigation: boolean;
   private freehand: DrawingPoint[] | null = null;
   private drag: Drag | null = null;
+  /** Checkpoints taken by the current press, and the selection before it (for {@link cancelDrag}). */
+  private pressEdits = 0;
+  private pressSelection: string | null = null;
   private readonly lastInGroup = new Map<string, string>();
   private readonly listeners = new Map<keyof ControllerEvents, Set<Listener<never>>>();
+  private readonly offDataLoad: () => void;
 
   constructor(
     readonly chart: Chart,
@@ -122,7 +152,15 @@ export class DrawingController {
     this.navigation = options.navigation ?? true;
     this.history = new DrawingHistory(chart);
     this.history.onChange(() => this.emit('change', undefined));
+    this.offDataLoad = followPrepends(chart, this, DrawingController.followPrepend);
     for (const g of TOOL_GROUPS) this.lastInGroup.set(g.id, g.sections[0]!.tools[0]!.name);
+  }
+
+  /** Prepended history moves every bar right: points being placed must follow. */
+  private static followPrepend(controller: DrawingController, added: number): void {
+    if (controller.tool !== null && controller.def(controller.tool)?.anchored === true) return;
+    controller.points = shiftPoints(controller.points, added);
+    if (controller.freehand !== null) controller.freehand = shiftPoints(controller.freehand, added);
   }
 
   // ------------------------------------------------------------------ events
@@ -140,6 +178,17 @@ export class DrawingController {
 
   private emit<K extends keyof ControllerEvents>(event: K, payload: ControllerEvents[K]): void {
     for (const fn of this.listeners.get(event) ?? []) (fn as Listener<K>)(payload);
+  }
+
+  /**
+   * Stops following the chart's data (and disposes {@link history}); call when
+   * discarding the controller while the chart lives on. A controller dropped
+   * without it is only held weakly by the chart, and stops following once
+   * collected.
+   */
+  dispose(): void {
+    this.offDataLoad();
+    this.history.dispose();
   }
 
   // ------------------------------------------------------------------ queries
@@ -191,7 +240,14 @@ export class DrawingController {
       return { title, detail: `${detail}${esc}`, quiet: false };
     }
     if (this.cursor === 'eraser') return { title: 'Eraser', detail: 'click or drag over drawings to remove them', quiet: false };
-    return { title: '', detail: 'Drag to scroll · wheel to zoom · click a drawing to edit it', quiet: true };
+    return { title: '', detail: this.touch ? TOUCH_IDLE_HINT : 'Drag to scroll · wheel to zoom · click a drawing to edit it', quiet: true };
+  }
+
+  /** Records whether the latest press was a finger (see {@link touch}); emits `change` when that flips. */
+  setTouch(touch: boolean): void {
+    if (this.touch === touch) return;
+    this.touch = touch;
+    this.emit('change', undefined);
   }
 
   // ------------------------------------------------------------------ modes
@@ -265,12 +321,24 @@ export class DrawingController {
     this.emit('change', undefined);
   }
 
-  /** Hides drawings and/or indicators without deleting them. */
+  /**
+   * Hides drawings and/or indicators without deleting them. Studies change
+   * only when `indicators` flips: hiding hides the visible ones, and showing
+   * brings back just those, so a study hidden on its own stays hidden.
+   */
   setHidden(drawings: boolean, indicators: boolean): void {
+    const flip = indicators !== this.indicatorsHidden;
     this.drawingsHidden = drawings;
     this.indicatorsHidden = indicators;
-    for (const ind of this.chart.getConfig().indicators) ind.visible = !indicators;
-    this.chart.setDrawingsHidden(drawings);
+    // Through the API, in one render, so config listeners (the indicators dialog) hear about it.
+    this.chart.batch(() => {
+      if (flip) {
+        const ids = indicators ? this.chart.getConfig().indicators.filter((ind) => ind.visible).map((ind) => ind.id) : this.hiddenStudies;
+        for (const id of ids) this.chart.updateIndicator(id, { visible: !indicators });
+        this.hiddenStudies = indicators ? ids : [];
+      }
+      this.chart.setDrawingsHidden(drawings);
+    });
     if (drawings) this.select(null);
     this.emit('change', undefined);
   }
@@ -372,13 +440,31 @@ export class DrawingController {
     this.chart.setDraft({ name: this.tool, points: pts, color: this.color, text: this.pendingText });
   }
 
-  /** Whether the drawing under `(x, y)` may be edited. */
+  /**
+   * Whether the drawing under `(x, y)` may be edited. A finger prefers the
+   * selected drawing where another lies on top of it (see `claimTouch`).
+   */
   private editableAt(x: number, y: number): string | null {
     if (this.locked) return null;
-    return this.chart.drawingAt(x, y);
+    return this.chart.drawingAt(x, y, this.hitTolerance, this.touch ? this.chart.selectedDrawing : null);
+  }
+
+  /** Records a checkpoint taken by the current press. */
+  private edit(): void {
+    this.history.checkpoint();
+    this.pressEdits++;
+  }
+
+  /** Checkpoints a drawing drag on its first move, so a press that goes nowhere leaves no undo step. */
+  private checkpointDrag(d: { checkpointed: boolean }): void {
+    if (d.checkpointed) return;
+    this.edit();
+    d.checkpointed = true;
   }
 
   pointerDown(x: number, y: number): void {
+    this.pressEdits = 0;
+    this.pressSelection = this.chart.selectedDrawing;
     if (this.tool === ZOOM_TOOL) {
       this.drag = { kind: 'zoom', x0: x, x1: x };
       return;
@@ -400,10 +486,9 @@ export class DrawingController {
     }
     const selected = this.chart.selectedDrawing;
     if (selected !== null && !this.locked && !this.chart.getDrawing(selected)!.locked) {
-      const h = this.chart.handleAt(x, y);
+      const h = this.chart.handleAt(x, y, this.handleTolerance ?? this.hitTolerance);
       if (h >= 0) {
-        this.history.checkpoint();
-        this.drag = { kind: 'handle', id: selected, index: h };
+        this.drag = { kind: 'handle', id: selected, index: h, checkpointed: false };
         this.emit('change', undefined);
         return;
       }
@@ -427,20 +512,18 @@ export class DrawingController {
     }
     switch (d.kind) {
       case 'pan': {
-        const spacing = Math.max(0.5, this.chart.scale.indexToX(1) - this.chart.scale.indexToX(0));
+        const spacing = Math.max(0.5, this.chart.scale.barSpacing());
         this.chart.scale.scrollBy((x - d.lastX) / spacing);
         d.lastX = x;
         this.emit('viewport', undefined);
         break;
       }
       case 'handle':
+        this.checkpointDrag(d);
         this.chart.moveDrawingPoint(d.id, d.index, this.pointAt(x, y, this.chart.getDrawing(d.id)!.name));
         break;
       case 'move':
-        if (!d.checkpointed) {
-          this.history.checkpoint();
-          d.checkpointed = true;
-        }
+        this.checkpointDrag(d);
         this.chart.translateDrawing(d.id, x - d.lastX, y - d.lastY);
         d.lastX = x;
         d.lastY = y;
@@ -515,6 +598,25 @@ export class DrawingController {
     if (this.drag === null && this.navigation) this.chart.clearCrosshair();
   }
 
+  /**
+   * Aborts the press in progress (a cancelled touch, or a second finger
+   * turning it into a pinch) as if it never happened: nothing is placed or
+   * zoomed, drawings it moved or erased are restored, and the selection is
+   * put back. An armed tool stays armed with the points placed before it.
+   */
+  cancelDrag(): void {
+    const d = this.drag;
+    if (d === null) return;
+    this.drag = null;
+    this.freehand = null;
+    this.history.rollback(this.pressEdits);
+    if (d.kind === 'place' || d.kind === 'freehand') {
+      this.chart.setDraft(this.points.length === 0 ? null : { name: this.tool!, points: [...this.points], color: this.color, text: this.pendingText });
+    }
+    this.select(this.pressSelection);
+    this.emit('change', undefined);
+  }
+
   /** Right-click: cancels an armed tool. Returns whether it was consumed. */
   contextMenu(): boolean {
     if (this.tool === null) return false;
@@ -558,7 +660,7 @@ export class DrawingController {
   private eraseAt(x: number, y: number): void {
     const hit = this.editableAt(x, y);
     if (hit === null || this.chart.getDrawing(hit)!.locked) return;
-    this.history.checkpoint();
+    this.edit();
     this.chart.removeDrawing(hit);
   }
 

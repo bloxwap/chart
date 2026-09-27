@@ -89,6 +89,13 @@ export interface TextStyle {
   readonly pad?: number;
   /** Background corner radius; default 3. */
   readonly radius?: number;
+  /**
+   * Keep the label within the plot horizontally: a box crossing its left or
+   * right edge slides back in (see `slideInside`). Models set it only
+   * while the labelled shape is on screen (`spansPlot`), so labels of
+   * drawings scrolled out of view leave with them.
+   */
+  readonly inside?: boolean;
 }
 
 /** A pixel-space primitive produced by a drawing model. */

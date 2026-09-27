@@ -1,0 +1,485 @@
+---
+title: Migrating from TradingView
+description: Replace the TradingView Charting Library in bloxwap.pro with @bloxwap/chart, option by option.
+---
+
+This guide is for the bloxwap.pro team. It maps everything the pro app uses from the TradingView Charting Library to `@bloxwap/chart`, then gives a replacement plan and a complete component.
+
+The pro app's chart lives in `workers/pro/src/components/chart`:
+
+| File | Today | After |
+| --- | --- | --- |
+| `tv-chart.tsx` | Loads the licensed script, builds the widget with brand overrides | Replaced by `bloxwap-chart.tsx` (below) |
+| `tv-datafeed.ts`, `tv-datafeed-core.ts` | UDF datafeed: paging, abort, live folding | Replaced by one `fetchBars` function |
+| `tv-types.ts` | Structural widget and UDF types | Deleted; the library ships its types |
+| `live-bars.ts` | `LiveBarFolder` | Deleted; the datafeed folds ticks |
+| `candle-data.ts` | Timeframes, mapping, `priceFormatFor` | Keep `TIMEFRAME_MS`, `Timeframe`, and `priceFormatFor` |
+| `pro-chart.tsx` | lightweight-charts fallback with mark and last lines | Deleted; nothing external can fail to load |
+| `public/tv-theme.css` | Styles the widget iframe | Replaced by CSS custom properties |
+
+## What changes
+
+- **No iframe and no licensed script.** The chart is an npm package with no runtime dependencies. There is no `library_path`, no script probe, and no fallback path. It draws into a canvas in your own DOM.
+- **The UI is optional and in your DOM.** The drawing rail, header, menus, settings card, and indicator dialog are separate modules from `@bloxwap/chart/ui`. They are styled with CSS custom properties, not an injected iframe stylesheet.
+- **One config object.** TradingView's `overrides`, `studies_overrides`, and chart settings all map to fields of one typed `ChartConfig`, changed with `chart.updateConfig`.
+- **Time in seconds.** Candle `time` is UNIX **seconds**. The datafeed's request window is in milliseconds, like Hyperliquid's API.
+
+## Widget options
+
+| TradingView option | bloxwap.pro value | `@bloxwap/chart` |
+| --- | --- | --- |
+| `container` | The chart div | `container: canvas` in a positioned wrapper |
+| `datafeed` | `createTvDatafeed()` | `createDatafeedChart({ fetchBars })`; see [UDF datafeed](#udf-datafeed) |
+| `symbol` | Prop | `datafeed.setSymbol(symbol, intervalMs)` |
+| `interval` | `'15'` | `intervalMs: 900_000` |
+| `library_path` | `/charting_library/` | Not needed |
+| `theme` | `'dark'` | `preset: 'bloxwapDark'` (see [overrides](#overrides)) |
+| `autosize` | `true` | `autoResize: true` |
+| `locale` | `'en'` | UI text is English; format numbers with `formatters.price` |
+| `timezone` | `'Etc/UTC'` | The default time formatter is UTC (`YYYY-MM-DD HH:mm`); replace `formatters.time` for another zone |
+| `loading_screen` | Card and green | Render your own placeholder while `datafeed.loading` is true |
+| `toolbar_bg` | `#171717` | `--cts-bg` and `--cts-panel`; see [themes and CSS](#custom-themes-and-css) |
+| `custom_css_url` | `/tv-theme.css` | CSS custom properties in the app's own stylesheet |
+| `custom_font_family` | system-ui stack | `theme.fontFamily`, `monoFamily`, `scaleFontFamily` (set by `bloxwapDark`) and `--cts-font` |
+| `custom_themes` | Brand gradients | `bloxwapDark` colors and CSS custom properties |
+
+## Features
+
+| `disabled_features` entry | Equivalent |
+| --- | --- |
+| `use_localstorage_for_settings` | Nothing is stored by default. The toolbar persists favorite tools only when you pass `storage` |
+| `header_symbol_search`, `symbol_search_hot_key`, `header_quick_search` | There is no symbol search. The header shows a label; your command palette calls `datafeed.setSymbol` and the header follows |
+| `header_compare` | There is no compare feature |
+| `header_saveload` | There is no layout backend; persist `chart.getConfig()` fields yourself if needed |
+| `display_market_status` | There is no market status indicator |
+| `border_around_the_chart` | The canvas has no border. `enabled_features: ['remove_library_container_border']` is the default |
+| `timeframes_toolbar` | There is no bottom toolbar. Timeframes are in the header. The on-chart A / % / L strip is opt-in (`createScaleButtons`) |
+| `header_fullscreen_button` | There is no fullscreen button; add one to the header's `slots` |
+| `header_screenshot` | There is no screenshot button; `chart.toBlob()` backs one in the header's `slots` |
+| `popup_hints` | The toolbar's idle hint fades after three seconds. Hide it with `html .cts-hint.cts-quiet { display: none; }`; drawing instructions still show |
+
+TradingView keeps its attribution link because of its license. `@bloxwap/chart` is MIT-licensed and draws no attribution.
+
+## Overrides
+
+`preset: 'bloxwapDark'` reproduces the overrides in `tv-chart.tsx`. Only the last-price line differs: it follows the bar's direction instead of staying green (see below).
+
+| TradingView override | Value | `ChartConfig` field |
+| --- | --- | --- |
+| `paneProperties.background` | `#171717` | `theme.background` |
+| `paneProperties.backgroundType` | `solid` | Always solid |
+| `paneProperties.vertGridProperties.color`, `horzGridProperties.color` | `rgba(255, 255, 255, 0.05)` | `grid.color`; `grid.vertical` and `grid.horizontal` toggle each |
+| `paneProperties.separatorColor` | `#171717` | `theme.borderColor` (pane separators) |
+| `scalesProperties.textColor` | `#a1a1a1` | `theme.textColor` |
+| `scalesProperties.lineColor` | `#171717` | No scale border line is drawn |
+| `scalesProperties.fontSize` | `11` | `theme.scaleFontSize` |
+| `paneProperties.legendProperties.showBackground` | `false` | The status line has no background |
+| `paneProperties.legendProperties.showVolume` | `false` | `statusLine.volume: false` |
+| `paneProperties.legendProperties.showStudyArguments` | `false` | The status line shows study values, never their arguments |
+| `mainSeriesProperties.priceLineColor` | `#00ff3f` | `priceAxis.lines.lastPrice` and `labels.lastPrice`, colored by the bar's direction |
+| `mainSeriesProperties.candleStyle.upColor`, `downColor` | `#00ff3f`, `#ff479c` | `series.upColor`, `series.downColor` |
+| `candleStyle.wickUpColor`, `wickDownColor` | Same | `series.wickUpColor`, `series.wickDownColor` |
+| `candleStyle.drawBorder` | `false` | `series.borderVisible: false` |
+| `candleStyle.borderUpColor`, `borderDownColor` | Same | `series.borderUpColor`, `series.borderDownColor` |
+| `studies_overrides` `volume.volume.color.0` and `.1` | 50% pink and green | `volume: { overlay: true, opacity: 0.5 }` in the candle colors |
+
+TradingView draws volume as an overlay in the price pane, and so does `bloxwapDark` (`volume.overlay`). For a separate pane, add the `vol` indicator instead. The crosshair uses `#737373` lines and `#262626` labels.
+
+If the last-price line must stay green instead of following the bar's direction, turn `priceAxis.lines.lastPrice` off and draw a [price line](/docs/guides/price-lines-markers) at the live price in `#00ff3f`.
+
+## Custom themes and CSS
+
+`tv-theme.css` restyles TradingView's chrome through `--tv-color-*` properties inside the iframe. The same palette maps to the UI's custom properties:
+
+| `tv-theme.css` | Value | `@bloxwap/chart/ui` |
+| --- | --- | --- |
+| `--tv-color-platform-background` | `#171717` | `--cts-bg`, `--cts-panel`, `--cts-header-bg` |
+| `--tv-color-pane-background` | `#171717` | `theme.background` (canvas config) |
+| `--tv-color-toolbar-button-background-hover` | `#262626` | `--cts-accent-soft`, `--cts-header-hover-bg` |
+| `--tv-color-toolbar-button-background-active` | `#262626` | `--cts-panel-raised`, `--cts-header-active-bg` |
+| `--tv-color-toolbar-button-text` | `#a1a1a1` | `--cts-idle`, `--cts-header-text` |
+| `--tv-color-toolbar-button-text-hover`, `-active` | `#fafafa` | `--cts-hover`, `--cts-header-text-active` |
+| `--tv-color-item-active-text`, `--tv-color-toolbar-toggle-button-background-active` | `#00ff3f` | `--cts-accent`, `--cts-header-accent` |
+| `--tv-color-toolbar-divider-background`, `--tv-color-popup-element-divider-background` | `transparent` | `--cts-edge: transparent` |
+| `--tv-color-popup-background` | `#171717` | `--cts-panel` |
+| `--tv-color-popup-element-text` | `#fafafa` | `--cts-hover` |
+| `--tv-color-popup-element-background-hover` | `#262626` | `--cts-accent-soft` |
+| `.layout__area--*` `border: 0` | | `--cts-edge: transparent` |
+| Round buttons | `9999px` | `--cts-header-radius: 9999px`; round rail buttons with `.cts-btn` |
+
+`BLOXWAP_HEADER_TOKENS` sets the header half (in an app with a light mode, pass `BLOXWAP_HEADER_THEME` to keep it to dark). Put the rest in the app's global stylesheet in place of `tv-theme.css`:
+
+```css
+/* Replaces public/tv-theme.css. Fill-only surfaces; hover shifts the fill. */
+html .cts-theme {
+  --cts-bg: #171717; --cts-panel: #171717; --cts-panel-raised: #262626; --cts-edge: transparent;
+  --cts-idle: #a1a1a1; --cts-muted: #737373; --cts-hover: #fafafa;
+  --cts-accent: #00ff3f; --cts-accent-soft: #262626; --cts-on-accent: #0a0a0a;
+  --cts-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+html .cts-theme .cts-btn { border-radius: 9999px; }
+```
+
+The `html` prefix outranks the library's `.cts-theme` rule whatever order the stylesheets load in. See [theming and presets](/docs/guides/theming-presets#ui-custom-properties).
+
+## UDF datafeed
+
+| UDF (`tv-datafeed.ts`) | `@bloxwap/chart/datafeed` |
+| --- | --- |
+| `onReady` with `supported_resolutions` | The header's `timeframes`. `DEFAULT_TIMEFRAMES` is the app's list: 1m 5m 15m 1h 4h 1d 3d 1w 1M, with the same millisecond widths as `TIMEFRAME_MS` |
+| `resolveSymbol` (`pricescale` from a reference price) | `priceAxis.precision`: set it from `priceFormatFor(price).precision` when a symbol's first price arrives |
+| `getBars(symbolInfo, resolution, { from, to, countBack })` | `fetchBars({ symbol, intervalMs, fromMs, toMs, countBack, signal })`: one read of an inclusive millisecond window |
+| `loadCandles` paging, `HL_CANDLE_PAGE_SIZE`, no-progress guard | Built in: `pageSize` (default 5000), boundary dedupe, clipping to the window |
+| `clipBarsToWindow`, `mapCandles` dedupe and sort | Built in: rows outside the window are dropped, rows are deduped (last wins) and sorted |
+| `barsController` abort on switch | Built in: every read of a previous symbol is aborted and ignored |
+| `onResult([], { noData: true })` | Inferred: `maxEmptyPages` empty reads in a row (3 by default) set `datafeed.exhausted`, and shorter holes are stepped over |
+| `subscribeBars` with `LiveBarFolder` and `feed.subscribeCoin` | `feed.subscribeCoin(symbol, (price) => datafeed.pushTick(price, symbol))` |
+| `LiveBarFolder`'s `fetchGap` | Built in with `fetchBars`, or pass `fetchGap(fromMs, toMs, { symbol, intervalMs, signal })` |
+| `lastBars` seed map | Built in: live folding starts from the last loaded bar |
+| `unsubscribeBars(listenerGuid)` | Your price-feed unsubscribe in the effect cleanup |
+| `onResetCacheNeededCallback` | `datafeed.setSymbol(datafeed.symbol, datafeed.intervalMs)` reloads |
+| `dispose()` | `destroy()` from `createDatafeedChart` |
+| `HISTORY_BARS = 500` | `initialBars` (default 500) |
+
+`feed.acquireFastCoin(symbol)` stays in the app: it is part of the price feed, not the chart.
+
+The whole datafeed becomes:
+
+```ts
+import { info, type Candle as HyperliquidCandle } from '@workspace/trading-core/hyperliquid/info';
+import type { FetchBars } from '@bloxwap/chart/datafeed';
+import { TIMEFRAME_MS, type Timeframe } from './candle-data';
+
+const TIMEFRAME_BY_MS = new Map(Object.entries(TIMEFRAME_MS).map(([tf, ms]) => [ms, tf as Timeframe]));
+
+const toCandle = (k: HyperliquidCandle) => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v });
+
+export const fetchBars: FetchBars = async ({ symbol, intervalMs, fromMs, toMs, signal }) =>
+  (await info.candleSnapshot(symbol, TIMEFRAME_BY_MS.get(intervalMs)!, fromMs, toMs, signal)).map(toCandle);
+```
+
+Invalid rows (non-finite prices, non-positive times) are dropped by the datafeed, as `mapCandle` did.
+
+## Price lines
+
+`pro-chart.tsx` draws a dashed blue **mark** line at the live price and a dotted **last** line at the previous bar's close, both from lightweight-charts' `createPriceLine`:
+
+| lightweight-charts | `@bloxwap/chart` |
+| --- | --- |
+| `series.createPriceLine({ price, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'mark' })` | `chart.series.createPriceLine({ price, color, lineStyle: 'dashed', title: 'mark' })` |
+| `LineStyle.Dotted` | `lineStyle: 'dotted'` |
+| `line.applyOptions({ price })` | `line.applyOptions({ price })` |
+| `series.removePriceLine(line)` | `line.remove()` or `chart.series.removePriceLine(line)` |
+
+```ts
+let mark: PriceLine | null = null;
+const unsubscribe = feed.subscribeCoin(symbol, (price) => {
+  if (mark === null) mark = chart.series.createPriceLine({ price, color: '#35b5ff', lineStyle: 'dashed', title: 'mark' });
+  else mark.applyOptions({ price });
+  datafeed.pushTick(price, symbol);
+});
+```
+
+For the **last** line, read the bars back with [`chart.getData()`](/docs/guides/data#reading-state) when data loads. As in `pro-chart.tsx`, a load puts the line on the latest close, and each new bar moves it to the close of the bar that just closed:
+
+```ts
+let last: PriceLine | null = null;
+const setLast = (price: number) => {
+  if (last === null) last = chart.series.createPriceLine({ price, color: 'rgba(255, 255, 255, 0.6)', lineStyle: 'dotted', title: 'last' });
+  else last.applyOptions({ price });
+};
+const offLoad = chart.subscribeDataLoad(({ reason }) => {
+  const bars = chart.getData();
+  if (reason === 'set') {
+    if (bars.length > 0) setLast(bars.at(-1)!.close);
+    else { last?.remove(); last = null; } // a failed switch cleared the chart
+  } else if (reason === 'append' && bars.length > 1) {
+    setLast(bars.at(-2)!.close); // a new bar opened
+  }
+});
+```
+
+Every datafeed load goes through `setData`, `appendData`, or `prependData`, so the line follows symbol and interval switches, live bars, and gap backfills; history pages (`'prepend'`) leave it alone. If you don't need the title and axis badge, `priceAxis.lines.previousClose: true` is a one-line alternative: it draws the previous bar's close, dashed in the crosshair color.
+
+## Chart types
+
+| TradingView style | `series.type` |
+| --- | --- |
+| Bars | `'bar'` |
+| Candles | `'candlestick'` |
+| Hollow candles | `'hollow-candlestick'` |
+| Heikin Ashi | `'heikin-ashi'` |
+| Line | `'line'` |
+| Area | `'area'` |
+
+The header's chart-type menu offers these six. `'histogram'` plots each bar's volume as a column. TradingView's Columns (closing prices), Baseline, step line, HLC area, high-low, Renko, Kagi, Point & Figure, Line Break, and Range bars are not available.
+
+## Indicators
+
+| TradingView study | `name` |
+| --- | --- |
+| Moving Average | `sma` |
+| Moving Average Exponential | `ema` |
+| Bollinger Bands | `boll` |
+| MACD | `macd` |
+| Relative Strength Index | `rsi` |
+| Volume | `vol` (sub-pane) or `volume.overlay` (price pane) |
+| VWAP | `vwap` |
+| Average Directional Index | `adx` |
+| Commodity Channel Index | `cci` |
+| Money Flow Index | `mfi` |
+| On Balance Volume | `obv` |
+| Moving Average Ribbon | `ma-ribbon` |
+| Average True Range | `atr` |
+| Supertrend | `supertrend` |
+| Ichimoku Cloud | `ichimoku` |
+| Donchian Channels | `donchian` |
+| Stochastic | `stoch` |
+| Stochastic RSI | `stochrsi` |
+| Parabolic SAR | `psar` |
+
+`kdj` is also built in. `chart.createStudy('Moving Average', false, false, { length: 20 })` becomes `chart.addIndicator({ name: 'sma', params: { period: 20 } })`. The Indicators dialog becomes `createIndicatorsDialog`, opened from the header's Indicators button. Per-study `studies_overrides` become each instance's `colors`, `lineWidths`, and `hiddenLines`. See [indicators](/docs/guides/indicators).
+
+## Header and toolbars
+
+| TradingView | `@bloxwap/chart/ui` |
+| --- | --- |
+| Top toolbar (symbol, intervals, chart style, indicators) | `createChartHeader` |
+| Left drawing toolbar | `createDrawingToolbar` |
+| Chart settings dialog | `createChartSettings`, opened from a header slot button or the context menu |
+| Right-click menus | `createDrawingToolbar({ contextMenu: { … } })` |
+| Undo and redo | Cmd/Ctrl + Z and Shift + Cmd/Ctrl + Z, or `toolbar.controller.undo()` and `redo()` |
+| Price scale Auto, %, Log (bottom toolbar) | The header's scale buttons, or `createScaleButtons` on the chart |
+| Mobile touch | Built into the toolbar; see [touch gestures](/docs/guides/touch) |
+
+The toolbar listens for its shortcuts on the whole document, ignoring inputs, selects, text areas, and editable elements. Pass `keyboard: false` if other panels own those keys.
+
+## Widget methods
+
+| TradingView | `@bloxwap/chart` |
+| --- | --- |
+| `widget.onChartReady(callback)` | Not needed: the chart is usable as soon as `createChart` returns. `chart.ready` resolves once the WASM kernels (or the JS fallback) are ready |
+| `widget.remove()` | `destroy()` for each handle, then the chart |
+| `activeChart().setSymbol(symbol)` | `datafeed.setSymbol(symbol, datafeed.intervalMs)` |
+| `activeChart().setResolution('60')` | `datafeed.setSymbol(datafeed.symbol, 3_600_000)`; the header follows |
+| `activeChart().setChartType(type)` | `chart.updateConfig({ series: { type } })` or `header.setChartType(type)` |
+| `activeChart().createStudy(…)`, `removeEntity(id)` | `chart.addIndicator(…)`, `chart.removeIndicator(id)` |
+| `activeChart().createShape(…)`, `createMultipointShape(…)` | `chart.addDrawing({ name, points })` with points in bar indices |
+| `activeChart().onVisibleRangeChanged()` | `chart.subscribeVisibleRangeChange` |
+| `activeChart().crossHairMoved()` | `chart.subscribeCrosshairMove` |
+| `widget.applyOverrides(overrides)` | `chart.updateConfig(partial)` |
+| `widget.changeTheme('light')` | `toolbar.setTheme('light')`, `header.setTheme('light')`, and the other handles |
+| `widget.takeClientScreenshot()` | `chart.takeScreenshot()`, `chart.toBlob()`, `chart.toDataURL()` |
+
+## Out of scope
+
+These TradingView features are intentionally not part of `@bloxwap/chart`. bloxwap.pro disables or doesn't use most of them.
+
+- **Symbol search and quick search.** Asset switching stays in the command palette.
+- **Compare and overlay symbols.** One series per chart.
+- **Save and load of chart layouts, study templates, and drawing templates.** Persist config fields yourself if needed.
+- **Alerts.** The context menu's `extraItems` can add an "Add alert…" row that calls your own alert flow.
+- **Trading lines** (`createOrderLine`, `createPositionLine`, draggable brackets). Price lines are display-only; use them for read-only order and position levels.
+- **Multi-chart layouts, bar replay, market status, session calendars, timezone menu, and Pine Script.**
+
+## Replacement plan
+
+1. **Add the package.** `npm install @bloxwap/chart` in the pro worker. It has no runtime dependencies.
+2. **Write `fetchBars`.** Map `info.candleSnapshot` to candles as shown under [UDF datafeed](#udf-datafeed). Test it with a stubbed `info` client: the window passes through unchanged, `t` becomes seconds, and an empty response yields no candles. The paging, clipping, and abort cases that `tv-datafeed-core.test.ts` covered are tested in the library.
+3. **Add `bloxwap-chart.tsx`** from the [complete component](#complete-component) below, and the CSS block from [themes and CSS](#custom-themes-and-css) to the global stylesheet.
+4. **Swap it in behind a flag.** In `components/layout/slots.tsx`, render `BloxwapChart` in place of `TvChart` when the flag is on. Keep the TradingView path until the parity check passes.
+5. **Check parity** in the app, side by side with TradingView:
+   - Colors, fonts, grid, crosshair, and the volume overlay match, and the last-price line and badge show (colored by direction).
+   - Every timeframe loads its latest 500 bars (fewer for a short history), scrolling left pages history in without gaps or duplicates, and a switch never shows the previous symbol's bars.
+   - Live bars roll on the bucket boundary, and a backgrounded tab repairs its gap on return.
+   - Drawings, indicators, the chart settings, undo, the context menu, and touch on a phone work.
+   - The mark line follows the price feed.
+6. **Remove TradingView.** Delete `tv-chart.tsx`, `tv-datafeed.ts`, `tv-datafeed-core.ts` and its test, `tv-types.ts`, `live-bars.ts` and its test, `pro-chart.tsx`, `public/tv-theme.css`, the `public/charting_library/` assets, and the `lightweight-charts` dependency (only `pro-chart.tsx` uses it). Trim `candle-data.ts` to what's still used.
+
+## Complete component
+
+`workers/pro/src/components/chart/bloxwap-chart.tsx`:
+
+```tsx
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { cn } from '@workspace/ui/lib/utils';
+import { info, type Candle as HyperliquidCandle } from '@workspace/trading-core/hyperliquid/info';
+import { ensurePriceFeed } from '@workspace/trading-core/hyperliquid/price-feed';
+import type { Chart, PriceLine } from '@bloxwap/chart';
+import { presetChartTheme } from '@bloxwap/chart';
+import { createDatafeedChart, type Datafeed, type FetchBars } from '@bloxwap/chart/datafeed';
+import {
+  BLOXWAP_HEADER_TOKENS,
+  createChartHeader,
+  createChartSettings,
+  createDrawingToolbar,
+  createIndicatorsDialog,
+  icon,
+} from '@bloxwap/chart/ui';
+import { TIMEFRAME_MS, priceFormatFor, type Timeframe } from './candle-data';
+
+/** TradingView's `interval: '15'`. */
+const DEFAULT_INTERVAL_MS = TIMEFRAME_MS['15m'];
+const MARK_COLOR = '#35b5ff'; // --bloxwap-blue
+const LAST_COLOR = 'rgba(255, 255, 255, 0.6)'; // ProChart's "last" line
+const TIMEFRAME_BY_MS = new Map(Object.entries(TIMEFRAME_MS).map(([tf, ms]) => [ms, tf as Timeframe]));
+
+const toCandle = (k: HyperliquidCandle) => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v });
+
+/** Hyperliquid bars opening within [fromMs, toMs]; the datafeed pages, dedupes and aborts. */
+const fetchBars: FetchBars = async ({ symbol, intervalMs, fromMs, toMs, signal }) =>
+  (await info.candleSnapshot(symbol, TIMEFRAME_BY_MS.get(intervalMs)!, fromMs, toMs, signal)).map(toCandle);
+
+/** A header button styled like the built-in ones. */
+function headerButton(iconName: string, title: string, onClick?: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'cts-header-btn';
+  button.title = title;
+  button.setAttribute('aria-label', title);
+  button.innerHTML = icon(iconName, 18);
+  if (onClick !== undefined) button.addEventListener('click', onClick);
+  return button;
+}
+
+export function BloxwapChart({ symbol, className }: { symbol: string; className?: string }) {
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const boundRef = useRef<{ chart: Chart; datafeed: Datafeed } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // The chart, its datafeed and UI live as long as the component.
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const stage = stageRef.current!;
+    const { chart, datafeed, destroy } = createDatafeedChart({
+      container: canvas,
+      autoResize: true,
+      preset: 'bloxwapDark',
+      config: {
+        statusLine: { symbolVisible: false }, // the header shows the symbol
+      },
+      fetchBars,
+      onError: (error) => console.warn('chart data', error),
+    });
+    const chartTheme = presetChartTheme('bloxwapDark');
+
+    // ProChart's dotted "last" line: the latest close on load, then the close of each bar that just closed.
+    let last: PriceLine | null = null;
+    const setLast = (price: number) => {
+      if (last === null) last = chart.series.createPriceLine({ price, color: LAST_COLOR, lineStyle: 'dotted', title: 'last' });
+      else last.applyOptions({ price });
+    };
+    const offLoad = chart.subscribeDataLoad(({ reason }) => {
+      const bars = chart.getData();
+      if (reason === 'set') {
+        if (bars.length > 0) setLast(bars.at(-1)!.close);
+        else { last?.remove(); last = null; } // a failed switch cleared the chart
+      } else if (reason === 'append' && bars.length > 1) {
+        setLast(bars.at(-2)!.close); // a new bar opened
+      }
+    });
+
+    const toolbar = createDrawingToolbar({
+      chart, document, canvas, rail: railRef.current!, overlay: stage,
+      theme: 'dark',
+      chartTheme, // keep bloxwapDark's colors
+      contextMenu: {
+        onChartSettings: () => settings.open(),
+        onIndicatorSettings: (id) => indicators.openSettings(id), // the dialog follows the menu's edits
+      },
+    });
+    const indicators = createIndicatorsDialog({
+      chart, document, theme: 'dark',
+      onOpen: () => { settings.close(); toolbar.flyouts.close(); },
+    });
+    const settingsButton = headerButton('settings', 'Chart settings'); // the settings card toggles on its click
+    const settings = createChartSettings({
+      chart, document, trigger: settingsButton, theme: 'dark', chartTheme,
+      onOpen: () => { indicators.close(); toolbar.flyouts.close(); toolbar.cancelNavigation(); },
+      onChange: () => toolbar.refreshViewport(),
+    });
+    const screenshotButton = headerButton('image', 'Copy chart image', () => {
+      void chart.toBlob({ type: 'image/png' })
+        .then((blob) => navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]))
+        .catch((error: unknown) => console.warn('chart screenshot', error));
+    });
+    const header = createChartHeader({
+      chart, document, container: headerRef.current!,
+      datafeed, // timeframe picks reload the symbol; the header follows setSymbol
+      flyouts: toolbar.flyouts,
+      tokens: BLOXWAP_HEADER_TOKENS,
+      scaleButtons: false, // the app hides TradingView's bottom toolbar, which holds these
+      onIndicators: () => indicators.openPicker(),
+      slots: { right: [screenshotButton, settingsButton] },
+    });
+    const offState = datafeed.subscribeState((state) => setLoading(state.loading));
+
+    boundRef.current = { chart, datafeed };
+    return () => {
+      boundRef.current = null;
+      offState();
+      offLoad();
+      header.destroy();
+      settings.destroy();
+      indicators.destroy();
+      toolbar.destroy();
+      destroy(); // the datafeed, then the chart
+    };
+  }, []);
+
+  // Load the symbol and stream its price; runs after the chart exists and on every asset switch.
+  useEffect(() => {
+    const bound = boundRef.current;
+    if (bound === null || !symbol) return;
+    const { chart, datafeed } = bound;
+    void datafeed.setSymbol(symbol, datafeed.intervalMs ?? DEFAULT_INTERVAL_MS);
+
+    const feed = ensurePriceFeed();
+    const releaseFast = feed.acquireFastCoin(symbol);
+    let mark: PriceLine | null = null;
+    const unsubscribe = feed.subscribeCoin(symbol, (price) => {
+      if (!Number.isFinite(price) || price <= 0) return;
+      if (mark === null) {
+        // resolveSymbol's pricescale: decimals from the first price.
+        chart.updateConfig({ priceAxis: { precision: priceFormatFor(price).precision } });
+        mark = chart.series.createPriceLine({ price, color: MARK_COLOR, lineStyle: 'dashed', title: 'mark' });
+      } else {
+        mark.applyOptions({ price });
+      }
+      datafeed.pushTick(price, symbol); // ignored until history has loaded
+    });
+
+    return () => {
+      unsubscribe();
+      releaseFast();
+      mark?.remove();
+    };
+  }, [symbol]);
+
+  return (
+    <div className={cn('flex h-full min-h-0 flex-col bg-card', className)}>
+      <div ref={headerRef} className="shrink-0" />
+      <div className="flex min-h-0 flex-1">
+        <div ref={railRef} className="w-[52px] flex-none" />
+        <div ref={stageRef} className="relative min-w-0 flex-1" aria-busy={loading}>
+          <canvas ref={canvasRef} />
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+Notes:
+
+- **Lifecycle:** the first effect runs once. It is safe under React Strict Mode, since each mount builds and destroys its own chart. The symbol effect runs after it on mount, so `boundRef` is set.
+- **Switching assets:** `setSymbol` keeps the interval the user picked in the header. Reads for the previous asset are aborted, and ticks for it are ignored.
+- **Mark and last lines:** the mark line belongs to the symbol effect and follows the price feed. The last line belongs to the chart and follows its data through `getData()`, so a switch moves it to the new asset's latest close once its history loads.
+- **Precision:** `priceFormatFor` is the same helper `resolveSymbol` used for `pricescale`. It runs on each asset's first price.
+- **Loading state:** `loading` is true while a history read is in flight. Use it for a skeleton like the one in `tv-chart.tsx`.
+- **Countdown:** to show TradingView's bar-close countdown, enable `statusLine.countdown` or `priceAxis.labels.countdown` and start `startCountdownTicker({ chart, window })` in the first effect. See [snapshots and countdown](/docs/guides/snapshots-countdown).

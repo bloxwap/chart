@@ -21,13 +21,17 @@ The component is marked `'use client'`, so it works in the Next.js App Router. I
 - creates the chart after mount and fills its box, following size and device pixel ratio changes;
 - calls `setData` when `data` changes, without recreating the chart;
 - follows the system color scheme by default, switching live when it changes, and applies `theme` changes live;
+- keeps a bar-close countdown live: while the config shows one (`statusLine.countdown` or `priceAxis.labels.countdown`, including one turned on later with `updateConfig` or the settings card), it runs [`startCountdownTicker`](/docs/guides/snapshots-countdown#clock-and-ticker) on the page's timers;
 - destroys the chart on unmount, which also makes it safe under React Strict Mode.
 
 | Prop | Type | Meaning |
 | --- | --- | --- |
 | `data` | `readonly Candle[]` | Candles to display; a new array replaces the data |
-| `theme` | `'system' \| 'dark' \| 'light'` | Color theme; default `'system'`, which follows `prefers-color-scheme` |
+| `theme` | `'system' \| 'dark' \| 'light'` | Color theme; default `'system'`, which follows `prefers-color-scheme`. With a `preset` and no `theme`, none is applied |
+| `preset` | `'bloxwapDark' \| DeepPartial<ChartConfig>` | Brand preset, read once at mount (`preset < theme < config`) |
 | `config` | `DeepPartial<ChartConfig>` | Initial configuration, applied once at mount |
+| `now` | `() => number` | Clock for the bar-close countdown, read once at mount; default `() => Date.now()` |
+| `countdownTicker` | `boolean` | Repaint a configured countdown every second, read once at mount; default `true`. Pass `false` if you run your own ticker |
 | `height` | `number \| string` | Height of the chart box; default `400`. The width fills the parent |
 | `className`, `style` | | Passed to the chart box |
 | `onReady` | `(chart) => void` | Called once with the chart instance |
@@ -57,7 +61,52 @@ export function LiveChart({ data, feed }) {
 }
 ```
 
-`config` is read once at mount; change configuration later through the instance with `updateConfig`. Attach the [toolbar and settings](/docs/guides/toolbar-settings) from an effect like the one above, and dispose of their handles in its cleanup.
+`config`, `preset`, and `now` are read once at mount; change configuration later through the instance with `updateConfig`. Attach the [toolbar and settings](/docs/guides/toolbar-settings) from an effect like the one above, and dispose of their handles in its cleanup.
+
+## Presets
+
+```tsx
+<Chart data={data} preset="bloxwapDark" />                 // keeps the preset's colors
+<Chart data={data} preset="bloxwapDark" theme="light" />   // preset < theme < config
+<Chart data={data} theme="dark" now={() => serverNow()} /> // clock for the bar-close countdown
+<Chart data={data} config={{ statusLine: { visible: true, countdown: true } }} /> // a live countdown, no ticker code
+```
+
+With a `preset` and no `theme` prop, `<Chart>` doesn't follow the system color scheme, because a built-in theme would replace the preset's colors. Pass `theme="system"` to follow it anyway. See [theming and presets](/docs/guides/theming-presets).
+
+## With a paging datafeed
+
+The [paging datafeed](/docs/guides/datafeed) attaches to the instance. Every new `data` array replaces the chart's data, so give `<Chart>` a stable empty array and let the datafeed own the data:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { Chart, type ChartInstance } from '@bloxwap/chart/react';
+import { attachDatafeed, type Datafeed } from '@bloxwap/chart/datafeed';
+import type { Candle } from '@bloxwap/chart';
+
+const NO_DATA: Candle[] = [];
+
+export function MarketChart({ symbol }: { symbol: string }) {
+  const [chart, setChart] = useState<ChartInstance | null>(null);
+  const [datafeed, setDatafeed] = useState<Datafeed | null>(null);
+
+  useEffect(() => {
+    if (chart === null) return;
+    const feed = attachDatafeed(chart, { fetchBars });
+    setDatafeed(feed);
+    return () => feed.destroy();
+  }, [chart]);
+
+  useEffect(() => {
+    void datafeed?.setSymbol(symbol, datafeed.intervalMs ?? 15 * 60_000);
+    return priceFeed.subscribe(symbol, (mid) => datafeed?.pushTick(mid, symbol));
+  }, [datafeed, symbol]);
+
+  return <Chart data={NO_DATA} preset="bloxwapDark" onReady={setChart} />;
+}
+```
+
+For a complete bloxwap.pro component with the header, drawing toolbar, and indicators, see [migrating from TradingView](/docs/guides/tradingview-migration#complete-component).
 
 ## Without the component
 

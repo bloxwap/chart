@@ -185,4 +185,158 @@
         (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (local.get $prev))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $mloop))))
+
+  ;; ---------------------------------------------------------------------------
+  ;; rolling_max_f32(src, dst, tmp, len, period)
+  ;; Sliding-window maximum over `period` values (van Herk/Gil-Werman): block
+  ;; prefix maxima go to dst, block suffix maxima to tmp (len floats of
+  ;; scratch), then dst[i] = max(tmp[i-period+1], dst[i]) in a SIMD pass.
+  ;; O(len) regardless of period. dst[i] = NaN for i < period - 1, and a NaN
+  ;; input poisons exactly the windows containing it. Needs 1 <= period.
+  ;; ---------------------------------------------------------------------------
+  (func $rolling_max_f32 (export "rolling_max_f32")
+    (param $src i32) (param $dst i32) (param $tmp i32) (param $len i32) (param $period i32)
+    (local $i i32)
+    (local $k i32)
+    (local $acc f32)
+    (local $v f32)
+    ;; forward pass: prefix maxima restarting every `period` values
+    (local.set $i (i32.const 0))
+    (local.set $k (i32.const 0))
+    (block $fdone
+      (loop $floop
+        (br_if $fdone (i32.ge_u (local.get $i) (local.get $len)))
+        (local.set $v (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
+        (local.set $acc
+          (select (local.get $v) (f32.max (local.get $acc) (local.get $v)) (i32.eqz (local.get $k))))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (local.get $acc))
+        (local.set $k (i32.add (local.get $k) (i32.const 1)))
+        (if (i32.eq (local.get $k) (local.get $period)) (then (local.set $k (i32.const 0))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $floop)))
+    ;; backward pass: suffix maxima within the same blocks
+    (local.set $i (local.get $len))
+    (local.set $k (i32.rem_u (local.get $len) (local.get $period)))
+    (block $bdone
+      (loop $bloop
+        (br_if $bdone (i32.eqz (local.get $i)))
+        (local.set $i (i32.sub (local.get $i) (i32.const 1)))
+        (local.set $v (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
+        ;; k counts down within the block; k = 0 marks the block's last value
+        ;; (or the final partial block's end).
+        (if (i32.eqz (local.get $k)) (then (local.set $k (local.get $period))))
+        (local.set $acc
+          (select (local.get $v) (f32.max (local.get $acc) (local.get $v))
+            (i32.or (i32.eq (local.get $k) (local.get $period)) (i32.eq (local.get $i) (i32.sub (local.get $len) (i32.const 1))))))
+        (f32.store (i32.add (local.get $tmp) (i32.shl (local.get $i) (i32.const 2))) (local.get $acc))
+        (local.set $k (i32.sub (local.get $k) (i32.const 1)))
+        (br $bloop)))
+    ;; combine: windows [i-period+1, i] = suffix(i-period+1) + prefix(i); SIMD by 4
+    (local.set $i (i32.sub (local.get $period) (i32.const 1)))
+    (block $vdone
+      (loop $vloop
+        (br_if $vdone (i32.gt_u (i32.add (local.get $i) (i32.const 4)) (local.get $len)))
+        (v128.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2)))
+          (f32x4.max
+            (v128.load (i32.add (local.get $tmp)
+              (i32.shl (i32.add (i32.sub (local.get $i) (local.get $period)) (i32.const 1)) (i32.const 2))))
+            (v128.load (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))))))
+        (local.set $i (i32.add (local.get $i) (i32.const 4)))
+        (br $vloop)))
+    (block $tdone
+      (loop $tloop
+        (br_if $tdone (i32.ge_u (local.get $i) (local.get $len)))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2)))
+          (f32.max
+            (f32.load (i32.add (local.get $tmp)
+              (i32.shl (i32.add (i32.sub (local.get $i) (local.get $period)) (i32.const 1)) (i32.const 2))))
+            (f32.load (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $tloop)))
+    ;; warmup: NaN-fill dst[0 .. min(period-1, len))
+    (local.set $i (i32.const 0))
+    (block $ndone
+      (loop $nloop
+        (br_if $ndone (i32.ge_u (local.get $i) (i32.sub (local.get $period) (i32.const 1))))
+        (br_if $ndone (i32.ge_u (local.get $i) (local.get $len)))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (f32.const nan))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $nloop))))
+
+  ;; ---------------------------------------------------------------------------
+  ;; rolling_min_f32(src, dst, tmp, len, period)
+  ;; Sliding-window minimum over `period` values (van Herk/Gil-Werman): block
+  ;; prefix minima go to dst, block suffix minima to tmp (len floats of
+  ;; scratch), then dst[i] = min(tmp[i-period+1], dst[i]) in a SIMD pass.
+  ;; O(len) regardless of period. dst[i] = NaN for i < period - 1, and a NaN
+  ;; input poisons exactly the windows containing it. Needs 1 <= period.
+  ;; ---------------------------------------------------------------------------
+  (func $rolling_min_f32 (export "rolling_min_f32")
+    (param $src i32) (param $dst i32) (param $tmp i32) (param $len i32) (param $period i32)
+    (local $i i32)
+    (local $k i32)
+    (local $acc f32)
+    (local $v f32)
+    ;; forward pass: prefix minima restarting every `period` values
+    (local.set $i (i32.const 0))
+    (local.set $k (i32.const 0))
+    (block $fdone
+      (loop $floop
+        (br_if $fdone (i32.ge_u (local.get $i) (local.get $len)))
+        (local.set $v (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
+        (local.set $acc
+          (select (local.get $v) (f32.min (local.get $acc) (local.get $v)) (i32.eqz (local.get $k))))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (local.get $acc))
+        (local.set $k (i32.add (local.get $k) (i32.const 1)))
+        (if (i32.eq (local.get $k) (local.get $period)) (then (local.set $k (i32.const 0))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $floop)))
+    ;; backward pass: suffix minima within the same blocks
+    (local.set $i (local.get $len))
+    (local.set $k (i32.rem_u (local.get $len) (local.get $period)))
+    (block $bdone
+      (loop $bloop
+        (br_if $bdone (i32.eqz (local.get $i)))
+        (local.set $i (i32.sub (local.get $i) (i32.const 1)))
+        (local.set $v (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
+        ;; k counts down within the block; k = 0 marks the block's last value
+        ;; (or the final partial block's end).
+        (if (i32.eqz (local.get $k)) (then (local.set $k (local.get $period))))
+        (local.set $acc
+          (select (local.get $v) (f32.min (local.get $acc) (local.get $v))
+            (i32.or (i32.eq (local.get $k) (local.get $period)) (i32.eq (local.get $i) (i32.sub (local.get $len) (i32.const 1))))))
+        (f32.store (i32.add (local.get $tmp) (i32.shl (local.get $i) (i32.const 2))) (local.get $acc))
+        (local.set $k (i32.sub (local.get $k) (i32.const 1)))
+        (br $bloop)))
+    ;; combine: windows [i-period+1, i] = suffix(i-period+1) + prefix(i); SIMD by 4
+    (local.set $i (i32.sub (local.get $period) (i32.const 1)))
+    (block $vdone
+      (loop $vloop
+        (br_if $vdone (i32.gt_u (i32.add (local.get $i) (i32.const 4)) (local.get $len)))
+        (v128.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2)))
+          (f32x4.min
+            (v128.load (i32.add (local.get $tmp)
+              (i32.shl (i32.add (i32.sub (local.get $i) (local.get $period)) (i32.const 1)) (i32.const 2))))
+            (v128.load (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))))))
+        (local.set $i (i32.add (local.get $i) (i32.const 4)))
+        (br $vloop)))
+    (block $tdone
+      (loop $tloop
+        (br_if $tdone (i32.ge_u (local.get $i) (local.get $len)))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2)))
+          (f32.min
+            (f32.load (i32.add (local.get $tmp)
+              (i32.shl (i32.add (i32.sub (local.get $i) (local.get $period)) (i32.const 1)) (i32.const 2))))
+            (f32.load (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $tloop)))
+    ;; warmup: NaN-fill dst[0 .. min(period-1, len))
+    (local.set $i (i32.const 0))
+    (block $ndone
+      (loop $nloop
+        (br_if $ndone (i32.ge_u (local.get $i) (i32.sub (local.get $period) (i32.const 1))))
+        (br_if $ndone (i32.ge_u (local.get $i) (local.get $len)))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (f32.const nan))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $nloop))))
 )

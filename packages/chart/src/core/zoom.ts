@@ -32,6 +32,7 @@ const clampLog = (value: number): number => Math.min(MAX_LOG, Math.max(MIN_LOG, 
  * Accumulates wheel/button input into a bounded target spacing and eases toward
  * it once per animation frame. Equal opposite deltas produce reciprocal zoom.
  * Cancel when starting a drag, replacing data, or resizing the viewport.
+ * History prepended mid-zoom does not stop it when the scale has `visibleSlots`.
  */
 export class SmoothZoom {
   private frame: number | null = null;
@@ -47,7 +48,7 @@ export class SmoothZoom {
   private readonly timeConstant: number;
 
   constructor(
-    private readonly scale: Pick<ScaleApi, 'zoom' | 'indexToX'>,
+    private readonly scale: Pick<ScaleApi, 'zoom' | 'indexToX'> & Partial<Pick<ScaleApi, 'barSpacing' | 'visibleSlots'>>,
     private readonly scheduler: FrameScheduler,
     private readonly options: SmoothZoomOptions = {},
   ) {
@@ -72,7 +73,7 @@ export class SmoothZoom {
     }
     this.direction = direction;
     this.expectedSpacing = spacing;
-    this.expectedX = this.scale.indexToX(0);
+    this.expectedX = this.position(spacing);
     this.anchor = anchorX;
     this.target = clampLog(this.target + change);
     if (Math.abs(this.target - Math.log(spacing)) < 1e-12) {
@@ -105,13 +106,23 @@ export class SmoothZoom {
     this.destroyed = true;
   }
 
+  /** Pixels per bar; `barSpacing` stays exact when a time-continuous gap separates bars 0 and 1. */
   private spacing(): number {
-    return this.scale.indexToX(1) - this.scale.indexToX(0);
+    return this.scale.barSpacing?.() ?? this.scale.indexToX(1) - this.scale.indexToX(0);
+  }
+
+  /**
+   * X of the latest scroll unit: the scroll position, which (unlike bar 0's x)
+   * holds still when history is prepended. Bar 0's x without `visibleSlots`.
+   */
+  private position(spacing: number): number {
+    const slots = this.scale.visibleSlots?.();
+    return this.scale.indexToX(0) + (slots === undefined ? 0 : (slots.length - 1) * spacing);
   }
 
   private externallyChanged(spacing: number): boolean {
     return Math.abs(spacing - this.expectedSpacing) > Math.abs(spacing) * 1e-9 ||
-      Math.abs(this.scale.indexToX(0) - this.expectedX) > 1e-7;
+      Math.abs(this.position(spacing) - this.expectedX) > 1e-7;
   }
 
   private readonly step = (timestamp: number): void => {
@@ -131,7 +142,7 @@ export class SmoothZoom {
     if (next !== current) {
       this.scale.zoom(desired / spacing, this.anchor);
       this.expectedSpacing = this.spacing();
-      this.expectedX = this.scale.indexToX(0);
+      this.expectedX = this.position(this.expectedSpacing);
       this.advanced = true;
       this.options.onFrame?.();
     }

@@ -4,7 +4,7 @@ import { MockContext2D } from '../dist/dom.js';
 import { PriceScale, TimeScale } from '../dist/core/scale.js';
 import { resolveConfig, type ChartConfig } from '../dist/config.js';
 import type { Candle } from '../dist/core/data.js';
-import { renderChart, type RenderView } from '../dist/render/renderer.js';
+import { renderChart, renderOverlay, type RenderView } from '../dist/render/renderer.js';
 import type { IndicatorOutput } from '../dist/indicators/types.js';
 
 const candles: Candle[] = Array.from({ length: 20 }, (_, i) => ({
@@ -22,6 +22,19 @@ function makeScale(min: number, max: number, height: number): PriceScale {
   ps.setRange(min, max);
   return ps;
 }
+
+it('renders the pointer overlay with optional plot offsets and restores the context on failure', () => {
+  for (const plotLeft of [undefined, 64]) {
+    const ctx = new MockContext2D();
+    const view = makeView({ crosshair: { active: true, x: 200, y: 100 } });
+    renderOverlay(ctx, { ...view, ...(plotLeft !== undefined ? { plotLeft } : {}) });
+    assert.equal(ctx.countCalls('scale'), 1);
+    assert.ok(ctx.countCalls('fillText') > 0);
+    ctx.fillText = () => { throw new Error('formatter'); };
+    assert.throws(() => renderOverlay(ctx, view), /formatter/);
+    assert.equal(ctx.calls.at(-1)![0], 'restore');
+  }
+});
 
 function makeView(overrides: {
   config?: Partial<Parameters<typeof resolveConfig>[0]>;

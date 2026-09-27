@@ -24,7 +24,7 @@ Provide finite numeric prices and valid OHLC bounds: `low` should not exceed the
 
 `chart.setData(candles)` replaces the history, sorts timestamps when needed, invalidates indicator calculations, and redraws. Supply one candle per timestamp. The array is copied, but treat candle objects as immutable after handing them to the chart.
 
-Time on the horizontal axis is indexed by bars. Missing timestamps do not automatically reserve empty columns; aggregate your feed into your desired interval before passing it in.
+Time on the horizontal axis is indexed by bars by default. Missing timestamps do not reserve empty columns; aggregate your feed into your desired interval before passing it in. To show gaps such as weekends as empty space, turn on the [time-continuous axis](/docs/guides/time-scale).
 
 ## Append or update a candle
 
@@ -35,9 +35,24 @@ chart.appendData({ time: 1700003600, open: 103, high: 108, low: 102, close: 107 
 chart.appendData({ time: 1700003600, open: 103, high: 110, low: 102, close: 109 });
 ```
 
-`appendData` appends a new latest timestamp, replaces an existing timestamp, or inserts an earlier candle in timestamp order. It does not open a WebSocket or subscribe to an exchange. The playground (`apps/playground/index.html`) shows a complete example: it seeds the chart from Hyperliquid's `candleSnapshot` REST endpoint and streams live BTC perpetual candles from the `candle` WebSocket subscription into `appendData`.
+`appendData` appends a new latest timestamp, replaces an existing timestamp, or inserts an earlier candle in timestamp order. A candle older than the first one is added like [`prependData`](#add-older-history), so index-based drawings stay on their bars. It does not open a WebSocket or subscribe to an exchange. The playground (`apps/playground/index.html`) shows a complete example: it seeds the chart from Hyperliquid's `candleSnapshot` REST endpoint and streams live BTC perpetual candles from the `candle` WebSocket subscription into `appendData`.
 
-Your application owns symbol changes, interval aggregation, retries, feed validation, and subscription cleanup.
+Your application owns symbol changes, interval aggregation, retries, feed validation, and subscription cleanup. The [paging datafeed](/docs/guides/datafeed) handles most of that for you: it loads history for a symbol and interval, pages older bars in as the user scrolls, and folds live price ticks into bars.
+
+## Add older history
+
+```ts
+const added = chart.prependData(olderCandles); // returns how many candles were added
+```
+
+`prependData` puts older history in front of the loaded data, as a datafeed does when the user scrolls back:
+
+- Rows at or after the current first candle are ignored, as are rows with a non-finite time or price. The rest are deduped by time (the last row wins) and sorted.
+- The view stays on the same candles at the same pixels, including on a continuous time axis.
+- Drawings tied to bars move with their bars, including a drawing still being placed and the toolbar's undo history. Screen-anchored drawings stay put.
+- Indicators recompute, and `subscribeDataLoad` listeners receive `{ reason: 'prepend', added }`.
+
+`DataStore`, exported from the root entry, has the lower-level `prepend(older)`, which expects rows that are already sorted, unique, and older than the first candle.
 
 ## Group updates into one redraw
 
@@ -52,4 +67,19 @@ Batching is synchronous and supports nesting. Avoid passing an async callback if
 
 ## Reading state
 
-`chart.dataLength` gives the current number of candles. `getConfig().data` describes configured input; it is not a live data feed snapshot after `setData` or `appendData`. Keep your authoritative dataset in your application.
+`chart.getData()` returns the loaded candles, oldest first, exactly as the chart holds them: after `setData`, `appendData`, `prependData`, and every [datafeed](/docs/guides/datafeed) load. Use it when the chart is fed by a datafeed and you need the bars back, for example to place markers or to read the previous close:
+
+```ts
+const bars = chart.getData();
+const previousClose = bars.at(-2)?.close;
+```
+
+It returns the chart's own array, not a copy. Don't mutate it, and call it again after a data change instead of keeping it: the next load may replace it. `chart.dataLength` gives the current number of candles. `getConfig().data` describes configured input; it is not a live snapshot after `setData`, `appendData`, or a datafeed load.
+
+To react to data changes, subscribe to them. Each event reports the `reason` (`'set'`, `'append'`, `'update'`, or `'prepend'`), the candles `added`, the new `length`, and the first and last times:
+
+```ts
+const off = chart.subscribeDataLoad(({ reason, added, length }) => console.log(reason, added, length));
+```
+
+See [chart events](/docs/guides/events) for the visible range, crosshair, and layout events too.

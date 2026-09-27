@@ -1,0 +1,101 @@
+---
+title: Chart events
+description: React to scrolling, crosshair moves, data loads, config changes, and layout changes.
+---
+
+The chart emits five typed event streams. Each `subscribe…` method returns an unsubscribe function.
+
+```ts
+const offRange = chart.subscribeVisibleRangeChange((e) => {
+  if (e.barsBefore < 50) loadOlderHistory();
+});
+const offCrosshair = chart.subscribeCrosshairMove((e) => {
+  legend.textContent = e.candle === null ? '' : `C ${e.candle.close}`;
+});
+const offData = chart.subscribeDataLoad((e) => console.log(e.reason, e.added));
+const offLayout = chart.subscribeLayoutChange((e) => placeOverlay(e.plotLeft, e.plotWidth));
+const offConfig = chart.subscribeConfigChange((e) => {
+  if (e.keys.includes('indicators') || e.keys.includes('drawings')) saveLayout();
+});
+
+// later
+offRange(); offCrosshair(); offData(); offLayout(); offConfig();
+```
+
+## Visible range
+
+`subscribeVisibleRangeChange` fires after each render that moves the visible bars: scrolling, zooming, resizing, data growth, or a config change that affects layout. Crosshair-only repaints never fire it.
+
+| Field | Meaning |
+| --- | --- |
+| `from`, `to` | Visible data indices, `[from, to)`, as in `scale.visibleRange()` |
+| `logicalFrom`, `logicalTo` | Fractional bar positions at the plot's left and right edges; beyond the data when whitespace shows |
+| `barsBefore` | Bars hidden past the left edge; negative means leading whitespace |
+| `barsAfter` | Bars hidden past the right edge; negative means trailing whitespace |
+| `fromTime`, `toTime` | Times of the first and last visible candles, or `null` when none are visible |
+| `length` | Number of candles |
+
+`barsBefore` is what a lazy history loader watches; the [paging datafeed](/docs/guides/datafeed) uses it. On a [continuous time axis](/docs/guides/time-scale), the edges are mapped back to fractional candle indices.
+
+## Crosshair
+
+`subscribeCrosshairMove` fires when `setCrosshair` or `clearCrosshair` changes the crosshair, including the toolbar's pointer handling and the touch long press. It also fires when a render changes what sits under a still pointer: scrolling or zooming moves another bar under it, a live tick replaces the hovered candle, `setData` or `prependData` shifts the indices, or the price axis rescales. A legend built on it stays in step with the chart without extra subscriptions.
+
+| Field | Meaning |
+| --- | --- |
+| `active` | `false` once the crosshair is hidden; the other fields are then `NaN` or `null` |
+| `x`, `y` | Pointer position in canvas CSS pixels |
+| `index`, `time` | Nearest bar, clamped into the data |
+| `candle` | That bar's OHLCV as loaded |
+| `displayCandle` | That bar as drawn: the Heikin Ashi bar on a `'heikin-ashi'` series, otherwise the same object as `candle` |
+| `price` | Price under `y` on the hovered pane, or `null` off the panes |
+| `paneId` | `'main'`, the id of a sub-pane's indicator, or `null` |
+
+## Data loads
+
+`subscribeDataLoad` fires after a data change has rendered.
+
+| `reason` | Cause | `added` |
+| --- | --- | --- |
+| `'set'` | `setData`, or `data` in `updateConfig` | The whole series |
+| `'append'` | `appendData` adding a candle | `1` |
+| `'update'` | `appendData` replacing an existing candle | `0` |
+| `'prepend'` | `prependData`, or `appendData` with a candle older than the first | Bars inserted |
+
+Every event also carries `length`, `firstTime`, and `lastTime`. Several changes in one batch are delivered in order. An `appendData` candle older than the first goes in front exactly like `prependData`: index-based drawings move with their bars. One that lands between existing bars is reported as `'append'` with `lastTime` unchanged, and the indices after it move up by one.
+
+## Config changes
+
+`subscribeConfigChange` fires after a render that follows a config change. Its `keys` list the top-level config sections written since the last delivery, each once, in the order they were first written:
+
+| Cause | `keys` |
+| --- | --- |
+| `updateConfig(partial)` | The partial's keys, for example `['series']` for a chart type or `['priceAxis']` for Alt+L and the scale toggles |
+| `resetScale()` | `['priceAxis']` |
+| `addIndicator`, `updateIndicator`, `removeIndicator` (from code, the picker, the context menu, or the toolbar) | `['indicators']` |
+| `addDrawing`, `updateDrawing`, `removeDrawing`, `clearDrawings`, `moveDrawingPoint`, `translateDrawing` | `['drawings']` |
+| `prependData` moving index-based drawing points with their bars | `['drawings']` |
+| The toolbar's undo and redo, and a press it takes back (a touch tap or long press on the selected drawing, a cancelled drag) | `['drawings']` once, after the whole set is restored |
+
+Values aren't compared, so a call names its section even when it writes what was already there: the same chart type again, an empty `updateIndicator` patch, or `resetScale()` with auto-scale already on. Only calls with nothing to act on (an unknown id, an empty `clearDrawings`) don't count. Selection, `setDrawingsHidden`, drafts, price lines, and markers aren't config. A `chart.batch` delivers one event with every section it touched. The stream is cheap: there's no diffing, and nothing is recorded while no one listens. The header, the scale toggles, and the indicators dialog use it to follow the chart.
+
+## Layout
+
+`subscribeLayoutChange` fires after a render that changed the canvas size, the main plot's bounds (price-axis side, width, or visibility; sub-panes; the time axis), or the config. Every `updateConfig` counts. Scrolling, zooming, and pointer moves don't. The event carries `width`, `height`, `plotLeft`, `plotWidth`, `plotHeight` (CSS pixels), and the resolved `config`. The on-chart scale buttons use it to follow the price axis.
+
+## Listener rules
+
+- **After the render, never during it.** Listeners run synchronously once the chart has painted the change they describe. Inside `chart.batch`, delivery waits until the outermost batch ends.
+- **In a fixed order.** One flush delivers queued data loads first, then the changed config sections, then a visible-range change, then a crosshair change, then a layout change.
+- **Only on change.** Range, crosshair, and layout events are compared field by field with what was last delivered, so nothing fires when nothing changed. Subscribing takes the current state as its starting point and does not fire.
+- **Listeners may change the chart.** A listener can scroll, load data, change the config, or move the crosshair. Those changes are delivered as fresh events in the next round. If a listener changes what an event in flight describes, the remaining listeners skip the stale event and everyone receives the fresh one.
+- **Feedback loops are cut off.** After 100 delivery rounds in one flush, pending events are dropped and the next flush starts from the current state.
+- **A throwing listener doesn't starve the others.** Every listener still runs, and the first error is rethrown from the chart call that triggered the render once delivery has finished.
+- **Subscription order.** Listeners run in subscription order. One added during delivery waits for the next event; one removed during delivery is skipped at once.
+- **Cleanup.** Unsubscribing twice is harmless. `chart.destroy()` drops every listener.
+
+Data-load and config events are recorded only while at least one listener of that stream is subscribed, so an unused stream costs nothing.
+
+## Your own streams
+
+`Emitter<T>` is the typed listener list behind these streams, exported for your own events. `subscribe(listener)` returns an idempotent unsubscribe function, `emit(event)` calls listeners in order and rethrows the first error once all have run, and `clear()` removes them all.

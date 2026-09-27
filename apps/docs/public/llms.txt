@@ -2,7 +2,7 @@
 
 > A zero-dependency TypeScript library for interactive financial charts, drawn on an HTML canvas with WebAssembly-accelerated math and a JavaScript fallback. Open source (MIT) by Bloxwap, Inc.
 
-`@bloxwap/chart` renders candlestick, OHLC bar, line, area, and histogram series with built-in indicators (SMA, EMA, Bollinger Bands, MACD, RSI, KDJ, volume) and 89 drawing tools grouped the way trading terminals present them (trend lines, channels, pitchforks, Fibonacci, Gann, harmonic patterns, Elliott waves, long/short positions, measurers, shapes, annotations). An optional UI layer, `@bloxwap/chart/ui`, adds a drawing toolbar, settings card, and on-chart editing.
+`@bloxwap/chart` renders candlestick, hollow candle, Heikin Ashi, OHLC bar, line, area, and histogram series with 20 built-in indicators (SMA, EMA, Bollinger Bands, VWAP, MA ribbon, Supertrend, Ichimoku, Donchian, Parabolic SAR, MACD, RSI, KDJ, volume, ADX, CCI, MFI, OBV, ATR, Stochastic, Stochastic RSI) and 89 drawing tools grouped the way trading terminals present them (trend lines, channels, pitchforks, Fibonacci, Gann, harmonic patterns, Elliott waves, long/short positions, measurers, shapes, annotations). An optional UI layer, `@bloxwap/chart/ui`, adds a drawing toolbar, header bar, settings card, indicator dialog, context menus, touch gestures, and on-chart editing. An optional datafeed, `@bloxwap/chart/datafeed`, pages history from a server and folds live ticks into bars, replacing a TradingView UDF datafeed.
 
 ## When to use this
 
@@ -11,7 +11,8 @@ Reach for `@bloxwap/chart` when an agent or developer needs to:
 - Put an interactive price chart (candles, OHLC, line, area) into a web app, dashboard, or trading interface.
 - Let users draw and edit technical-analysis annotations: trend lines, Fibonacci retracements, pitchforks, long/short positions, price and date ranges.
 - Add standard technical indicators to a chart without writing the math.
-- Stream live candle updates into an existing chart.
+- Stream live candle updates into an existing chart, or page history in from a server as the user scrolls.
+- Replace the TradingView Charting Library with an MIT-licensed, dependency-free library.
 - Keep full control of layout and DOM: the core draws into a canvas you pass in and never touches global `document` or `window`, so it also runs in workers, SSR, and tests.
 - Ship without runtime dependencies.
 
@@ -58,13 +59,22 @@ Add the toolbar with `createDrawingToolbar({ chart, document, canvas, rail, over
 
 - [Introduction](https://bloxwap.github.io/chart/docs/): What the library is and how its layers fit together.
 - [Quick start](https://bloxwap.github.io/chart/docs/getting-started/): Build the package locally and render a first candlestick chart.
-- [Data and updates](https://bloxwap.github.io/chart/docs/guides/data/): Supply candles, stream the current bar, and group changes.
-- [Series and appearance](https://bloxwap.github.io/chart/docs/guides/series/): Renderers, colors, labels, scales, and themes.
-- [Indicators](https://bloxwap.github.io/chart/docs/guides/indicators/): Built-in studies and custom calculations.
+- [Data and updates](https://bloxwap.github.io/chart/docs/guides/data/): Supply candles, stream the current bar, add older history, and group changes.
+- [Paging datafeed](https://bloxwap.github.io/chart/docs/guides/datafeed/): Load history through one fetch function, page it in on scroll, and fold live ticks into bars.
+- [Series and appearance](https://bloxwap.github.io/chart/docs/guides/series/): Renderers (including Heikin Ashi and hollow candles), colors, labels, scales, and themes.
+- [Theming and presets](https://bloxwap.github.io/chart/docs/guides/theming-presets/): Brand presets, preset/theme/config layering, scale fonts, and UI CSS variables.
+- [Price lines and markers](https://bloxwap.github.io/chart/docs/guides/price-lines-markers/): Live horizontal price references and bar markers.
+- [Indicators](https://bloxwap.github.io/chart/docs/guides/indicators/): 20 built-in studies, per-plot styling, the indicator dialog, and custom calculations.
 - [Drawings](https://bloxwap.github.io/chart/docs/guides/drawings/): Place, edit, and manage annotations in data coordinates.
-- [Toolbar and settings](https://bloxwap.github.io/chart/docs/guides/toolbar-settings/): Drawing rail, navigation, and the settings card.
+- [Toolbar and settings](https://bloxwap.github.io/chart/docs/guides/toolbar-settings/): Drawing rail, navigation, the settings card, and context menus.
+- [Header and scale buttons](https://bloxwap.github.io/chart/docs/guides/header/): Top bar with timeframes, chart types, indicators, and Auto / % / Log toggles.
+- [Touch gestures](https://bloxwap.github.io/chart/docs/guides/touch/): Pan, pinch, fling, and long-press crosshair.
+- [Time scale](https://bloxwap.github.io/chart/docs/guides/time-scale/): Bar-indexed or time-continuous axis, and what stays bar-indexed.
+- [Chart events](https://bloxwap.github.io/chart/docs/guides/events/): Visible range, crosshair, data load, and layout events and their delivery rules.
+- [Snapshots and countdown](https://bloxwap.github.io/chart/docs/guides/snapshots-countdown/): Export images and show the bar-close countdown.
 - [React integration](https://bloxwap.github.io/chart/docs/guides/react/): Keep the chart in a ref and manage its lifetime.
 - [Rendering and performance](https://bloxwap.github.io/chart/docs/guides/performance/): Batching, caches, animation, and the canvas boundary.
+- [Migrating from TradingView](https://bloxwap.github.io/chart/docs/guides/tradingview-migration/): Map Charting Library widget options, overrides, UDF datafeeds, and features to `@bloxwap/chart`.
 
 ## API reference
 
@@ -76,7 +86,7 @@ Add the toolbar with `createDrawingToolbar({ chart, document, canvas, rail, over
 ## Optional
 
 - [Developer portal](https://bloxwap.github.io/chart/developers/): Quickstart, machine-readable resources, and the sandbox in one place.
-- [Interactive playground](https://bloxwap.github.io/chart/docs/playground/): The complete chart with drawing tools and a simulated live feed.
+- [Interactive playground](https://bloxwap.github.io/chart/docs/playground/): The complete chart on live Hyperliquid data through the paging datafeed, with the header, drawing tools, context menus, and settings.
 - [OpenAPI specification](https://bloxwap.github.io/chart/openapi.json): OpenAPI 3.1 description of this site's machine-readable endpoints (this index, the sitemap, the search index).
 - [Search index](https://bloxwap.github.io/chart/search.json): Full-text index over all documentation for question answering without crawling.
 - [Sitemap](https://bloxwap.github.io/chart/sitemap.xml): Every public page with last modification dates.

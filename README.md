@@ -20,8 +20,14 @@
   `document`/`window`; it runs in browsers, workers, SSR, and tests.
 - **One consolidated config** — a single `ChartConfig` describes data, panes,
   series, indicators, drawings, axes, crosshair, grid, theme, and watermark.
-- **Indicators** — SMA, EMA, BOLL, MACD, RSI, KDJ, VOL built in, plus a
-  registry for custom ones.
+- **20 indicators** — moving averages, Bollinger Bands, VWAP, Ichimoku,
+  Supertrend, MACD, RSI, Stochastic, ADX, volume and more, with per-plot
+  styling, an indicator dialog, and a registry for custom ones.
+- **Paging datafeed** — `@bloxwap/chart/datafeed` pages history in as the user
+  scrolls and folds live ticks into bars, replacing a TradingView UDF datafeed.
+- **TradingView parity** — header bar, context menus, touch gestures, price
+  lines and markers, Heikin Ashi and hollow candles, and brand presets. See the
+  [migration guide](https://bloxwap.github.io/chart/docs/guides/tradingview-migration/).
 - **89 drawing tools** — TradingView-style groups: lines, channels, pitchforks,
   Fibonacci, Gann, harmonic patterns, Elliott waves, shapes, and annotations.
 - **Display-P3 colors** — wide-gamut colors flow straight to the canvas, with

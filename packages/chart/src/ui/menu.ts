@@ -19,6 +19,9 @@ export const HOVER_OPEN_MS = 120;
 /** Grace period before a flyout closes after the pointer leaves (ms). */
 export const HOVER_CLOSE_MS = 260;
 
+/** Where {@link Flyouts.show} opens a menu: beside a rail button (default) or under a header button. */
+export type FlyoutPlacement = 'right' | 'below';
+
 /** The injected document's window; the UI needs it for timers. */
 export function requireWindow(doc: UIDocument): UIWindow {
   if (doc.defaultView === null) throw new Error('chart-ts: the injected document has no window (defaultView)');
@@ -69,16 +72,19 @@ export function addCaret(doc: UIDocument, btn: UIElement): UIElement {
   return btn;
 }
 
-/** A section label inside a menu. */
+/** A section label inside a menu (`role="presentation"`: a `role="menu"` holds only items, groups and separators). */
 export function menuLabel(doc: UIDocument, text: string): UIElement {
   const node = el(doc, 'div', 'cts-menu-label');
+  node.setAttribute('role', 'presentation');
   node.textContent = text;
   return node;
 }
 
-/** A hairline separator inside a menu. */
+/** A hairline separator inside a menu (`role="separator"`). */
 export function menuSeparator(doc: UIDocument): UIElement {
-  return el(doc, 'div', 'cts-menu-sep');
+  const node = el(doc, 'div', 'cts-menu-sep');
+  node.setAttribute('role', 'separator');
+  return node;
 }
 
 /** Options for {@link menuItem}. */
@@ -118,6 +124,12 @@ export class Flyouts {
   private closeTimer: number | undefined;
   private readonly onDocPointerDown: (e: UIEvent) => void;
   private readonly win: UIWindow;
+  /** Placement chosen in {@link create}; other menus open to the right. */
+  private readonly placements = new WeakMap<UIElement, FlyoutPlacement>();
+  /** The open menu's opener: its `cts-open` clears on close even when it was never registered. */
+  private shownBy: UIElement | null = null;
+  /** Openers whose `aria-expanded` follows their menu; see {@link trackExpanded}. */
+  private readonly expandable = new WeakSet<UIElement>();
 
   constructor(
     private readonly doc: UIDocument,
@@ -136,10 +148,11 @@ export class Flyouts {
     return this.current;
   }
 
-  /** Creates an empty menu in the portal. */
-  create(extraClass = ''): UIElement {
+  /** Creates an empty menu in the portal, opening at `placement` (default `'right'`). */
+  create(extraClass = '', placement: FlyoutPlacement = 'right'): UIElement {
     const menu = el(this.doc, 'div', `cts-menu ${extraClass}`.trim());
     menu.setAttribute('role', 'menu');
+    this.placements.set(menu, placement);
     this.portal.append(menu);
     return menu;
   }
@@ -151,14 +164,36 @@ export class Flyouts {
     this.close();
     menu.classList.add('cts-open');
     opener.classList.add('cts-open');
+    this.expand(opener, true);
     this.current = menu;
+    this.shownBy = opener;
     const r = anchor.getBoundingClientRect();
     const viewport = this.win.innerHeight;
+    if (this.placements.get(menu) === 'below') {
+      // Drop under the anchor, flipping above it when the viewport has no room below.
+      const below = r.bottom + 4;
+      const top = below + menu.offsetHeight + 8 > viewport ? Math.max(8, r.top - menu.offsetHeight - 4) : below;
+      const left = this.win.innerWidth === undefined ? r.left
+        : Math.max(8, Math.min(r.left, this.win.innerWidth - menu.offsetWidth - 8));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      return;
+    }
     const top = Math.max(8, Math.min(r.top, viewport - menu.offsetHeight - 8));
     const left = this.win.innerWidth === undefined ? r.right + 8
       : Math.max(8, Math.min(r.right + 8, this.win.innerWidth - menu.offsetWidth - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
+  }
+
+  /** Keeps `opener`'s `aria-expanded` in step with the menus it shows, however they close. */
+  trackExpanded(opener: UIElement): void {
+    this.expandable.add(opener);
+    opener.setAttribute('aria-expanded', 'false');
+  }
+
+  private expand(opener: UIElement, open: boolean): void {
+    if (this.expandable.has(opener)) opener.setAttribute('aria-expanded', String(open));
   }
 
   /** Opens `menu`, or closes it when it is already open. */
@@ -173,15 +208,18 @@ export class Flyouts {
     if (this.current === null) return;
     this.current.classList.remove('cts-open');
     this.current = null;
+    this.shownBy!.classList.remove('cts-open');
+    this.expand(this.shownBy!, false);
+    this.shownBy = null;
     for (const opener of this.openers) opener.classList.remove('cts-open');
   }
 
   /**
    * Hover intent: pointing at `owner` opens `menu` after
    * {@link HOVER_OPEN_MS}; leaving both closes it after
-   * {@link HOVER_CLOSE_MS}. Mouse only — touch uses clicks.
+   * {@link HOVER_CLOSE_MS}. Mouse only — touch uses clicks. Returns a listener cleanup.
    */
-  hover(owner: UIElement, menu: UIElement, anchor: UIElement = owner, opener: UIElement = anchor): void {
+  hover(owner: UIElement, menu: UIElement, anchor: UIElement = owner, opener: UIElement = anchor): () => void {
     this.openers.add(opener);
     const leave = (e: UIEvent): void => {
       if (e.pointerType !== 'mouse') return;
@@ -190,26 +228,42 @@ export class Flyouts {
         if (this.current === menu) this.close();
       }, HOVER_CLOSE_MS);
     };
-    owner.addEventListener('pointerenter', (e) => {
+    const enter = (e: UIEvent): void => {
       if (e.pointerType !== 'mouse') return;
       this.cancelTimers();
       this.openTimer = this.win.setTimeout(() => this.show(menu, anchor, opener), HOVER_OPEN_MS);
-    });
+    };
+    const stay = (): void => this.cancelTimers();
+    owner.addEventListener('pointerenter', enter);
     owner.addEventListener('pointerleave', leave);
-    menu.addEventListener('pointerenter', () => this.cancelTimers());
+    menu.addEventListener('pointerenter', stay);
     menu.addEventListener('pointerleave', leave);
+    return () => {
+      this.cancelTimers();
+      owner.removeEventListener('pointerenter', enter);
+      owner.removeEventListener('pointerleave', leave);
+      menu.removeEventListener('pointerenter', stay);
+      menu.removeEventListener('pointerleave', leave);
+      this.openers.delete(opener);
+    };
   }
 
-  /** Wires a plain button to open `menu` on click and hover, with the chevron. */
-  attach(btn: UIElement, menu: UIElement): void {
+  /** Wires a button to open `menu` on click/hover; returns a listener cleanup. */
+  attach(btn: UIElement, menu: UIElement): () => void {
     btn.classList.add('cts-flyout-btn');
     addCaret(this.doc, btn);
     this.openers.add(btn);
-    btn.addEventListener('click', (e) => {
+    const click = (e: UIEvent): void => {
       e.stopPropagation();
       this.show(menu, btn);
-    });
-    this.hover(btn, menu);
+    };
+    btn.addEventListener('click', click);
+    const detachHover = this.hover(btn, menu);
+    return () => {
+      if (this.current === menu) this.close();
+      btn.removeEventListener('click', click);
+      detachHover();
+    };
   }
 
   /** Removes the document listener and pending timers. */

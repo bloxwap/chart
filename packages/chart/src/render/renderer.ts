@@ -1,7 +1,7 @@
 /**
  * Layer-based canvas renderer. Layers, in order: background, watermark,
- * grid, series, indicators, drawings, axes, crosshair. Rendering is a full
- * redraw on every invalidate — deliberately simple.
+ * grid, series, indicators, drawings, axes, crosshair. Pointer overlays can
+ * be repainted independently of the static layers.
  *
  * @module
  */
@@ -14,11 +14,17 @@ import type { IndicatorOutput } from '../indicators/types.js';
 import type { Canvas2DLike } from '../dom.js';
 import { contrastingTextColor } from '../color.js';
 import { SERIES_RENDERERS } from '../series/index.js';
-import { drawHistogramBars } from '../series/histogram.js';
 import { drawWatermark } from '../watermark.js';
 import { drawTimeAxis, timeTickIndices } from './axis.js';
 import { drawDrawings, type ResolvedDrawing } from './drawings.js';
 import { drawPriceReferences, drawStatusLine } from './settings-layers.js';
+import { scaleFont, scaleFontSize } from './scale-font.js';
+import { drawVolumeOverlay } from './volume-overlay.js';
+import { drawPriceLines } from './price-lines.js';
+import { drawMarkers } from './markers.js';
+import type { PriceLineRenderItem, SeriesMarker } from '../core/price-lines.js';
+import { drawCountdownLabel } from './countdown.js';
+import { drawIndicator } from './indicator-draw.js';
 
 export type { ResolvedDrawing } from './drawings.js';
 
@@ -27,6 +33,8 @@ export interface PaneRenderInfo {
   readonly layout: PaneLayout;
   readonly priceScale: PriceScale;
   readonly indicators: readonly IndicatorOutput[];
+  /** Status-line labels by line key, parallel to `indicators`; keys without one show uppercased. */
+  readonly indicatorLabels?: readonly ReadonlyMap<string, string>[];
   /** Per-overlay opacity during indicator transitions. Defaults to 1. */
   readonly indicatorOpacities?: readonly number[];
   /** Sub-pane opacity, including its grid, separator and axis. Defaults to 1. */
@@ -43,8 +51,17 @@ export interface RenderView {
   /** Backing-store pixels per CSS pixel; the context is scaled by this ratio. */
   readonly pixelRatio: number;
   readonly candles: readonly Candle[];
-  /** Visual OHLC override for the last candle; calculations use `candles`. */
+  /**
+   * Visual OHLC override for the last bar of `displayCandles ?? candles`, in
+   * the same space (a Heikin Ashi bar for `'heikin-ashi'`); calculations use `candles`.
+   */
   readonly liveCandle?: Candle;
+  /**
+   * Main-series bars as displayed (Heikin Ashi bars for `'heikin-ashi'`); the
+   * series, status line and price references read these, and `liveCandle`
+   * overrides their last bar. Defaults to `candles`.
+   */
+  readonly displayCandles?: readonly Candle[];
   readonly range: VisibleRange;
   readonly timeScale: TimeScale;
   /** First entry is the main pane; the rest are indicator sub-panes. */
@@ -52,33 +69,12 @@ export interface RenderView {
   readonly config: ChartConfig;
   readonly drawings: readonly ResolvedDrawing[];
   readonly crosshair: { readonly active: boolean; readonly x: number; readonly y: number };
-}
-
-function drawLinePath(
-  ctx: Canvas2DLike,
-  values: readonly (number | null)[],
-  range: VisibleRange,
-  timeScale: TimeScale,
-  priceScale: PriceScale,
-): void {
-  ctx.beginPath();
-  let pen = false;
-  for (let i = range.from; i < range.to; i++) {
-    const v = values[i];
-    if (v === null || Number.isNaN(v)) {
-      pen = false;
-      continue;
-    }
-    const x = timeScale.indexToX(i, values.length);
-    const y = priceScale.priceToY(v);
-    if (pen) {
-      ctx.lineTo(x, y);
-    } else {
-      ctx.moveTo(x, y);
-      pen = true;
-    }
-  }
-  ctx.stroke();
+  /** Main-series price lines, painted above the built-in price references in order. */
+  readonly priceLines?: readonly PriceLineRenderItem[];
+  /** Main-series markers sorted by time. */
+  readonly markers?: readonly SeriesMarker[];
+  /** Wall clock in ms for the bar-close countdown; without it the countdown is hidden. */
+  readonly now?: () => number;
 }
 
 function drawIndicatorOutput(
@@ -87,24 +83,9 @@ function drawIndicatorOutput(
   range: VisibleRange,
   timeScale: TimeScale,
   priceScale: PriceScale,
+  length: number,
 ): void {
-  if (output.bars !== undefined) {
-    drawHistogramBars(
-      ctx,
-      output.bars.values,
-      output.bars.up,
-      range,
-      timeScale,
-      priceScale,
-      output.bars.upColor,
-      output.bars.downColor,
-    );
-  }
-  for (const line of output.lines) {
-    ctx.strokeStyle = line.color;
-    ctx.lineWidth = 1;
-    drawLinePath(ctx, line.values, range, timeScale, priceScale);
-  }
+  drawIndicator(ctx, output, range, timeScale, priceScale, length);
 }
 
 function strokeHLine(ctx: Canvas2DLike, x1: number, x2: number, y: number): void {
@@ -127,19 +108,19 @@ function strokeVLine(ctx: Canvas2DLike, x: number, y1: number, y2: number): void
  * recording mock context. All coordinates are CSS pixels; the 2D context is
  * scaled by `view.pixelRatio` for the duration of the frame.
  */
-export function renderChart(ctx: Canvas2DLike, view: RenderView): void {
+export function renderChart(ctx: Canvas2DLike, view: RenderView, overlay = true): void {
   ctx.save();
   ctx.scale(view.pixelRatio, view.pixelRatio);
   try {
-    renderLayers(ctx, view);
+    renderLayers(ctx, view, overlay);
   } finally {
     ctx.restore();
   }
 }
 
-function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
+function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): void {
   const { config, plotWidth, plotHeight } = view;
-  const monoFont = `${config.theme.fontSize}px ${config.theme.monoFamily}`;
+  const monoFont = scaleFont(config.theme);
 
   // Layer 0: background.
   ctx.fillStyle = config.theme.background;
@@ -156,7 +137,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   drawWatermark(ctx, config.watermark, plotWidth, plotHeight, config.theme.fontFamily);
 
   // Layer 2: grid.
-  const timeIndices = timeTickIndices(view.range, config.timeAxis.tickCount);
+  const timeIndices = timeTickIndices(view.range, config.timeAxis.tickCount, view.timeScale, view.candles.length);
   if (config.grid.visible) {
     ctx.save();
     ctx.strokeStyle = config.grid.color;
@@ -178,7 +159,8 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     ctx.restore();
   }
 
-  // Layer 3: main series.
+  // Layer 3: main series. Continuous time axes also draw the candles just outside the viewport.
+  const drawRange = view.timeScale.drawRange(view.range, view.candles.length);
   const mainPane = view.panes[0];
   if (mainPane !== undefined) {
     ctx.save();
@@ -186,19 +168,21 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     ctx.beginPath();
     ctx.rect(0, 0, plotWidth, mainPane.layout.height);
     ctx.clip();
+    drawVolumeOverlay(ctx, view, mainPane.layout.height);
     SERIES_RENDERERS[config.series.type](
       ctx,
-      view.candles,
-      view.range,
+      view.displayCandles ?? view.candles,
+      drawRange,
       view.timeScale,
       mainPane.priceScale,
       config.series,
       view.liveCandle,
     );
+    drawMarkers(ctx, view, mainPane.priceScale);
     // Layer 4a: main-pane indicators overlay the series.
     for (const [index, output] of mainPane.indicators.entries()) {
       ctx.globalAlpha = mainPane.indicatorOpacities?.[index] ?? 1;
-      drawIndicatorOutput(ctx, output, view.range, view.timeScale, mainPane.priceScale);
+      drawIndicatorOutput(ctx, output, drawRange, view.timeScale, mainPane.priceScale, view.candles.length);
     }
     ctx.restore();
   }
@@ -212,7 +196,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     ctx.rect(0, 0, plotWidth, pane.layout.height);
     ctx.clip();
     for (const output of pane.indicators) {
-      drawIndicatorOutput(ctx, output, view.range, view.timeScale, pane.priceScale);
+      drawIndicatorOutput(ctx, output, drawRange, view.timeScale, pane.priceScale, view.candles.length);
     }
     ctx.restore();
   }
@@ -230,6 +214,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
       fontSize: config.theme.fontSize,
       background: config.theme.background,
       pixelRatio: view.pixelRatio,
+      width: plotWidth,
     });
     ctx.restore();
   }
@@ -284,7 +269,33 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   }
 
   drawPriceReferences(ctx, view);
+  drawPriceLines(ctx, view);
+  if (overlay) renderOverlayLayers(ctx, view);
+}
+
+/** Repaints hover-dependent status text and crosshair above a cached base. */
+export function renderOverlay(ctx: Canvas2DLike, view: RenderView): void {
+  ctx.save();
+  ctx.scale(view.pixelRatio, view.pixelRatio);
+  try {
+    const left = view.plotLeft ?? 0;
+    if (left > 0) {
+      ctx.translate(left, 0);
+      view = { ...view, crosshair: { ...view.crosshair, x: view.crosshair.x - left } };
+    }
+    renderOverlayLayers(ctx, view);
+  } finally {
+    ctx.restore();
+  }
+}
+
+function renderOverlayLayers(ctx: Canvas2DLike, view: RenderView): void {
+  const { config, plotWidth, plotHeight } = view;
+  const mainPane = view.panes[0];
+  const axisX = config.priceAxis.position === 'left' ? -(view.canvasWidth - plotWidth) : plotWidth;
+  const monoFont = scaleFont(config.theme);
   drawStatusLine(ctx, view);
+  drawCountdownLabel(ctx, view);
 
   // Layer 8: crosshair with axis label boxes.
   const mode = config.crosshair.mode;
@@ -314,7 +325,7 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
     }
 
     const pad = 4;
-    const labelH = config.theme.fontSize + pad * 2;
+    const labelH = scaleFontSize(config.theme) + pad * 2;
     const labelColor = config.crosshair.labelColor === 'auto'
       ? contrastingTextColor(config.crosshair.labelBackground, config.theme.background)
       : config.crosshair.labelColor;

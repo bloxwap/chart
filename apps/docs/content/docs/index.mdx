@@ -15,24 +15,30 @@ The library is in development. These docs describe the code in this repository. 
 | Try the controls | [Interactive playground](/docs/playground) |
 | Integrate a component | [React](/docs/guides/react) |
 | Stream prices | [Data and updates](/docs/guides/data) |
+| Load history from a server and page it in | [Paging datafeed](/docs/guides/datafeed) |
 | Add the complete chart UI | [Toolbar and settings](/docs/guides/toolbar-settings) |
+| Replace the TradingView Charting Library | [Migrating from TradingView](/docs/guides/tradingview-migration) |
 | Look up a method | [Chart API](/docs/api/chart) |
 
 ## How the pieces fit
 
 The **core** owns the data, scales, and rendering. You provide a canvas or a small document abstraction. It has no dependency on React and does not access the global browser document.
 
-The **UI layer** is an optional import from `@bloxwap/chart/ui`. It adds pointer navigation, drawing controls, the settings card, and theme styling. You provide the browser document and the containers where that UI should appear.
+The **UI layer** is an optional import from `@bloxwap/chart/ui`. It adds pointer and touch navigation, drawing controls, a header bar, the settings card, an indicator dialog, context menus, and theme styling. You provide the browser document and the containers where that UI should appear.
+
+The **datafeed** is an optional import from `@bloxwap/chart/datafeed`. It loads history through one function you write, pages older bars in as the user scrolls, and folds live ticks into bars.
 
 The **registries** hold indicator calculations and drawing models. Built-in models work immediately; applications can register their own implementations.
 
 ## What is included
 
-- Candlestick, line, area, OHLC bar, and volume histogram series.
-- SMA, EMA, Bollinger Bands, MACD, RSI, KDJ, and volume indicators.
+- Candlestick, hollow candle, Heikin Ashi, line, area, OHLC bar, and volume histogram series, with an optional volume overlay.
+- 20 indicators, including moving averages, Bollinger Bands, VWAP, Ichimoku, Supertrend, MACD, RSI, Stochastic, ADX, and volume, with per-plot styling.
 - Drawing tools for lines, patterns, Fibonacci, annotations, measurements, and more.
-- Regular, percent, indexed, and logarithmic price scales.
-- A shared configuration for themes, labels, crosshair, grid, watermark, and formatters.
+- Price lines and bar markers for live values such as a mark price or order fills.
+- Regular, percent, indexed, and logarithmic price scales, and a bar-indexed or time-continuous time axis.
+- A shared configuration for themes, brand presets, labels, crosshair, grid, watermark, and formatters.
+- Events for the visible range, crosshair, data loads, and layout, plus snapshots and a bar-close countdown.
 - Optional WASM/SIMD calculation kernels with a JavaScript fallback.
 - Mock canvas and document implementations for tests.
 

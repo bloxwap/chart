@@ -17,6 +17,7 @@ import {
   poly,
   ratio,
   seg,
+  spansPlot,
   text,
   type FullView,
   type Pt,
@@ -67,6 +68,8 @@ function levelStack(
   right: number,
 ): DrawPrimitive[] {
   const out: DrawPrimitive[] = [];
+  // Labels sit left of the levels; while those are on screen they slide in rather than clip at the plot's edge.
+  const inside = spansPlot(left, right, view.width);
   for (let i = 0; i < levels.length - 1; i++) {
     const y0 = yOf(levels[i]!);
     const y1 = yOf(levels[i + 1]!);
@@ -86,7 +89,7 @@ function levelStack(
     const color = levelColor(i);
     out.push(seg({ x: left, y }, { x: right, y }, { color }));
     out.push(
-      text(`${ratio(level)} (${view.formatPrice(priceOf(level))})`, { x: left - 4, y }, { align: 'right', color }),
+      text(`${ratio(level)} (${view.formatPrice(priceOf(level))})`, { x: left - 4, y }, { align: 'right', color, inside }),
     );
   });
   return out;
@@ -135,8 +138,10 @@ export const fibChannelDrawing = defineDrawing({
       const s = { x: a!.x, y: a!.y + off * level };
       const e = { x: b!.x, y: b!.y + off * level };
       const color = levelColor(i);
-      out.push(extendedLine(s, e, v, false, true, { color }));
-      out.push(text(ratio(level), { x: s.x - 4, y: s.y }, { align: 'right', color }));
+      const line = extendedLine(s, e, v, false, true, { color });
+      out.push(line);
+      // Left of the level: slides in at the plot's edge while the extended level is on screen.
+      out.push(text(ratio(level), { x: s.x - 4, y: s.y }, { align: 'right', color, inside: spansPlot(line.x1, line.x2, v.width) }));
     });
     return out;
   },
@@ -154,7 +159,7 @@ export const fibTimeZoneDrawing = defineDrawing({
       const x = v.indexToX(pts[0]!.index + step * n);
       const color = levelColor(i);
       out.push(seg({ x, y: 0 }, { x, y: v.height }, { color }));
-      out.push(text(String(n), { x: x + 3, y: v.height - 4 }, { baseline: 'bottom', color }));
+      out.push(text(String(n), { x: x + 3, y: v.height - 4 }, { baseline: 'bottom', color, inside: spansPlot(x, x, v.width) }));
     });
     out.push(seg(a!, b!, { dash: [4, 4], alpha: 0.5 }));
     return out;
@@ -169,13 +174,14 @@ export const fibSpeedFanDrawing = defineDrawing({
     const out: DrawPrimitive[] = [
       { type: 'rect', x: Math.min(a!.x, b!.x), y: Math.min(a!.y, b!.y), w: Math.abs(b!.x - a!.x), h: Math.abs(b!.y - a!.y), dash: [2, 3], alpha: 0.5 },
     ];
+    const inside = spansPlot(a!.x, b!.x, v.width);
     GANN_LEVELS.forEach((level, i) => {
       const color = levelColor(i);
       const py = { x: b!.x, y: b!.y + (a!.y - b!.y) * level };
       const tx = { x: b!.x + (a!.x - b!.x) * level, y: b!.y };
       out.push(extendedLine(a!, py, v, false, true, { color }));
       if (level !== 0) out.push(extendedLine(a!, tx, v, false, true, { color, alpha: 0.7 }));
-      out.push(text(ratio(level), { x: b!.x + 4, y: py.y }, { color }));
+      out.push(text(ratio(level), { x: b!.x + 4, y: py.y }, { color, inside }));
     });
     return out;
   },
@@ -192,7 +198,7 @@ export const fibTimeDrawing = defineDrawing({
       const x = v.indexToX(pts[2]!.index + span * level);
       const color = levelColor(i);
       out.push(seg({ x, y: 0 }, { x, y: v.height }, { color }));
-      out.push(text(ratio(level), { x: x + 3, y: v.height - 4 }, { baseline: 'bottom', color }));
+      out.push(text(ratio(level), { x: x + 3, y: v.height - 4 }, { baseline: 'bottom', color, inside: spansPlot(x, x, v.width) }));
     });
     return out;
   },
@@ -292,7 +298,10 @@ export const fibWedgeDrawing = defineDrawing({
   },
 });
 
-/** Rays from `origin` through each point of `through`, filled between neighbors and labeled. */
+/**
+ * Rays from `origin` through each point of `through`, filled between
+ * neighbors and labeled; a label whose point is on screen stays whole.
+ */
 function fanRays(view: FullView, origin: Pt, through: readonly Pt[], labels: readonly string[]): DrawPrimitive[] {
   const rays = through.map((p) => extendedLine(origin, p, view, false, true));
   const out: DrawPrimitive[] = [];
@@ -309,7 +318,8 @@ function fanRays(view: FullView, origin: Pt, through: readonly Pt[], labels: rea
   rays.forEach((ray, i) => {
     const color = levelColor(i);
     out.push({ ...ray, color });
-    out.push(text(labels[i]!, { x: through[i]!.x + 4, y: through[i]!.y }, { color, size: 10 }));
+    // Gated per point: labels sharing a row (a flat b–c, the gann 1×n points) don't pile up at the edge.
+    out.push(text(labels[i]!, { x: through[i]!.x + 4, y: through[i]!.y }, { color, size: 10, inside: spansPlot(through[i]!.x, through[i]!.x, view.width) }));
   });
   return out;
 }
@@ -328,11 +338,14 @@ export const pitchfanDrawing = defineDrawing({
 export const gannBoxDrawing = defineDrawing({
   name: 'gann-box',
   minPoints: 2,
-  build: ([a, b]) => gannGrid(a!, b!, false),
+  build: ([a, b], v) => gannGrid(a!, b!, false, v.width),
 });
 
-/** Grid shared by Gann box and squares; `arcs` adds the quarter-circle set. */
-function gannGrid(a: Pt, b: Pt, arcs: boolean): DrawPrimitive[] {
+/**
+ * Grid shared by Gann box and squares; `arcs` adds the quarter-circle set.
+ * Labels stay within a plot `width` px wide while their line is on screen.
+ */
+function gannGrid(a: Pt, b: Pt, arcs: boolean, width: number): DrawPrimitive[] {
   const w = b.x - a.x;
   const h = b.y - a.y;
   const out: DrawPrimitive[] = [
@@ -344,8 +357,9 @@ function gannGrid(a: Pt, b: Pt, arcs: boolean): DrawPrimitive[] {
     const y = a.y + h * level;
     out.push(seg({ x, y: a.y }, { x, y: b.y }, { color, alpha: 0.8 }));
     out.push(seg({ x: a.x, y }, { x: b.x, y }, { color, alpha: 0.8 }));
-    out.push(text(ratio(level), { x, y: Math.min(a.y, b.y) - 4 }, { align: 'center', baseline: 'bottom', color, size: 10 }));
-    out.push(text(ratio(level), { x: Math.min(a.x, b.x) - 4, y }, { align: 'right', color, size: 10 }));
+    // Column labels share a row, so each is gated on its own line; row labels on the box.
+    out.push(text(ratio(level), { x, y: Math.min(a.y, b.y) - 4 }, { align: 'center', baseline: 'bottom', color, size: 10, inside: spansPlot(x, x, width) }));
+    out.push(text(ratio(level), { x: Math.min(a.x, b.x) - 4, y }, { align: 'right', color, size: 10, inside: spansPlot(a.x, b.x, width) }));
   });
   out.push(seg(a, b, { dash: [4, 4] }), seg({ x: a.x, y: b.y }, { x: b.x, y: a.y }, { dash: [4, 4] }));
   if (arcs) {
@@ -370,10 +384,10 @@ function gannGrid(a: Pt, b: Pt, arcs: boolean): DrawPrimitive[] {
 export const gannSquareFixedDrawing = defineDrawing({
   name: 'gann-square-fixed',
   minPoints: 2,
-  build: ([a, b]) => {
+  build: ([a, b], v) => {
     const side = Math.max(Math.abs(b!.x - a!.x), Math.abs(b!.y - a!.y));
     const sb = { x: a!.x + (b!.x >= a!.x ? side : -side), y: a!.y + (b!.y >= a!.y ? side : -side) };
-    return gannGrid(a!, sb, true);
+    return gannGrid(a!, sb, true, v.width);
   },
 });
 
@@ -381,7 +395,7 @@ export const gannSquareFixedDrawing = defineDrawing({
 export const gannSquareDrawing = defineDrawing({
   name: 'gann-square',
   minPoints: 2,
-  build: ([a, b]) => gannGrid(a!, b!, true),
+  build: ([a, b], v) => gannGrid(a!, b!, true, v.width),
 });
 
 /** Gann fan (2 points): 1×1 through b, with 8/1 … 1/8 angles. */

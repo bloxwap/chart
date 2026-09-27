@@ -39,9 +39,13 @@ export function rsiValues(closes: readonly number[], period: number): (number | 
 /** RSI indicator definition (name `'rsi'`, param `period`, default 14). */
 export const rsiIndicator: IndicatorDef = {
   name: 'rsi',
+  label: 'Relative Strength Index',
+  shortName: 'RSI',
   defaultParams: { period: 14 },
   defaultColors: ['#7e57c2'],
   defaultPane: 'sub',
+  inputs: [{ key: 'period', label: 'RSI length', min: 1, step: 1, integer: true }],
+  styles: [{ key: 'value', label: 'RSI', colorIndex: 0 }],
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = Math.max(1, Math.floor(params['period'] ?? 14));
     const closes = candles.map((c) => c.close);

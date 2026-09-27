@@ -8,7 +8,7 @@
 
 import { defineDrawing } from './define.js';
 import type { DrawingMeta, DrawPrimitive } from './types.js';
-import { clampIndex, poly, seg, text, type FullView, type Pt } from './geom.js';
+import { clampIndex, poly, seg, spansPlot, text, type FullView, type Pt } from './geom.js';
 
 /** `meta.text`, or `fallback` when empty. */
 function body(meta: DrawingMeta, fallback: string): string {
@@ -65,7 +65,7 @@ export const priceNoteDrawing = defineDrawing({
   build: ([a, b], v, pts) => [
     seg(a!, b!),
     { type: 'ellipse', cx: a!.x, cy: a!.y, rx: 3, ry: 3, fill: true, fillAlpha: 1 },
-    text(v.formatPrice(pts[0]!.price), b!, { align: b!.x >= a!.x ? 'left' : 'right', bg: true }),
+    text(v.formatPrice(pts[0]!.price), b!, { align: b!.x >= a!.x ? 'left' : 'right', bg: true, inside: spansPlot(a!.x, b!.x, v.width) }),
   ],
 });
 

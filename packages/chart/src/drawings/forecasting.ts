@@ -21,6 +21,7 @@ import {
   seg,
   signedDelta,
   changeText,
+  spansPlot,
   text,
   timeAt,
   volumeBetween,
@@ -55,6 +56,8 @@ function position(name: string, long: boolean): DrawingDef {
       const risk = Math.abs(stop - entry);
       const rr = risk === 0 ? '∞' : (reward / risk).toFixed(2);
       const cx = left + w / 2;
+      // Labels stay whole while the box is on screen, even where it meets the price axis.
+      const inside = spansPlot(left, right, v.width);
       const out: DrawPrimitive[] = [
         { type: 'rect', x: left, y: Math.min(e!.y, t!.y), w, h: Math.abs(t!.y - e!.y), fill: v.upColor, fillAlpha: 0.2, noStroke: true },
         { type: 'rect', x: left, y: Math.min(e!.y, s!.y), w, h: Math.abs(s!.y - e!.y), fill: v.downColor, fillAlpha: 0.2, noStroke: true },
@@ -64,14 +67,16 @@ function position(name: string, long: boolean): DrawingDef {
           baseline: long ? 'bottom' : 'top',
           bg: v.upColor,
           font: 'sans',
+          inside,
         }),
         text(`Stop: ${v.formatPrice(stop)} (${pctChange(entry, stop)})`, { x: cx, y: s!.y }, {
           align: 'center',
           baseline: long ? 'top' : 'bottom',
           bg: v.downColor,
           font: 'sans',
+          inside,
         }),
-        text(`${long ? 'Long' : 'Short'} · R/R ${rr}`, { x: cx, y: e!.y }, { align: 'center', bg: '#787b86', font: 'sans' }),
+        text(`${long ? 'Long' : 'Short'} · R/R ${rr}`, { x: cx, y: e!.y }, { align: 'center', bg: '#787b86', font: 'sans', inside }),
       ];
       // Open P&L from the latest close inside the box's time span.
       const last = clampIndex(v.candles, Math.min(v.candles.length - 1, v.xToIndex(right)));
@@ -83,6 +88,7 @@ function position(name: string, long: boolean): DrawingDef {
             bg: pnl >= 0 ? v.upColor : v.downColor,
             font: 'sans',
             size: 10,
+            inside,
           }),
         );
       }
@@ -111,7 +117,7 @@ export const forecastDrawing = defineDrawing({
       { type: 'ellipse', cx: a!.x, cy: a!.y, rx: 4, ry: 4, fill: true, fillAlpha: 1 },
       { type: 'ellipse', cx: b!.x, cy: b!.y, rx: 4, ry: 4, fill: true, fillAlpha: 1 },
       seg({ x: b!.x, y: b!.y }, { x: b!.x, y: v.height }, { dash: [3, 3], alpha: 0.5 }),
-      text(lines.join('\n'), { x: b!.x + 8, y: b!.y }, { bg: true, font: 'sans' }),
+      text(lines.join('\n'), { x: b!.x + 8, y: b!.y }, { bg: true, font: 'sans', inside: spansPlot(a!.x, b!.x, v.width) }),
     ];
   },
 });
@@ -205,7 +211,7 @@ export const ghostFeedDrawing = defineDrawing({
 export const projectionDrawing = defineDrawing({
   name: 'projection',
   minPoints: 3,
-  build: ([a, b, c], _v, pts) => {
+  build: ([a, b, c], v, pts) => {
     const leg1 = pts[1]!.price - pts[0]!.price;
     const leg2 = pts[2]!.price - pts[1]!.price;
     const r = dist(b!, c!);
@@ -220,6 +226,7 @@ export const projectionDrawing = defineDrawing({
         align: 'center',
         bg: true,
         font: 'sans',
+        inside: spansPlot(Math.min(a!.x, b!.x, c!.x), Math.max(a!.x, b!.x, c!.x), v.width),
       }),
     ];
   },
@@ -248,7 +255,7 @@ export const anchoredVwapDrawing = defineDrawing({
     return [
       poly(line, { width: 2 }),
       { type: 'ellipse', cx: line[0]!.x, cy: line[0]!.y, rx: 3, ry: 3, fill: true, fillAlpha: 1 },
-      text(`VWAP ${v.formatPrice(last)}`, { x: end.x + 4, y: end.y }, { bg: true }),
+      text(`VWAP ${v.formatPrice(last)}`, { x: end.x + 4, y: end.y }, { bg: true, inside: spansPlot(line[0]!.x, end.x, v.width) }),
     ];
   },
 });
@@ -327,7 +334,7 @@ export const volumeProfileDrawing = defineDrawing({
     });
     const pocY = v.priceToY(prof.lo + rowH * (poc + 0.5));
     out.push(seg({ x: left, y: pocY }, { x: right, y: pocY }, { color: '#f23645', width: 2 }));
-    out.push(text(`POC ${v.formatPrice(prof.lo + rowH * (poc + 0.5))}`, { x: right + 4, y: pocY }, { bg: '#f23645' }));
+    out.push(text(`POC ${v.formatPrice(prof.lo + rowH * (poc + 0.5))}`, { x: right + 4, y: pocY }, { bg: '#f23645', inside: spansPlot(left, right, v.width) }));
     return out;
   },
 });
@@ -375,7 +382,13 @@ export const priceRangeDrawing = defineDrawing({
       seg({ x: a!.x, y: a!.y }, { x: b!.x, y: a!.y }, { color }),
       seg({ x: a!.x, y: b!.y }, { x: b!.x, y: b!.y }, { color }),
       ...measureArrow({ x, y: a!.y }, { x, y: b!.y }, color),
-      text(priceSpan(v, pts), { x, y: b!.y + (b!.y <= a!.y ? -6 : 6) }, { align: 'center', baseline: b!.y <= a!.y ? 'bottom' : 'top', bg: color, font: 'sans' }),
+      text(priceSpan(v, pts), { x, y: b!.y + (b!.y <= a!.y ? -6 : 6) }, {
+        align: 'center',
+        baseline: b!.y <= a!.y ? 'bottom' : 'top',
+        bg: color,
+        font: 'sans',
+        inside: spansPlot(a!.x, b!.x, v.width),
+      }),
     ];
   },
 });
@@ -398,6 +411,7 @@ export const dateRangeDrawing = defineDrawing({
         baseline: 'top',
         bg: color,
         font: 'sans',
+        inside: spansPlot(a!.x, b!.x, v.width),
       }),
     ];
   },
@@ -422,6 +436,7 @@ export const datePriceRangeDrawing = defineDrawing({
         baseline: up ? 'bottom' : 'top',
         bg: color,
         font: 'sans',
+        inside: spansPlot(a!.x, b!.x, v.width),
       }),
     ];
   },

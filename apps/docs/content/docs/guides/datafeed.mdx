@@ -1,0 +1,210 @@
+---
+title: Paging datafeed
+description: Load recent history, page older bars in as the user scrolls, and fold live ticks into bars.
+---
+
+`@bloxwap/chart/datafeed` replaces a TradingView UDF datafeed. You write one function that reads bars for a time window. The datafeed loads recent history, pages older history in as the user scrolls left, and folds live price ticks into the forming bar. Superseded reads are aborted and never reach the chart.
+
+## Create a chart with a datafeed
+
+```ts
+import { createDatafeedChart } from '@bloxwap/chart/datafeed';
+
+const { chart, datafeed, destroy } = createDatafeedChart({
+  container: canvas,          // any createChart option works here
+  autoResize: true,
+  preset: 'bloxwapDark',
+  // Bars opening within [fromMs, toMs], both inclusive. Hand `signal` to fetch.
+  fetchBars: ({ symbol, intervalMs, fromMs, toMs, signal }) => readCandles(symbol, intervalMs, fromMs, toMs, signal),
+  symbol: 'BTC',
+  intervalMs: 15 * 60_000,
+  onError: (error) => console.warn('chart data', error),
+});
+
+priceFeed.subscribe('BTC', (mid) => datafeed.pushTick(mid, 'BTC'));
+await datafeed.setSymbol('ETH', 60_000); // switch symbol or interval
+datafeed.subscribeState(({ loading, exhausted, error }) => renderSpinner(loading, exhausted, error));
+
+// When the view goes away:
+destroy(); // the datafeed first, then the chart
+```
+
+`fetchBars` receives a `FetchBarsRequest` and resolves to every candle the source has in the window, in any order. Duplicates and rows outside the window are tolerated. A window never holds more than `pageSize` buckets.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `symbol` | `string` | The instrument, as passed to `setSymbol` |
+| `intervalMs` | `number` | Bar width in milliseconds |
+| `fromMs`, `toMs` | `number` | Earliest and latest bar **open** wanted, both inclusive, epoch milliseconds |
+| `countBack` | `number` | Bars the window holds (at most `pageSize`); the window already bounds the read |
+| `signal` | `AbortSignal` | Aborted once the read is superseded; results after an abort are ignored |
+
+Candle `time` stays in **UNIX seconds**. Only the request window is in milliseconds.
+
+To bind a datafeed to a chart you already have (one from `<Chart onReady>`, or the one the toolbar wraps), use `attachDatafeed(chart, options)` with the same options minus the chart ones. `datafeed.destroy()` then detaches it and leaves the chart alive.
+
+## Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `fetchBars` | Required | The history source |
+| `symbol`, `intervalMs` | None | Load right away; give both or neither |
+| `fetchGap` | `fetchBars` over the gap | Gap repair for live folding: `(fromMs, toMs, { symbol, intervalMs, signal })` |
+| `initialBars` | `500` (`DEFAULT_INITIAL_BARS`) | Bars loaded by `setSymbol` |
+| `pageBars` | `1000` (`DEFAULT_PAGE_BARS`) | Bars per lazy history page |
+| `pageSize` | `5000` (`DEFAULT_PAGE_SIZE`) | Most rows one `fetchBars` call may return (Hyperliquid's cap); no more than your source's own per-request cap |
+| `maxEmptyPages` | `3` (`DEFAULT_MAX_EMPTY_PAGES`) | Empty reads in a row that end paging; shorter holes in the source are stepped over |
+| `lazyLoadThreshold` | Visible bar count, at least `50` | Load older history once fewer bars than this hide past the left edge; `0` waits until blank space shows |
+| `now` | `chart.now()` | Wall clock in milliseconds; also times the retry backoff |
+| `scheduler` | None: bars apply at once | A `FrameScheduler` (for example `createFrameScheduler`) that applies live bars at most once per frame; see [once per frame](#once-per-frame) |
+| `createAbortController` | The global `AbortController` | Makes the controller behind each symbol's reads; see [abort controllers](#abort-controllers) |
+| `onError` | None | Receives read failures and errors thrown by state listeners or while publishing live bars |
+
+`initialBars`, `pageBars`, `pageSize`, and `maxEmptyPages` must be positive integers, and `lazyLoadThreshold` must be finite and nonnegative. Invalid values throw when the datafeed is created.
+
+## How loading works
+
+- **Initial load:** `setSymbol(symbol, intervalMs)` aborts every read of the previous symbol, loads `initialBars` ending now, and shows them scrolled to the latest bar. It also sets `timeAxis.intervalMs` and `timeScale.intervalMs`, so the bar-close countdown and a continuous time axis use the right interval. Live folding restarts from the last bar.
+- **Switching:** results that belong to a previous symbol never reach the chart, even if your `fetchBars` ignores the signal. If a switch fails, the chart is cleared so the old symbol's bars never show under the new name.
+- **Lazy history:** when fewer than `lazyLoadThreshold` bars hide past the left edge, the datafeed loads `pageBars` older bars and inserts them with [`chart.prependData`](/docs/guides/data#add-older-history). The view stays on the same bars. Only one read runs at a time, and the edge is checked again after each page, so a zoomed-out view keeps filling itself.
+- **Paging:** each request covers at most `pageSize` bars. The next request ends 1 ms before the earliest bar received, and rows outside the requested window are dropped, so no bucket is read twice or skipped. A page that comes back short (the source has no bar for some buckets) doesn't end the read: paging goes on until the load has its bars.
+- **Holes:** an empty page is taken as a hole in the source, such as a weekend, a closed session, or an outage. The next request ends where the empty one began and spans a whole `pageSize`, so the hole is stepped over in as few reads as possible. An initial load made while a market is closed steps back to its last session the same way.
+- **End of history:** after `maxEmptyPages` empty pages in a row, `exhausted` becomes true and no more requests are made. Reaching the start of a symbol's history therefore costs that many empty reads, once. An initial load that reaches it is exhausted right away.
+- **Errors:** failures appear in `datafeed.error` and go to `onError`. There is no retry loop. The next approach to the left edge retries once a backoff has passed: `RETRY_BACKOFF_MS` (1 s) after a failure, doubling with each failure in a row up to `MAX_RETRY_BACKOFF_MS` (30 s), so dragging at the edge doesn't hammer a rate-limited source. A `loadMore()` call retries at once, and a successful load resets the backoff. A failed initial load is retried by `loadMore()`.
+- **Timers:** the datafeed starts none. Loading is driven by viewport changes and your calls, so a backoff that ends retries at the next viewport change after it.
+
+`loadMore(bars?)` loads up to `bars` (default `pageBars`) older bars and resolves to the number added. It never rejects. While a read is in flight it returns that read.
+
+## Live bars
+
+```ts
+priceFeed.subscribe(symbol, (mid) => datafeed.pushTick(mid, symbol));
+```
+
+`pushTick(price, symbol?)` updates the forming bar, opens new buckets at the previous close, and backfills missed buckets:
+
+- Buckets are epoch-aligned multiples of `intervalMs`.
+- A tick in the held bucket updates high, low, and close. The next bucket opens at the previous close with volume 0.
+- A tick that lands a whole bucket late, or after 8 seconds of silence (2 seconds when it opens a bucket), triggers a gap repair. The repair reads history from the held bar through now with `fetchGap`, or `fetchBars` when you gave no `fetchGap`. Ticks that arrive meanwhile are buffered and replayed afterwards, even when the read fails.
+- A repair's burst of bars renders once.
+
+Ticks carry prices only, so a bar formed from ticks has the volume of its last history read (0 for a bucket opened by a tick) until a repair reads it again. This matches the app's `LiveBarFolder`.
+
+### Once per frame
+
+A busy feed sends many ticks per frame, and each one repaints the chart by default. Pass a `scheduler` to render them once per frame instead, in the same batch as pointer work, animations, and the [countdown](/docs/guides/snapshots-countdown#clock-and-ticker):
+
+```ts
+import { createDatafeedChart } from '@bloxwap/chart/datafeed';
+import { createFrameScheduler, startCountdownTicker } from '@bloxwap/chart/ui';
+
+const frames = createFrameScheduler(window, (update) => chart.batch(update));
+const { chart, datafeed } = createDatafeedChart({ container: canvas, fetchBars, scheduler: frames });
+startCountdownTicker({ chart, window, scheduler: frames });
+priceFeed.subscribe('BTC', (mid) => datafeed.pushTick(mid, 'BTC')); // no queue of your own
+```
+
+- `pushTick` still folds each tick at once, so every tick lands in the bucket of the moment it arrives.
+- The next frame applies what changed with `appendData`, in one render: every bar that closed since the last frame, in order, then the forming one. Only the latest state of each bar is applied.
+- A hidden tab gets no animation frames. Folding goes on meanwhile, and the chart catches up in one render when the tab is shown.
+- `setSymbol` and `destroy` drop bars not yet applied and cancel their frame.
+- The chart delivers its events when the frame's `chart.batch` ends, after the datafeed's part of the frame. A chart listener that throws there is thrown from the frame, like any listener error from pointer work in it, and doesn't reach `onError`. A scheduler that doesn't wrap its frames in `chart.batch` sends it to `onError`.
+
+Without a `scheduler`, each tick's bar is applied at once, as before.
+
+## Listener rules
+
+- **`pushTick` is safe in any price-feed callback.** It never throws: errors from publishing a bar (for example, a chart listener that throws) go to `onError`. With a `scheduler` the bar is published in a later frame; see [once per frame](#once-per-frame) for where a listener's error goes then.
+- **Ticks are ignored until history has landed**, and ticks for another symbol are ignored when you pass `symbol`. Non-finite and non-positive prices are ignored too. Subscribe to the price feed whenever you like; you don't need to wait for `setSymbol`.
+- **`subscribeState(listener)`** calls `listener` with a `DatafeedState` snapshot (`symbol`, `intervalMs`, `loading`, `exhausted`, `error`) when a load starts and when it settles. It does not call the listener on subscribe; read `datafeed.state` for the current value. A listener that throws is reported to `onError`, and the other listeners still run. It returns an unsubscribe function, and `destroy()` removes every state listener.
+- **The datafeed owns the chart's data while it is attached.** Don't call `setData` or `appendData` for the datafeed's symbol yourself. Use `setSymbol` to reload and `pushTick` for live prices.
+- **Chart events keep working.** Every datafeed load goes through `setData`, `prependData`, or `appendData`, so [`subscribeDataLoad`](/docs/guides/events) reports `'set'`, `'prepend'`, `'append'`, and `'update'` loads as usual.
+- **Destroy it.** Call `destroy()` from `createDatafeedChart`, or `datafeed.destroy()` before destroying the chart yourself. Otherwise reads already in flight still write into the destroyed chart's store. This is harmless, since rendering is a no-op, but wasteful.
+
+## Abort controllers
+
+Each `setSymbol` makes one `AbortController`. Every history and gap read for that symbol gets its `signal`, and a switch or `destroy()` aborts it. By default the controller comes from the global `AbortController`. Pass `createAbortController` for a runtime without one, or to observe aborts:
+
+```ts
+createDatafeedChart({
+  container: canvas,
+  fetchBars,
+  createAbortController: () => new AbortControllerPolyfill(), // a spec-complete polyfill
+});
+```
+
+The factory returns an `AbortControllerLike`: a `signal` and `abort(reason?)`. The datafeed hands that `signal` to `fetchBars`, and usually on to `fetch`, so it is typed as your project's `AbortSignal` whenever DOM or Node typings are loaded. Return a real or spec-complete `AbortSignal` there. A bare `{ aborted, reason }` signal type-checks only in a project without those typings, and only works with a `fetchBars` that doesn't pass it to `fetch`. The datafeed itself reads just `signal.aborted` and `signal.reason` around every read, so an abort takes effect even when `fetchBars` ignores the signal. `loadHistory` takes the same option, which it uses only when you pass no `signal`.
+
+## Hyperliquid example
+
+This reads [Hyperliquid](https://hyperliquid.gitbook.io/hyperliquid-docs)'s public `candleSnapshot` endpoint and streams mid prices from its `allMids` WebSocket channel.
+
+```ts
+import { createDatafeedChart, type FetchBars } from '@bloxwap/chart/datafeed';
+
+const INFO_URL = 'https://api.hyperliquid.xyz/info';
+const INTERVALS: Record<number, string> = {
+  60_000: '1m', 300_000: '5m', 900_000: '15m', 3_600_000: '1h', 14_400_000: '4h',
+  86_400_000: '1d', 259_200_000: '3d', 604_800_000: '1w', 2_592_000_000: '1M',
+};
+
+interface HyperliquidCandle { t: number; o: string; h: string; l: string; c: string; v: string }
+
+const fetchBars: FetchBars = async ({ symbol, intervalMs, fromMs, toMs, signal }) => {
+  const response = await fetch(INFO_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'candleSnapshot',
+      req: { coin: symbol, interval: INTERVALS[intervalMs], startTime: fromMs, endTime: toMs },
+    }),
+    signal,
+  });
+  if (!response.ok) throw new Error(`candleSnapshot failed: ${response.status}`);
+  const rows = (await response.json()) as HyperliquidCandle[];
+  return rows.map((k) => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v }));
+};
+
+const { chart, datafeed, destroy } = createDatafeedChart({
+  container: document.querySelector<HTMLCanvasElement>('#chart')!,
+  autoResize: true,
+  preset: 'bloxwapDark',
+  fetchBars,
+  symbol: 'BTC',
+  intervalMs: 900_000,
+});
+
+const socket = new WebSocket('wss://api.hyperliquid.xyz/ws');
+socket.onopen = () => socket.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'allMids' } }));
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  const symbol = datafeed.symbol;
+  const mid = symbol === null || message.channel !== 'allMids' ? undefined : message.data.mids[symbol];
+  if (mid !== undefined) datafeed.pushTick(Number(mid), symbol!);
+};
+```
+
+`candleSnapshot` returns at most 5000 rows per request, which is the default `pageSize`. Its windows are inclusive at both ends, which is what `fetchBars` expects.
+
+## Building blocks
+
+The pieces behind the datafeed are exported for custom loaders:
+
+| Export | Purpose |
+| --- | --- |
+| `loadHistory({ fetchBars, symbol, intervalMs, toMs, countBack, fromMs?, signal?, createAbortController?, pageSize?, maxEmptyPages? })` | Pages backwards from `toMs`, over holes, until `countBack` bars or `fromMs` are covered, and resolves to at most `countBack` normalized candles |
+| `pageWindow(intervalMs, fromMs, toMs, pageSize)` | The inclusive window of `pageSize` buckets ending with the one containing `toMs` |
+| `barsInWindow(intervalMs, fromMs, toMs)` | Bucket opens within an inclusive window |
+| `mergeCandles(a, b)` | Normalized merge; `b` wins on equal times |
+| `normalizeCandles(candles)` | Drops invalid rows, zeroes missing volume, dedupes (last wins), sorts |
+| `createLiveBarFolder({ intervalMs, seedBar, onBar, fetchGap?, now?, gapSilenceMs?, rollSilenceMs?, batch?, onError? })` | Tick folding with gap repair, without a chart |
+| `bucketStartMs`, `candleTimeMs`, `applyTick`, `hasMissedBucket`, `seedBarFromTick` | Bucket arithmetic |
+| `MAX_GAP_BARS`, `GAP_SILENCE_MS`, `ROLL_SILENCE_MS`, `MAX_PENDING_TICKS` | Folder limits: 5000 bars, 8000 ms, 2000 ms, 2000 ticks |
+
+`createLiveBarFolder` returns `{ pushTick, onPrice, bar, filling, dispose }`. Its `onError` receives errors thrown by `onBar` (or `batch`) while a gap repair publishes, which would otherwise be lost in the asynchronous repair.
+
+## Known limits
+
+- The datafeed can't tell a long hole from the start of history. A hole of `(maxEmptyPages - 1) × pageSize` buckets or more can end paging early: 10,000 buckets with the defaults, about a week of 1m bars. Raise `maxEmptyPages` for a source with a small `pageSize` and long closures. Hyperliquid's history is contiguous, so this doesn't happen there.
+- Paging takes each page to hold every bar the source has from its earliest row to the end of the window. Keep `pageSize` at or below your source's per-request row cap: a source that cuts a longer window down to its **earliest** rows (rather than its latest) would otherwise leave holes that nothing reports.
+- A gap read that fails leaves the missed buckets empty; the tick opens its own bucket. The failure is reported through `onError`.

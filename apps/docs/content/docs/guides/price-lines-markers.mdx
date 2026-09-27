@@ -1,0 +1,83 @@
+---
+title: Price lines and markers
+description: Add live horizontal price references and pin glyphs to bars on the main series.
+---
+
+`chart.series` holds lightweight annotations that belong to the main series: horizontal **price lines** (mark price, entry, liquidation) and **markers** pinned to bars (fills, liquidations, signals). Unlike [drawings](/docs/guides/drawings), they are never selected, hit-tested, recorded in undo history, or hidden with the drawing layer. They live outside the config, so updating one costs a single repaint.
+
+## Price lines
+
+```ts
+const mark = chart.series.createPriceLine({
+  price: 64_250,
+  color: '#35b5ff',
+  lineStyle: 'dashed',
+  title: 'mark',
+});
+
+priceFeed.subscribe('BTC', (price) => mark.applyOptions({ price }));
+
+mark.remove(); // or chart.series.removePriceLine(mark)
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `price` | Required | Price in raw data units |
+| `color` | `#2962ff` (`DEFAULT_PRICE_LINE_COLOR`) | Line and label color |
+| `lineStyle` | `'solid'` | `'solid'`, `'dashed'`, or `'dotted'`; dash lengths scale with `lineWidth` |
+| `lineWidth` | `1` | CSS pixels |
+| `title` | `''` | Tag drawn inside the plot next to the axis badge |
+| `axisLabelVisible` | `true` | Show the price badge on the axis and the title tag |
+| `lineVisible` | `true` | `false` keeps only the labels |
+| `axisLabelColor` | `''` | Badge fill; empty uses `color` |
+| `axisLabelTextColor` | `''` | Badge text; empty picks black or white for contrast |
+| `autoscale` | `false` | Keep the price inside the main pane's automatic range |
+| `id` | Generated | Stable id |
+
+`createPriceLine` returns a `PriceLine` handle:
+
+| Member | Purpose |
+| --- | --- |
+| `id` | The line's id |
+| `options()` | A snapshot of the resolved options |
+| `applyOptions(patch)` | Patch options and repaint; does nothing when nothing changes or after removal |
+| `remove()` | Remove the line; calling it again does nothing |
+
+`chart.series.priceLines()` lists live lines in creation order, and `removePriceLine(line)` returns whether the line was live.
+
+Lines are painted over the built-in price references (last price, previous close, high/low), in creation order, with every line stroked before any label. A line whose price is outside the pane is skipped. Badges use the price-axis precision and formatter and the scale font. Several `applyOptions` calls inside `chart.batch` repaint once.
+
+After `chart.destroy()`, handles are detached: `applyOptions` does nothing, and new lines are never drawn.
+
+## Markers
+
+```ts
+chart.series.setMarkers([
+  { time: 1700003600, position: 'belowBar', shape: 'arrowUp', color: '#00ff3f', text: 'Buy' },
+  { time: 1700010800, position: 'aboveBar', shape: 'arrowDown', color: '#ff479c', text: 'Sell', size: 1.5 },
+  { time: 1700014400, position: 'inBar', shape: 'circle', color: '#ffc83d' },
+]);
+```
+
+| Field | Meaning |
+| --- | --- |
+| `time` | UNIX seconds; the marker belongs to the last candle with `time` at or before it |
+| `position` | `'aboveBar'`, `'belowBar'`, or `'inBar'` (centered on the close) |
+| `shape` | `'circle'`, `'square'`, `'arrowUp'`, or `'arrowDown'` |
+| `color` | Glyph and caption color |
+| `text` | Optional caption, drawn beyond the glyph, away from the bar |
+| `size` | Glyph size multiplier; default `1` |
+| `id` | Optional id for your own bookkeeping |
+
+`setMarkers` replaces every marker; pass `[]` to clear them. `chart.series.markers()` returns copies sorted by time. Markers before the first candle, or with a non-finite time, are not drawn.
+
+Several markers on one bar stack away from it. The glyph box follows the bar spacing between 12 and 30 CSS pixels (`MARKER_MIN_SIZE`, `MARKER_MAX_SIZE`) before the `size` multiplier. Line and area series anchor every position at the close. On a Heikin Ashi series, markers sit on the Heikin Ashi bars. Only markers near the visible range are visited, so a long order history costs nothing off screen.
+
+## Price lines or drawings?
+
+| Need | Use |
+| --- | --- |
+| A value your application updates (mark price, open order, liquidation) | A price line |
+| An event on a bar (a fill, a signal) | A marker |
+| A user annotation the user can select, drag, restyle, and undo | A `hline` or `horizontal-ray` [drawing](/docs/guides/drawings) |
+| The latest close, the previous close, or the visible high and low | `priceAxis.lines` and `priceAxis.labels` in the [configuration](/docs/api/configuration#price-axis) |

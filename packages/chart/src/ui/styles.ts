@@ -80,6 +80,7 @@ export const TOOLBAR_CSS = `
 .cts-settings-color:focus-within { outline: 2px solid var(--cts-accent); }
 .cts-settings-color.cts-disabled { opacity: .3; }
 .cts-settings-color.cts-disabled input { cursor: default; }
+.cts-settings-colors .cts-btn { width: 32px; height: 32px; }
 .cts-settings-select, .cts-settings-input { width: 156px; min-width: 0; padding: 8px 10px; border: 1px solid var(--cts-edge); border-radius: 6px; background: var(--cts-bg); color: var(--cts-hover); font: inherit; color-scheme: dark; }
 .cts-light .cts-settings-select, .cts-light .cts-settings-input { color-scheme: light; }
 .cts-settings-input:disabled { opacity: .4; }
@@ -159,9 +160,9 @@ export const TOOLBAR_CSS = `
 }
 .cts-group:hover .cts-more, .cts-more.cts-open { color: var(--cts-idle); opacity: 0.9; }
 
-/* ---- flyout menus ---- */
+/* ---- flyout menus: above the settings card and indicators dialog (1100), which stay open under them ---- */
 .cts-menu {
-  position: fixed; z-index: 1000; min-width: min(232px, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
+  position: fixed; z-index: 1200; min-width: min(232px, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
   background: var(--cts-panel); border: 1px solid var(--cts-edge); border-radius: var(--cts-radius-md);
   box-shadow: var(--cts-shadow); padding: 4px; display: none;
   animation: cts-fade-in 140ms var(--cts-ease);
@@ -190,6 +191,11 @@ export const TOOLBAR_CSS = `
 .cts-item:hover .cts-fav, .cts-fav.cts-on { opacity: 1; }
 .cts-fav:hover { color: var(--cts-hover); }
 .cts-fav.cts-on { color: var(--cts-favorite); }
+
+/* ---- context menu: fill only; keyboard focus shifts the fill like hover ---- */
+.cts-context-menu { border: 0; }
+.cts-context-menu:focus { outline: none; }
+.cts-context-menu .cts-item:focus-visible { outline: none; background: var(--cts-accent-soft); color: var(--cts-hover); }
 
 /* ---- icon picker ---- */
 .cts-picker { width: 312px; padding: 8px; }
@@ -290,6 +296,12 @@ export const TOOLBAR_CSS = `
 .cts-cursor-eraser { cursor: cell; }
 .cts-over-drawing { cursor: pointer; }
 .cts-dragging { cursor: grabbing; }
+
+/* ---- touch gestures: the chart owns every finger (no page scroll/zoom, callout or selection) ---- */
+.cts-touch {
+  touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .cts-menu, .cts-panel, .cts-toast { animation: none; }

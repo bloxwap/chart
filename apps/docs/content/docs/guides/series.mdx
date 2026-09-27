@@ -8,6 +8,8 @@ description: Choose a renderer and configure colors, labels, scales, and themes.
 | Type | Renders |
 | --- | --- |
 | `candlestick` | Candle bodies, optional borders, and wicks |
+| `hollow-candlestick` | TradingView's hollow candles: rising bars outlined, falling bars filled |
+| `heikin-ashi` | Heikin Ashi candles computed from your data |
 | `line` | Closing prices connected by a line |
 | `area` | Closing-price line with a filled area |
 | `bar` | OHLC bars with open and close ticks |
@@ -29,7 +31,28 @@ chart.updateConfig({
 
 Wick and border colors inherit the body colors when their configured strings are empty. `colorByPreviousClose` compares a candle's close to the preceding close; the first candle falls back to its own open.
 
-For a separate volume pane alongside price candles, add the built-in `vol` indicator instead of changing the main series to `histogram`.
+For a separate volume pane alongside price candles, add the built-in `vol` indicator instead of changing the main series to `histogram`. For volume bars along the bottom of the price pane, as TradingView draws them, turn on the volume overlay:
+
+```ts
+chart.updateConfig({ volume: { overlay: true, opacity: 0.5, height: 0.2 } });
+```
+
+## Hollow candles
+
+`hollow-candlestick` colors each bar by the previous close (up when the close is at or above it; the first bar compares with its own open) and fills it by its own direction: a falling bar (`close < open`) is filled, a rising bar is drawn as a 1px outline. Wicks stop at a hollow body's outline and take the wick colors, which default to the body color. `bodyVisible`, `borderVisible`, and `wickVisible` apply as for candlesticks.
+
+## Heikin Ashi
+
+`heikin-ashi` draws Heikin Ashi bars: close is the average of open, high, low, and close; open is the midpoint of the previous Heikin Ashi bar's open and close; high and low widen to include both. Time and volume carry over from your candle.
+
+The transformed bars are computed once per data change, with a constant-time update while the last bar streams, never per frame. They are what the chart **shows**; your data stays as it is:
+
+- The main series, autoscale, the last-price and countdown badges, the status line's OHLC, markers, and the volume overlay's colors use the Heikin Ashi bars.
+- Drawing magnets snap to Heikin Ashi open, high, low, and close.
+- `subscribeCrosshairMove` reports both: `candle` is your bar and `displayCandle` is the Heikin Ashi bar.
+- Indicators keep computing from your real candles, not the Heikin Ashi values.
+
+`heikinAshi(candles)`, `heikinAshiBar(candle, previous?)`, and `updateHeikinAshi` are exported for your own use.
 
 ## Colors and themes
 
@@ -46,6 +69,8 @@ chart.updateConfig({
 ```
 
 When using the toolbar, call `toolbar.setTheme('dark')` to synchronize its UI and the chart. A separate settings handle has `settings.setTheme('dark')` for its UI.
+
+For a brand look, pass a preset such as `createChart({ preset: 'bloxwapDark' })`. Presets layer under `theme` and `config`, and `presetChartTheme` keeps their colors when the toolbar switches themes. See [theming and presets](/docs/guides/theming-presets).
 
 ## Scale modes
 
