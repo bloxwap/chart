@@ -8,6 +8,8 @@
 
 export { createDrawingToolbar, FAVORITES_KEY, DEFAULT_FAVORITES, SWATCHES, GLYPH_SETS } from './toolbar.js';
 export { createChartSettings } from './settings.js';
+export { createThemeControl } from './theme.js';
+export type { ThemeControl, ThemeControlOptions, ThemeMode } from './theme.js';
 export type { ChartSettings, ChartSettingsOptions } from './settings.js';
 export type { DrawingToolbar, DrawingToolbarOptions } from './toolbar.js';
 export { DrawingController, ZOOM_TOOL, GLYPH_TOOLS, DRAG_THRESHOLD_PX, MIN_ZOOM_BOX_PX, groupOf } from './controller.js';

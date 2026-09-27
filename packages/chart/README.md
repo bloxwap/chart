@@ -129,6 +129,31 @@ settings.setTheme('light'); // match the host's UI theme
 // settings.destroy() removes the card and its listeners.
 ```
 
+For an embedded chart whose theme is controlled by the host, use a locked theme
+control. It creates no day/night/system button or menu and does not follow OS
+theme changes or a saved user preference:
+
+```ts
+import { createThemeControl } from '@bloxwap/chart/ui';
+
+const themeControl = createThemeControl({
+  document,
+  flyouts: toolbar.flyouts,
+  lockedTheme: 'dark', // 'light' also works; omit to show the theme picker
+  onChange(theme) {
+    toolbar.setTheme(theme); // applies chart colors and toolbar chrome
+    settings.setTheme(theme);
+  },
+});
+if (themeControl.element) controls.append(themeControl.element);
+themeControl.setTheme('light'); // host updates remain available while locked
+// Call themeControl.destroy() before destroying the toolbar.
+```
+
+Unlocked controls default to `theme: 'system'`; `onSelect(mode)` can persist
+user choices. The playground accepts `?lockedTheme=dark` or `?lockedTheme=light`.
+Core and React charts without this UI already use their host-supplied `theme`.
+
 Settings live in the chart config and remain selected when the card reopens.
 Reset restores the initial appearance without changing data, indicators or
 drawings. Percent and indexed scales use the first visible close as their
@@ -182,14 +207,26 @@ Run these commands from the repository root or this package directory.
 - `npm test` — build and run the test suite (node:test)
 - `npm run coverage` — tests with 100% line/branch/function threshold enforcement
 - `npm run bench` — indicator math, rolling-window algorithms, data ingestion and render CPU benchmarks
+- `npm run bench:browser --workspace @bloxwap/chart` — real Chrome canvas/frame benchmarks (Chrome must be installed)
+- `npm run bench:browser --workspace @bloxwap/chart -- --verify=true` — browser pixel, theme-lock and input-scheduling checks
 
 ## Performance
 
 Indicator results are reused across zoom, scroll, drawing and theme changes.
-Crosshair moves also reuse the prepared layout and drawing geometry. Data,
+Crosshair moves also reuse the prepared layout and drawing geometry. Browser
+canvases lazily cache the static pixels, repainting only status text and the
+crosshair while the viewport stays unchanged. `createChart({ crosshairCache: false, ... })`
+disables this extra canvas when memory is more important. Transparent or
+unparsed background colors and injected canvases without a canvas factory use
+the full renderer. Data,
 parameter, color and indicator-definition changes invalidate the affected work.
 Use `setData`/`appendData` to change candles and `updateConfig` to change configuration.
 Custom indicator `compute` functions must be pure; cached outputs are read-only.
+VOL and KDJ update only changed tail values during streaming; large KDJ batches
+use the full linear calculation. Other indicators retain full recomputation.
+Custom indicators may opt into `IndicatorDef.update` to mutate their chart-owned
+cached output; returning `undefined` falls back to `compute`. Historical edits,
+replacement data, parameter/color changes and WASM initialization invalidate it.
 
 Group related synchronous changes to paint once (nested batches are supported):
 

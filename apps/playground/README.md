@@ -20,6 +20,12 @@ relative imports work in the standalone app and exported documentation.
 
 The real-canvas benchmark is at http://localhost:8641/bench/browser.html.
 
+To lock the chart to its host's theme and remove the day/night/system control,
+open `/demo/?lockedTheme=dark` or `/demo/?lockedTheme=light`. The lock overrides
+the saved choice and OS theme without changing the saved preference. Hosts can
+use the same behavior through `createThemeControl({ lockedTheme, ... })` from
+`@bloxwap/chart/ui`.
+
 For the docs, `apps/docs/scripts/prepare-demo.mjs` copies the playground HTML,
 compiled library, and fonts into the docs public directory before dev or build.
 Restart `npm run docs:dev` after changing playground or library files to refresh

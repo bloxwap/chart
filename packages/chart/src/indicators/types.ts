@@ -60,6 +60,21 @@ export interface IndicatorDef {
     colors: readonly string[],
     kernels: WasmKernels | null,
   ): IndicatorOutput;
+  /**
+   * Optional tail updater for appended/replaced latest candles. `from` is the
+   * first changed index; earlier candles are unchanged. The cached output is
+   * owned by this chart and may be updated in place. Return undefined to use
+   * full compute. History edits, new parameters/colors and WASM changes always
+   * use compute; custom indicators without this hook retain that behavior.
+   */
+  update?(
+    output: IndicatorOutput,
+    candles: readonly Candle[],
+    from: number,
+    params: Record<string, number>,
+    colors: readonly string[],
+    kernels: WasmKernels | null,
+  ): IndicatorOutput | undefined;
 }
 
 /** Color token resolved to the series' `upColor` at render time. */

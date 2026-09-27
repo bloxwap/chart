@@ -25,6 +25,8 @@ export interface CanvasImageSourceLike {
  * A real `CanvasRenderingContext2D` is structurally assignable to this type.
  */
 export interface Canvas2DLike {
+  isContextLost?(): boolean;
+  getContextAttributes?(): { colorSpace?: 'srgb' | 'display-p3' };
   fillStyle: string | object;
   strokeStyle: string | object;
   lineWidth: number;
@@ -74,7 +76,11 @@ export interface Canvas2DLike {
 export interface ChartCanvas {
   width: number;
   height: number;
-  getContext(contextId: '2d'): Canvas2DLike | null;
+  getContext(contextId: '2d', options?: { colorSpace?: 'srgb' | 'display-p3' }): Canvas2DLike | null;
+  addEventListener?(type: 'contextrestored', listener: () => void): void;
+  removeEventListener?(type: 'contextrestored', listener: () => void): void;
+  /** Optional browser document used to lazily allocate the crosshair's raster cache. */
+  readonly ownerDocument?: { createElement?(tag: 'canvas'): ChartCanvas; readonly defaultView?: unknown } | null;
 }
 
 /** A `ResizeObserver` as the canvas's own window provides it. */
@@ -102,7 +108,7 @@ export interface AutoResizeParent {
  * it; the core reads it structurally so it still never touches the global `document` or `window`.
  */
 export interface AutoResizeCanvas extends ChartCanvas {
-  readonly ownerDocument?: { readonly defaultView: AutoResizeWindow | null } | null;
+  readonly ownerDocument?: { createElement?(tag: 'canvas'): ChartCanvas; readonly defaultView: AutoResizeWindow | null } | null;
   readonly parentElement?: AutoResizeParent | null;
   readonly style?: { position: string; inset: string; width: string; height: string; display: string };
 }

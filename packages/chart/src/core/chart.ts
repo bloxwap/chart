@@ -15,11 +15,12 @@ import {
 } from '../config.js';
 import type { AutoResizeCanvas, CanvasImageSourceLike, ChartCanvas, ChartDocument, ResizeObserverLike } from '../dom.js';
 import { CHART_THEMES, type ThemeName } from '../themes.js';
+import { parseColor } from '../color.js';
 import { DataStore, type Candle } from './data.js';
 import { PriceScale, TimeScale, seriesMinMax, visibleMinMax, type VisibleRange } from './scale.js';
 import { layoutPanes, MAIN_PANE_WEIGHT, type PaneSpec } from './pane.js';
 import { Crosshair } from './crosshair.js';
-import { renderChart, type RenderView, type PaneRenderInfo, type ResolvedDrawing } from '../render/renderer.js';
+import { renderChart, renderOverlay, type RenderView, type PaneRenderInfo, type ResolvedDrawing } from '../render/renderer.js';
 import { createIndicatorRegistry, IndicatorRegistry } from '../indicators/registry.js';
 import { resolveIndicatorColors, type IndicatorDef, type IndicatorOutput } from '../indicators/types.js';
 import { createDrawingRegistry, DrawingRegistry } from '../drawings/registry.js';
@@ -46,6 +47,8 @@ export interface CreateChartOptions {
    * the renderer scales the 2D context by this ratio. Default 1.
    */
   pixelRatio?: number;
+  /** Cache static pixels during pointer movement on browser canvases. Default true. */
+  crosshairCache?: boolean;
   /** Opt-in live candle, indicator, pane and autoscale transitions using the host's frame clock. */
   animation?: { scheduler: FrameScheduler; duration?: number };
   /** A built-in color theme, applied under `config` (fields in `config` win). */
@@ -120,6 +123,8 @@ export const WEAK_MAGNET_PX = 14;
 interface CachedIndicator {
   def: IndicatorDef;
   compute: IndicatorDef['compute'];
+  update: IndicatorDef['update'];
+  dirtyFrom: number;
   params: Record<string, number>;
   colors: string[];
   output: IndicatorOutput;
@@ -127,7 +132,7 @@ interface CachedIndicator {
 
 function matchesIndicator(cached: CachedIndicator, cfg: IndicatorConfig, def: IndicatorDef, colors: readonly string[]): boolean {
   const keys = Object.keys(cfg.params);
-  return cached.def === def && cached.compute === def.compute &&
+  return cached.def === def && cached.compute === def.compute && cached.update === def.update &&
     keys.length === Object.keys(cached.params).length &&
     keys.every((key) => Object.hasOwn(cached.params, key) && Object.is(cached.params[key], cfg.params[key])) &&
     cached.colors.length === colors.length && cached.colors.every((color, i) => color === colors[i]);
@@ -177,6 +182,10 @@ export class Chart {
   private mainPriceScale: PriceScale | null = null;
   private pixelRatio: number;
   private destroyed = false;
+  private readonly useCrosshairCache: boolean;
+  private crosshairCanvas: ChartCanvas | null = null;
+  private crosshairView: RenderView | null = null;
+  private readonly invalidateCrosshair = (): void => { this.crosshairView = null; };
   private resizeObserver: ResizeObserverLike | null = null;
   private indicatorSeq = 0;
   private drawingSeq = 0;
@@ -199,6 +208,7 @@ export class Chart {
   private lastGeometry: { id: string; primitives: readonly DrawPrimitive[] }[] = [];
 
   constructor(options: CreateChartOptions) {
+    this.useCrosshairCache = options.crosshairCache !== false;
     this.config = resolveConfig(options.theme !== undefined ? mergeDeep(CHART_THEMES[options.theme], options.config ?? {}) : options.config);
     if (options.animation !== undefined) {
       this.indicatorPresence = new Presence(options.animation.scheduler, () => this.render(),
@@ -276,8 +286,15 @@ export class Chart {
 
   /** Appends or replaces one candle (by time) and re-renders. */
   appendData(candle: Candle): void {
+    const length = this.store.length;
+    const last = this.store.last();
+    const tail = last === undefined || candle.time > last.time ||
+      (candle.time === last.time && this.store.at(length - 2)?.time !== candle.time);
     this.store.append(candle);
-    this.indicatorCache.clear();
+    if (tail) {
+      const from = this.store.length > length ? length : length - 1;
+      for (const cached of this.indicatorCache.values()) cached.dirtyFrom = Math.min(cached.dirtyFrom, from);
+    } else this.indicatorCache.clear();
     this.render();
   }
 
@@ -605,7 +622,30 @@ export class Chart {
       return;
     }
     const ctx = this.canvas.getContext('2d');
-    if (ctx !== null) renderChart(ctx, { ...view, crosshair: this.crosshair });
+    if (ctx === null) return;
+    const current = { ...view, crosshair: { active: this.crosshair.active, x: this.crosshair.x, y: this.crosshair.y } };
+    if (this.useCrosshairCache && this.canvas.ownerDocument?.createElement && parseColor(view.config.theme.background)?.a === 1) {
+      if (this.crosshairCanvas === null) {
+        this.crosshairCanvas = this.canvas.ownerDocument.createElement('canvas');
+        this.crosshairCanvas.addEventListener?.('contextrestored', this.invalidateCrosshair);
+      }
+      const cache = this.crosshairCanvas;
+      if (cache.width !== this.canvas.width) cache.width = this.canvas.width;
+      if (cache.height !== this.canvas.height) cache.height = this.canvas.height;
+      const cachedContext = cache.getContext('2d', ctx.getContextAttributes?.());
+      if (cachedContext !== null && cachedContext.isContextLost?.() !== true) {
+        if (this.crosshairView !== view) {
+          // A pointer's first frame after an invalidation prepares the static
+          // image. Panning and streaming never pay for this extra canvas.
+          renderChart(cachedContext, view, false);
+          this.crosshairView = view;
+        }
+        ctx.drawImage(cache, 0, 0, this.canvas.width, this.canvas.height);
+        renderOverlay(ctx, current);
+        return;
+      }
+    }
+    renderChart(ctx, current);
   }
 
   /** Tears down the chart; further renders become no-ops. */
@@ -619,6 +659,12 @@ export class Chart {
     this.store.clear();
     this.indicatorCache.clear();
     this.lastView = null;
+    this.crosshairView = null;
+    if (this.crosshairCanvas !== null) {
+      this.crosshairCanvas.removeEventListener?.('contextrestored', this.invalidateCrosshair);
+      this.crosshairCanvas.width = this.crosshairCanvas.height = 0;
+      this.crosshairCanvas = null;
+    }
     this.lastGeometry = [];
   }
 
@@ -632,6 +678,7 @@ export class Chart {
     this.pendingRender = false;
     this.pendingCrosshair = false;
     this.lastView = null;
+    this.crosshairView = null;
     const ctx = this.canvas.getContext('2d');
     if (ctx === null) return;
 
@@ -672,9 +719,13 @@ export class Chart {
       let cached = this.indicatorCache.get(indCfg.id);
       if (cached === undefined || !matchesIndicator(cached, indCfg, def, colors)) {
         cached = {
-          def, compute: def.compute, params: { ...indCfg.params }, colors,
+          def, compute: def.compute, update: def.update, dirtyFrom: Infinity, params: { ...indCfg.params }, colors,
           output: def.compute(candles, indCfg.params, colors, this.kernels),
         };
+      } else if (cached.dirtyFrom !== Infinity) {
+        cached.output = def.update?.(cached.output, candles, cached.dirtyFrom, indCfg.params, colors, this.kernels)
+          ?? def.compute(candles, indCfg.params, colors, this.kernels);
+        cached.dirtyFrom = Infinity;
       }
       nextCache.set(indCfg.id, cached);
       computed.push({ cfg: indCfg, output: cached.output, opacity });

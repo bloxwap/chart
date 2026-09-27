@@ -1,7 +1,7 @@
 /**
  * Layer-based canvas renderer. Layers, in order: background, watermark,
- * grid, series, indicators, drawings, axes, crosshair. Rendering is a full
- * redraw on every invalidate — deliberately simple.
+ * grid, series, indicators, drawings, axes, crosshair. Pointer overlays can
+ * be repainted independently of the static layers.
  *
  * @module
  */
@@ -127,17 +127,17 @@ function strokeVLine(ctx: Canvas2DLike, x: number, y1: number, y2: number): void
  * recording mock context. All coordinates are CSS pixels; the 2D context is
  * scaled by `view.pixelRatio` for the duration of the frame.
  */
-export function renderChart(ctx: Canvas2DLike, view: RenderView): void {
+export function renderChart(ctx: Canvas2DLike, view: RenderView, overlay = true): void {
   ctx.save();
   ctx.scale(view.pixelRatio, view.pixelRatio);
   try {
-    renderLayers(ctx, view);
+    renderLayers(ctx, view, overlay);
   } finally {
     ctx.restore();
   }
 }
 
-function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
+function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): void {
   const { config, plotWidth, plotHeight } = view;
   const monoFont = `${config.theme.fontSize}px ${config.theme.monoFamily}`;
 
@@ -284,6 +284,30 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView): void {
   }
 
   drawPriceReferences(ctx, view);
+  if (overlay) renderOverlayLayers(ctx, view);
+}
+
+/** Repaints hover-dependent status text and crosshair above a cached base. */
+export function renderOverlay(ctx: Canvas2DLike, view: RenderView): void {
+  ctx.save();
+  ctx.scale(view.pixelRatio, view.pixelRatio);
+  try {
+    const left = view.plotLeft ?? 0;
+    if (left > 0) {
+      ctx.translate(left, 0);
+      view = { ...view, crosshair: { ...view.crosshair, x: view.crosshair.x - left } };
+    }
+    renderOverlayLayers(ctx, view);
+  } finally {
+    ctx.restore();
+  }
+}
+
+function renderOverlayLayers(ctx: Canvas2DLike, view: RenderView): void {
+  const { config, plotWidth, plotHeight } = view;
+  const mainPane = view.panes[0];
+  const axisX = config.priceAxis.position === 'left' ? -(view.canvasWidth - plotWidth) : plotWidth;
+  const monoFont = `${config.theme.fontSize}px ${config.theme.monoFamily}`;
   drawStatusLine(ctx, view);
 
   // Layer 8: crosshair with axis label boxes.

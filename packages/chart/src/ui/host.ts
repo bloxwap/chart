@@ -130,7 +130,11 @@ export interface UIWindow extends UITimers {
   requestAnimationFrame(callback: (time: number) => void): number;
   cancelAnimationFrame(handle: number): void;
   ResizeObserver?: new (callback: () => void) => { observe(target: unknown): void; disconnect(): void };
-  matchMedia?(query: string): { readonly matches: boolean };
+  matchMedia?(query: string): {
+    readonly matches: boolean;
+    addEventListener?(type: 'change', listener: () => void): void;
+    removeEventListener?(type: 'change', listener: () => void): void;
+  };
   createImageBitmap?(source: never): Promise<{ readonly width: number; readonly height: number }>;
 }
 

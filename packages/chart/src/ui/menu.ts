@@ -179,9 +179,9 @@ export class Flyouts {
   /**
    * Hover intent: pointing at `owner` opens `menu` after
    * {@link HOVER_OPEN_MS}; leaving both closes it after
-   * {@link HOVER_CLOSE_MS}. Mouse only — touch uses clicks.
+   * {@link HOVER_CLOSE_MS}. Mouse only — touch uses clicks. Returns a listener cleanup.
    */
-  hover(owner: UIElement, menu: UIElement, anchor: UIElement = owner, opener: UIElement = anchor): void {
+  hover(owner: UIElement, menu: UIElement, anchor: UIElement = owner, opener: UIElement = anchor): () => void {
     this.openers.add(opener);
     const leave = (e: UIEvent): void => {
       if (e.pointerType !== 'mouse') return;
@@ -190,26 +190,42 @@ export class Flyouts {
         if (this.current === menu) this.close();
       }, HOVER_CLOSE_MS);
     };
-    owner.addEventListener('pointerenter', (e) => {
+    const enter = (e: UIEvent): void => {
       if (e.pointerType !== 'mouse') return;
       this.cancelTimers();
       this.openTimer = this.win.setTimeout(() => this.show(menu, anchor, opener), HOVER_OPEN_MS);
-    });
+    };
+    const stay = (): void => this.cancelTimers();
+    owner.addEventListener('pointerenter', enter);
     owner.addEventListener('pointerleave', leave);
-    menu.addEventListener('pointerenter', () => this.cancelTimers());
+    menu.addEventListener('pointerenter', stay);
     menu.addEventListener('pointerleave', leave);
+    return () => {
+      this.cancelTimers();
+      owner.removeEventListener('pointerenter', enter);
+      owner.removeEventListener('pointerleave', leave);
+      menu.removeEventListener('pointerenter', stay);
+      menu.removeEventListener('pointerleave', leave);
+      this.openers.delete(opener);
+    };
   }
 
-  /** Wires a plain button to open `menu` on click and hover, with the chevron. */
-  attach(btn: UIElement, menu: UIElement): void {
+  /** Wires a button to open `menu` on click/hover; returns a listener cleanup. */
+  attach(btn: UIElement, menu: UIElement): () => void {
     btn.classList.add('cts-flyout-btn');
     addCaret(this.doc, btn);
     this.openers.add(btn);
-    btn.addEventListener('click', (e) => {
+    const click = (e: UIEvent): void => {
       e.stopPropagation();
       this.show(menu, btn);
-    });
-    this.hover(btn, menu);
+    };
+    btn.addEventListener('click', click);
+    const detachHover = this.hover(btn, menu);
+    return () => {
+      if (this.current === menu) this.close();
+      btn.removeEventListener('click', click);
+      detachHover();
+    };
   }
 
   /** Removes the document listener and pending timers. */

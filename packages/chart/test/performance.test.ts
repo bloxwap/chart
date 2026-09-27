@@ -13,6 +13,8 @@ import { PriceScale, TimeScale } from '../dist/core/scale.js';
 import { DEFAULT_CONFIG } from '../dist/config.js';
 import { emaValues, emaWasm, smaValues, smaWasm, macdIndicator } from '../dist/indicators/index.js';
 import { initWasm } from '../dist/wasm/loader.js';
+import { kdjIndicator } from '../dist/indicators/kdj.js';
+import { volIndicator } from '../dist/indicators/vol.js';
 
 const data = (n = 50): Candle[] => Array.from({ length: n }, (_, i) => ({
   time: i, open: 100 + i, close: 100.5 + i, high: 102 + i, low: 99 + i, volume: i,
@@ -35,6 +37,78 @@ function fixture(wasm = false) {
 }
 
 describe('render work reuse', () => {
+  it('lazily caches static pixels, invalidates on full renders and releases the buffer', () => {
+    const canvas = new MockCanvas(800, 400), cache = new MockCanvas(300, 150);
+    let allocations = 0;
+    Object.assign(canvas, { ownerDocument: { createElement: () => { allocations++; return cache; } } });
+    const chart = createChart({ container: canvas, config: { wasm: false, data: data() } });
+    assert.equal(allocations, 0);
+    chart.setCrosshair(20, 30);
+    assert.equal(allocations, 1);
+    assert.equal(canvas.context.countCalls('drawImage'), 1);
+    assert.equal(cache.width, 800); assert.equal(cache.height, 400);
+    const count = cache.context.calls.length;
+    chart.setCrosshair(21, 31); chart.clearCrosshair();
+    assert.equal(cache.context.calls.length, count);
+    chart.updateConfig({ theme: { background: '#ffffff' } });
+    chart.setCrosshair(21, 31);
+    assert.ok(cache.context.calls.length > count);
+    chart.updateConfig({ priceAxis: { position: 'left' } });
+    canvas.context.calls.length = 0;
+    chart.setCrosshair(222, 100);
+    assert.ok(canvas.context.calls.some(call => call[0] === 'lineTo' && call[1] === 158));
+    chart.destroy();
+    assert.equal(cache.width, 0); assert.equal(cache.height, 0);
+  });
+
+  it('rebuilds cached pixels after context restoration and falls back during context loss', () => {
+    const canvas = new MockCanvas(800, 400), cache = new MockCanvas(800, 400);
+    let restored: (() => void) | undefined;
+    let lost = false;
+    Object.assign(cache, {
+      addEventListener: (_: string, listener: () => void) => { restored = listener; },
+      removeEventListener: () => { restored = undefined; },
+    });
+    Object.assign(cache.context, { isContextLost: () => lost });
+    Object.assign(canvas.context, { getContextAttributes: () => ({ colorSpace: 'display-p3' }) });
+    Object.assign(canvas, { ownerDocument: { createElement: () => cache } });
+    const chart = createChart({ container: canvas, config: { wasm: false, data: data() } });
+    chart.setCrosshair(10, 20);
+    const calls = cache.context.calls.length;
+    lost = true; chart.setCrosshair(11, 20);
+    assert.equal(cache.context.calls.length, calls);
+    lost = false; restored!(); chart.setCrosshair(12, 20);
+    assert.ok(cache.context.calls.length > calls);
+    chart.destroy(); assert.equal(restored, undefined);
+  });
+
+  it('falls back without a cache context, and allows disabling caching', () => {
+    for (const crosshairCache of [true, false]) {
+      const canvas = new MockCanvas(800, 400);
+      let allocations = 0;
+      Object.assign(canvas, { ownerDocument: { createElement: () => {
+        allocations++; return { width: 800, height: 400, getContext: () => null };
+      } } });
+      const chart = createChart({ container: canvas, crosshairCache, config: { wasm: false, data: data() } });
+      const before = canvas.context.countCalls('fillRect');
+      chart.setCrosshair(30, 40);
+      assert.ok(canvas.context.countCalls('fillRect') > before);
+      assert.equal(allocations, crosshairCache ? 1 : 0);
+      chart.destroy();
+    }
+  });
+
+  it('preserves full-render compositing for transparent or unparsed backgrounds', () => {
+    const canvas = new MockCanvas(800, 400);
+    Object.assign(canvas, { ownerDocument: { createElement: () => { throw new Error('Must not cache transparency'); } } });
+    const chart = createChart({ container: canvas, config: { wasm: false } });
+    for (const background of ['transparent', 'rgba(0,0,0,0.5)']) {
+      chart.updateConfig({ theme: { background } });
+      chart.setCrosshair(10, 20); chart.clearCrosshair();
+    }
+    chart.destroy();
+  });
+
   it('reuses indicators across redraws, viewport, drawing and theme changes', () => {
     const { chart, canvas, count } = fixture();
     const originalData = chart.getConfig().data;
@@ -216,6 +290,60 @@ describe('render work reuse', () => {
     assert.equal(count(), 3);
     assert.equal(canvas.context.countCalls('scale'), 2);
     chart.destroy();
+  });
+});
+
+describe('incremental indicator tails', () => {
+  it('uses default periods and handles flat windows, missing volumes and appending during warmup', () => {
+    for (const def of [kdjIndicator, volIndicator]) {
+      const candles = Array.from({ length: 9 }, (_, time) => ({ time, open: 10, close: 10, high: 10, low: 10 }));
+      let out = def.compute(candles, {}, [], null);
+      candles.push({ time: 9, open: 10, close: 10, high: 10, low: 10 });
+      out = def.update!(out, candles, 8, {}, [], null)!;
+      assert.deepEqual(out, def.compute(candles, {}, [], null));
+      const short = candles.slice(0, 2);
+      out = def.compute(short, {}, [], null);
+      short.push(candles[2]!);
+      out = def.update!(out, short, 2, {}, [], null) ?? def.compute(short, {}, [], null);
+      assert.deepEqual(out, def.compute(short, {}, [], null));
+    }
+  });
+  it('matches full computation across warmup, replacements, appends, batches and missing extrema', () => {
+    for (const def of [kdjIndicator, volIndicator]) for (const period of [1, 9, 40, 2000, Infinity, NaN]) {
+      const candles = data(20);
+      const params = { period }, colors = ['red', 'blue', 'green'];
+      let output = def.compute(candles, params, colors, null);
+      for (let i = 0; i < 50; i++) {
+        const from = candles.length - 1;
+        candles[from] = { ...candles[from]!, high: i % 3 ? 300 : NaN, low: i % 4 ? 90 : NaN, close: i % 5 ? 120 : NaN };
+        if (i % 2) candles.push(...data(3));
+        output = def.update!(output, candles, from, params, colors, null) ?? def.compute(candles, params, colors, null);
+        assert.deepEqual(output, def.compute(candles, params, colors, null));
+      }
+    }
+  });
+
+  it('updates only dirty tails, falls back for custom indicators and invalidates historical edits', () => {
+    let updates = 0, computes = 0;
+    const def: IndicatorDef = { ...volIndicator, name: 'incremental',
+      compute(...args) { computes++; return volIndicator.compute(...args); },
+      update(...args) { updates++; return volIndicator.update!(...args); } };
+    const chart = createChart({ container: new MockCanvas(800, 400), registries: { indicators: createIndicatorRegistry(false).register(def) },
+      config: { wasm: false, data: data(10), indicators: [{ id: 'a', name: def.name, params: {}, colors: [], visible: true, pane: 'sub' }] } });
+    chart.batch(() => {
+      chart.appendData({ ...data(10)[9]!, close: 500 });
+      chart.appendData(data(11)[10]!);
+      chart.appendData({ ...data(11)[10]!, volume: 12 });
+    });
+    assert.equal(updates, 1); assert.equal(computes, 1);
+    chart.appendData({ ...data(2)[1]!, close: 500 });
+    assert.equal(computes, 2);
+    def.update = () => undefined;
+    chart.appendData(data(12)[11]!); assert.equal(computes, 3);
+    chart.appendData(data(13)[12]!); assert.equal(computes, 4);
+    chart.destroy();
+    const empty = createChart({ container: new MockCanvas(), config: { wasm: false } });
+    empty.appendData(data(1)[0]!); empty.destroy();
   });
 });
 

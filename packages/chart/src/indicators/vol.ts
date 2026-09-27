@@ -13,6 +13,15 @@ export const volIndicator: IndicatorDef = {
   defaultParams: {},
   defaultColors: [UP_COLOR, DOWN_COLOR],
   defaultPane: 'sub',
+  update(output, candles, from) {
+    const values = output.bars!.values as number[];
+    const up = output.bars!.up as boolean[];
+    for (let i = from; i < candles.length; i++) {
+      values[i] = candles[i].volume ?? 0;
+      up[i] = candles[i].close >= candles[i].open;
+    }
+    return output;
+  },
   compute(candles: readonly Candle[], _params: Record<string, number>, colors: readonly string[]) {
     const values = candles.map((c) => c.volume ?? 0);
     const up = candles.map((c) => c.close >= c.open);

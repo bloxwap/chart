@@ -35,7 +35,7 @@
   <script type="module">
     import { createChart, defineConfig } from '../dist/index.js';
     import {
-      createDrawingToolbar, createChartSettings, createFrameScheduler, attachScrollableRail, el, iconButton, labelButton, setButtonLabel, setButtonIcon, menuItem, menuLabel, menuSeparator,
+      createDrawingToolbar, createChartSettings, createThemeControl, createFrameScheduler, attachScrollableRail, el, iconButton, labelButton, setButtonLabel, setButtonIcon, menuItem, menuLabel, menuSeparator,
     } from '../dist/ui/index.js';
 
     // ---------------- data (deterministic random walk) ----------------
@@ -215,40 +215,6 @@
     controller.history.onChange(syncHistory);
     syncHistory();
 
-    // Theme: light, dark, or follow the system (the default), remembered per browser.
-    const themeKey = 'chart-ts:theme';
-    const systemDark = matchMedia('(prefers-color-scheme: dark)');
-    const THEME_MODES = [['light', 'Light', 'sun'], ['dark', 'Dark', 'moon'], ['system', 'System', 'monitor']];
-    let themeMode = THEME_MODES.some(([mode]) => mode === safeGet(themeKey)) ? safeGet(themeKey) : 'system';
-    const themeBtn = iconButton(document, 'monitor', 'Theme', 20);
-    const themeMenu = flyouts.create();
-    themeMenu.append(menuLabel(document, 'Theme'));
-    const themeItems = THEME_MODES.map(([mode, label, icon]) => {
-      const item = menuItem(document, { icon, label, tick: true, onClick: () => {
-        themeMode = mode;
-        safeSet(themeKey, mode);
-        applyTheme();
-        flyouts.close();
-      } });
-      item.setAttribute('role', 'menuitemradio');
-      themeMenu.append(item);
-      return item;
-    });
-    flyouts.attach(themeBtn, themeMenu);
-    function applyTheme() {
-      const light = themeMode === 'light' || (themeMode === 'system' && !systemDark.matches);
-      document.body.classList.toggle('light', light);
-      $('ctrl-rail').classList.toggle('cts-light', light);
-      toolbar.setTheme(light ? 'light' : 'dark'); // UI chrome + chart colors together
-      settings.setTheme(light ? 'light' : 'dark');
-      THEME_MODES.forEach(([mode, label, icon], i) => {
-        themeItems[i].classList.toggle('cts-active', mode === themeMode);
-        themeItems[i].setAttribute('aria-checked', String(mode === themeMode));
-        if (mode === themeMode) { setButtonIcon(themeBtn, icon, 20); themeBtn.title = `Theme: ${label}`; }
-      });
-    }
-    systemDark.addEventListener('change', () => { if (themeMode === 'system') applyTheme(); });
-
     let live = true;
     const settingsBtn = iconButton(document, 'settings', 'Settings', 20);
     const settingsExtras = el(document, 'div');
@@ -286,6 +252,22 @@
       onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
     });
 
+    // Embeds can pin a host theme with ?lockedTheme=dark (or light).
+    const themeKey = 'chart-ts:theme';
+    const requestedLock = new URLSearchParams(location.search).get('lockedTheme');
+    const lockedTheme = ['dark', 'light'].includes(requestedLock) ? requestedLock : undefined;
+    const savedTheme = safeGet(themeKey);
+    const themeControl = createThemeControl({ document, flyouts, lockedTheme,
+      theme: ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system',
+      onSelect: mode => safeSet(themeKey, mode),
+      onChange: theme => {
+        document.body.classList.toggle('light', theme === 'light');
+        $('ctrl-rail').classList.toggle('cts-light', theme === 'light');
+        toolbar.setTheme(theme);
+        settings.setTheme(theme);
+      },
+    });
+
     const railToggle = iconButton(document, 'panel-left-close', 'Hide drawing toolbar', 20);
     railToggle.setAttribute('aria-controls', 'tools');
     railToggle.setAttribute('aria-expanded', 'true');
@@ -302,9 +284,9 @@
       railToggle.title = show ? 'Hide drawing toolbar' : 'Show drawing toolbar';
     });
 
-    $('ctrl-scroll').append(tfBtn, ctBtn, fxBtn, divider(), undoBtn, redoBtn, divider(), themeBtn);
+    $('ctrl-scroll').append(tfBtn, ctBtn, fxBtn, divider(), undoBtn, redoBtn);
+    if (themeControl.element) $('ctrl-scroll').append(divider(), themeControl.element);
     $('ctrl-bottom').append(settingsBtn, railToggle);
-    applyTheme();
     attachScrollableRail(document, $('ctrl-scroll'));
 
     // Keep the chart usable in a narrow embed; drawing tools are one click away.

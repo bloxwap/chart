@@ -62,6 +62,27 @@ export const kdjIndicator: IndicatorDef = {
   defaultParams: { period: 9 },
   defaultColors: ['#2962ff', '#ff6d00', '#ab47bc'],
   defaultPane: 'sub',
+  update(output, candles, from, params) {
+    const period = Math.max(1, Math.floor(params['period'] ?? 9));
+    // Large batches/periods are cheaper with the linear monotonic-queue pass.
+    if (!Number.isFinite(period) || (candles.length - from) * period > candles.length * 2) return undefined;
+    const [k, d, j] = output.lines.map(line => line.values as (number | null)[]);
+    let previousK = k[from - 1] ?? 50, previousD = d[from - 1] ?? 50;
+    for (let i = from; i < candles.length; i++) {
+      k[i] = d[i] = j[i] = null;
+      if (i < period - 1) continue;
+      let low = Infinity, high = -Infinity;
+      for (let at = i - period + 1; at <= i; at++) {
+        if (candles[at].low < low) low = candles[at].low;
+        if (candles[at].high > high) high = candles[at].high;
+      }
+      const rsv = high === low ? 50 : (candles[i].close - low) / (high - low) * 100;
+      previousK = 2 / 3 * previousK + 1 / 3 * rsv;
+      previousD = 2 / 3 * previousD + 1 / 3 * previousK;
+      k[i] = previousK; d[i] = previousD; j[i] = 3 * previousK - 2 * previousD;
+    }
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = Math.max(1, Math.floor(params['period'] ?? 9));
     const { k, d, j } = kdjValues(candles, period);
