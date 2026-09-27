@@ -121,9 +121,14 @@ html > body[data-scroll-locked] {
   color: var(--bloxwap-green);
 }
 
+/* Fumadocs' sidebar icon-link bar ships as a stroked box; with GitHub its only link, drop the box and keep the icon. */
+#nd-sidebar div:has(> a[href="https://github.com/bloxwap/chart"]) {
+  border: 0;
+  background: none;
+}
+
 .docs-sidebar-footer {
-  border-top: 1px solid var(--border);
-  padding-top: 1rem;
+  padding-top: var(--space-xs);
 }
 
 .docs-app-link {
@@ -132,8 +137,8 @@ html > body[data-scroll-locked] {
   justify-content: space-between;
   min-height: 2.5rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
+  transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
   font-size: 0.875rem;
   font-weight: 700;
 }
@@ -306,16 +311,16 @@ html > body[data-scroll-locked] {
   .hero-copy > *, .code-window, .hero-preview { animation: none; }
 }
 
-/* Search: a zero-stroke filled pill at the small control height, with filled key chips. */
+/* Search (header and docs sidebar): a zero-stroke filled pill at the small control height, with key chips one step lighter than the box. */
 button[data-search-full] {
   height: var(--control-h-sm); gap: var(--space-sm); padding: 0 var(--space-xs) 0 var(--space-md);
-  border: 0; background: var(--card); color: var(--muted-foreground); font-size: var(--text-sm);
+  border: 0; border-radius: var(--radius-full); background: var(--card); color: var(--muted-foreground); font-size: var(--text-sm);
   transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
 }
 button[data-search-full]:hover { background: var(--muted); color: var(--foreground); }
 button[data-search-full] kbd {
   display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 var(--space-xs);
-  border: 0; border-radius: var(--radius-full); background: var(--background); color: var(--muted-foreground);
+  border: 0; border-radius: var(--radius-full); background: color-mix(in oklab, var(--card) 80%, var(--foreground)); color: var(--foreground);
   font: var(--text-2xs) / 1 var(--font-mono);
 }
 .hero-preview {
@@ -374,11 +379,20 @@ button[data-search-full] kbd {
 .guide-links a:hover h3 { color: var(--color-fd-primary); }
 .guide-links p { color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
 /* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
-/* The bloxwap.com footer (monorepo workers/www), inset to the header's box. margin-top: auto pins it to the bottom of short pages in the flex-column body. */
+/* The bloxwap.com footer (monorepo workers/www), inset to the header's box. The home page ends with it. */
 .site-footer { margin-top: auto; padding: var(--space-5xl) max(var(--space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--space-lg))) var(--space-4xl); }
-/* Inside a docs article: pinned below the page content (margin-top: auto in the flex column), inset to the article's own padding. */
-#nd-page > .site-footer { padding: var(--space-5xl) 0 0; }
-#nd-page > .site-footer .footer-grid { column-gap: var(--space-xl); }
+/* Page end: Edit on GitHub as a quiet ghost pill, prev/next as zero-stroke fill cards (the landing's card style). */
+#nd-page .edit-on-github {
+  align-self: flex-start; height: var(--control-h-sm); padding: 0 var(--space-md); border: 0; border-radius: var(--radius-full);
+  background: transparent; color: var(--muted-foreground); font-size: var(--text-sm);
+  transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
+}
+#nd-page .edit-on-github:hover { background: var(--card); color: var(--foreground); }
+.page-nav > a {
+  padding: var(--space-xl) var(--space-2xl); border: 0; border-radius: var(--radius-xl); background: var(--card);
+  transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
+}
+.page-nav > a:hover { background: var(--muted); color: var(--bloxwap-green); }
 .footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--space-2xl); row-gap: var(--space-4xl); }
 .footer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
 .footer-brand p { margin: 0; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); }
