@@ -32,8 +32,6 @@ jobs:
         run: |
           npm run coverage:lcov
           test -s packages/chart/coverage/lcov.info
-          # Node reports package-relative source paths (via source maps); Codecov needs repository-relative ones.
-          sed -i 's|^SF:|SF:packages/chart/|' packages/chart/coverage/lcov.info
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
