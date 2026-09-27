@@ -19,7 +19,9 @@ chart.updateDrawing(id, { lineStyle: 'dashed', locked: true });
 chart.removeDrawing(id);
 ```
 
-Use the [scale API](/docs/api/scale) to convert between pixels and these coordinates. Replacing or inserting history changes index positions; your application should remap drawing anchors when its data model requires timestamp-stable annotations.
+Use the [scale API](/docs/api/scale) to convert between pixels and these coordinates. `chart.prependData` (and the [paging datafeed](/docs/guides/datafeed), which uses it) moves bar-indexed points along with their bars, so drawings stay on the same candles as history loads. Replacing or inserting history with `setData` or `appendData` changes index positions; your application should remap drawing anchors when its data model requires timestamp-stable annotations.
+
+On a [time-continuous axis](/docs/guides/time-scale), points still use candle indices; a point inside a gap has a fractional index between the two candles around it.
 
 ## Discover tools
 
@@ -46,9 +48,28 @@ chart.moveDrawingPoint(id, 0, point);
 chart.translateDrawing(id, 20, -10); // CSS-pixel delta
 ```
 
-`snapPoint` supports `off`, `weak`, and `strong` magnet modes. A weak magnet snaps only near OHLC values. `handleAt` returns the selected drawing's anchor index, or `-1` when no handle is hit.
+`snapPoint` supports `off`, `weak`, and `strong` magnet modes. A weak magnet snaps only near OHLC values. On a `'heikin-ashi'` series, magnets snap to the Heikin Ashi values shown. `handleAt` returns the selected drawing's anchor index, or `-1` when no handle is hit.
 
 Anchored text and similar tools use screen fractions. Pass the tool name to `pointFromPixel(x, y, name)` to obtain the right coordinate type.
+
+## Labels at the plot edge
+
+Measurement and level labels stay whole while their drawing is on screen. Examples are the position tools' target, stop, R/R and P&L, the range tools, Fibonacci levels, channels, fans and time zones, Gann boxes, squares and fans, the trend angle, anchored VWAP, and the volume profile's POC. A label that would cross the price axis or the plot's left edge slides back inside, and `chart.drawingAt` hits it where it is drawn. Labels that share a row, such as a Gann box's column ratios, slide only while their own line is on screen, so they don't pile up at the edge. A custom model opts in per text primitive:
+
+```ts
+import { spansPlot, text } from '@bloxwap/chart/drawings';
+
+chart.drawings.register({
+  name: 'my-span',
+  minPoints: 2,
+  geometry: ([a, b], view) => {
+    const [x0, x1] = [view.indexToX(a.index), view.indexToX(b.index)];
+    const y = view.priceToY(b.price);
+    // Slides in while the span is on screen; leaves with it once scrolled out.
+    return [text('span label', { x: x1 + 4, y }, { bg: true, inside: spansPlot(x0, x1, view.width) })];
+  },
+});
+```
 
 ## Visibility and history
 
@@ -60,4 +81,6 @@ chart.clearDrawings();
 
 The core drawing methods do not automatically create undo checkpoints. The optional toolbar's controller supplies interaction history; use it for user-driven placement and edits, or call `controller.history.checkpoint()` before your own undoable mutation.
 
-For a complete interactive rail, use [the toolbar](/docs/guides/toolbar-settings) instead of implementing placement and hit-testing yourself.
+For a complete interactive rail, use [the toolbar](/docs/guides/toolbar-settings) instead of implementing placement and hit-testing yourself. It also provides [right-click menus](/docs/guides/toolbar-settings#context-menus) with Clone, Lock, Hide, and Remove, and [touch placement and editing](/docs/guides/touch).
+
+Drawings are user annotations. For values your application updates, such as a mark price or an order level, use [price lines](/docs/guides/price-lines-markers) instead: they aren't selectable or undoable and cost one repaint per update.

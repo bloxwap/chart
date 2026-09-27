@@ -35,9 +35,13 @@ export function emaWasm(values: readonly number[] | Float32Array, period: number
 /** EMA indicator definition (name `'ema'`, param `period`, default 20). */
 export const emaIndicator: IndicatorDef = {
   name: 'ema',
+  label: 'Moving Average Exponential',
+  shortName: 'EMA',
   defaultParams: { period: 20 },
   defaultColors: ['#ff6d00'],
   defaultPane: 'main',
+  inputs: [{ key: 'period', label: 'Length', min: 1, step: 1, integer: true }],
+  styles: [{ key: 'value', label: 'EMA', colorIndex: 0 }],
   compute(
     candles: readonly Candle[],
     params: Record<string, number>,

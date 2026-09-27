@@ -1,0 +1,162 @@
+---
+title: Header and scale buttons
+description: Add a TradingView-style top bar with timeframes, chart types, indicators, and price-scale toggles.
+---
+
+The chart header is an optional top bar from `@bloxwap/chart/ui`. It holds the symbol, a timeframe switcher that drives your datafeed, a chart-type menu, an Indicators button, Auto / % / Log price-scale toggles, and slots for your own controls. It is a normal-flow element: put its container above the chart. Nothing else depends on it, so skip it if you keep your own header.
+
+## Add the header
+
+```html
+<div id="chart-header"></div>
+<div id="stage" style="position: relative; height: 480px">
+  <canvas id="chart"></canvas>
+</div>
+```
+
+```ts
+import { createChartHeader, createIndicatorsDialog, BLOXWAP_HEADER_THEME } from '@bloxwap/chart/ui';
+
+const indicators = createIndicatorsDialog({ chart, document, theme: 'dark' });
+const header = createChartHeader({
+  chart,
+  document,
+  container: document.querySelector<HTMLElement>('#chart-header')!,
+  symbol: 'BTC',
+  datafeed,                                   // picking 1h calls datafeed.setSymbol('BTC', 3_600_000)
+  onTimeframeChange: (tf) => save(tf.label),
+  onIndicators: () => indicators.openPicker(), // the Indicators button only shows with this
+  slots: { left: [assetPicker], right: [screenshotButton] },
+  flyouts: toolbar.flyouts,                   // optional: share menus with the drawing toolbar
+  tokens: BLOXWAP_HEADER_THEME,               // optional: the bloxwap.pro look on dark
+});
+
+header.setSymbol('ETH');   // label and symbol for later picks; does not call the datafeed
+header.destroy();
+```
+
+The layout is `[symbol] [timeframes] [chart type] [Indicators] [left slot] … [Auto % Log] [right slot]`.
+
+## Options
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `chart`, `document`, `container` | Required | The bar is appended to `container` |
+| `symbol` | None | Symbol passed to the datafeed; also the label unless `symbolLabel` is set |
+| `symbolLabel` | `symbol` | Text or an element. No symbol and no label hides it |
+| `timeframes` | `DEFAULT_TIMEFRAMES` | 1m 5m 15m 1h 4h 1d 3d 1w 1M; `[]` hides the switcher |
+| `intervalMs` | `900_000` (`DEFAULT_HEADER_INTERVAL_MS`, 15m) | Interval selected at start |
+| `datafeed` | None | Any object with `setSymbol(symbol, intervalMs)` |
+| `onTimeframeChange` | None | Called after the user picks a different timeframe |
+| `chartTypes` | `DEFAULT_CHART_TYPES` | Candles, hollow candles, Heikin Ashi, bars, line, area; `[]` hides the menu |
+| `onChartTypeChange` | None | Called after a pick, which already set `series.type` |
+| `onIndicators` | None | Shows the Indicators button, which calls it |
+| `scaleButtons` | `true` | Auto / % / Log toggles |
+| `slots` | None | `{ left?, right? }` arrays of your elements |
+| `flyouts` | Its own | Share the drawing toolbar's `Flyouts` so only one menu is open at a time |
+| `theme` | `'dark'` | `setTheme('light')` switches later |
+| `compact` | `'auto'` | Collapse the timeframes into a dropdown, and the Indicators button to its icon, when the bar overflows; `true` or `false` forces it |
+| `tokens` | None | Custom properties set inline on the bar and its menus: one set for both themes, or `{ dark?, light? }` |
+
+`DEFAULT_TIMEFRAMES` uses Hyperliquid's intervals. `1M` spans 30 days (`2_592_000_000` ms). Pass your own `HeaderTimeframe[]` of `{ label, intervalMs }` to change them. An interval outside the list shows a generated label such as `2h`.
+
+## Working with a datafeed
+
+When the datafeed reports its own `symbol` and `intervalMs`, as the [paging datafeed](/docs/guides/datafeed) does, the header treats them as the truth:
+
+- It starts from the datafeed's symbol and interval.
+- A timeframe pick reloads the symbol the datafeed has loaded.
+- With `subscribeState`, it follows switches made elsewhere, such as your asset picker calling `datafeed.setSymbol`.
+
+For a datafeed without `subscribeState`, call `header.refresh()` after switching elsewhere.
+
+Picking a timeframe does not touch `timeAxis.intervalMs` or `timeScale.intervalMs`. The paging datafeed sets both on every load. With another datafeed, update them in `onTimeframeChange` if your chart relies on them.
+
+## Handle
+
+| Member | Purpose |
+| --- | --- |
+| `element` | The bar element |
+| `symbol`, `intervalMs`, `compact` | Current state |
+| `setSymbol(symbol, label?)` | Sets the symbol for later picks (unless the datafeed reports its own) and the label; does not call the datafeed |
+| `setInterval(ms)` | Marks an interval selected; calls neither the datafeed nor `onTimeframeChange` |
+| `setChartType(type)` | Applies `series.type` and updates the menu; does not call `onChartTypeChange` |
+| `setTheme(theme)` | Switch between the dark and light tokens, and to that theme's `tokens` set |
+| `refresh()` | Re-read the datafeed's symbol and interval and re-fit the bar |
+| `destroy()` | Remove the bar, its menus, and every listener |
+
+The chart-type button and scale toggles follow `series` and `priceAxis` changes as soon as they render, through [`subscribeConfigChange`](/docs/guides/events#config-changes): the toolbar's Alt+P and Alt+L, the settings card, the context menu, and your own `updateConfig` calls all show at once.
+
+Every control is its own tab stop, and dropdowns work from the keyboard: arrows, Home, and End move through entries, Escape closes the menu (from anywhere on the page, so a menu opened with a click or tap closes too) and returns focus to its button, and Tab closes it and continues from its button. Menus stack above the settings card and the indicators dialog.
+
+## Scale buttons on the chart
+
+TradingView shows `A`, `%`, and `L` toggles at the foot of the price axis. `createScaleButtons` adds the same strip above the time axis:
+
+```ts
+import { createScaleButtons } from '@bloxwap/chart/ui';
+
+const buttons = createScaleButtons({ chart, document, overlay: stage }); // stage: positioned, wraps the canvas
+buttons.destroy();
+```
+
+| Option | Meaning |
+| --- | --- |
+| `chart`, `document`, `overlay` | Required. `overlay` is a positioned element wrapping the canvas, such as the toolbar's overlay |
+| `canvas` | The canvas, when it doesn't sit at the overlay's top-left corner |
+| `theme` | Default `'dark'` |
+| `tokens` | Custom properties set inline, for example `BLOXWAP_HEADER_THEME`; `setTheme` swaps per-theme sets |
+
+The strip follows the axis to either side, tracks resizes and sub-panes, and hides while the price axis is hidden. It does nothing on plain scroll or zoom frames. Call `buttons.refresh()` if the canvas moves inside the overlay without resizing.
+
+The toggles edit existing config:
+
+- **Auto** toggles `priceAxis.autoScale`.
+- **%** and **Log** switch `priceAxis.mode` to `'percent'` or `'logarithmic'`, or back to `'regular'`, so they exclude each other. They also release a locked price-to-bar ratio, like Alt+P and Alt+L. Indexed mode lights neither.
+
+For your own controls, use `toggleScale(chart, 'auto' | 'percent' | 'log')`, `scaleToggleState(chart.getConfig().priceAxis)`, and `SCALE_TOGGLES` (labels, letters, and titles). Toggle groups already follow each rendered `priceAxis` change; call `syncScaleToggles(chart)` only to update them inside a `chart.batch`.
+
+## Theming
+
+Set these custom properties on the header, on the scale strip, or on any ancestor. Each falls back to the toolbar token shown, so dark and light follow `.cts-theme` and `.cts-light` automatically.
+
+| Property | Falls back to | Styles |
+| --- | --- | --- |
+| `--cts-header-bg` | `--cts-panel` | Bar and on-chart button fill |
+| `--cts-header-text` | `--cts-idle` | Idle text and icons |
+| `--cts-header-text-active` | `--cts-hover` | Hovered, selected, and symbol text |
+| `--cts-header-hover-bg` | `--cts-accent-soft` | Hover and open-menu fill |
+| `--cts-header-active-bg` | `--cts-panel-raised` | Selected timeframe fill |
+| `--cts-header-accent` | `--cts-accent` | Pressed scale toggles, focus ring |
+| `--cts-header-on-accent` | `--cts-on-accent` | Text on pressed toggles |
+| `--cts-header-radius` | `--cts-radius-md` | Button corners |
+| `--cts-header-height` | `40px` | Bar height |
+
+`BLOXWAP_HEADER_TOKENS` reproduces the bloxwap.pro chrome: a `#171717` surface, `#a1a1a1` idle and `#fafafa` active text, a `#262626` hover fill, the `#00ff3f` accent, pill buttons, and borderless menus. Pass it as `tokens`. Tokens are set inline, so they beat the theme classes, and they are also set on each header menu, so they reach menus in a shared toolbar portal.
+
+A flat set like `BLOXWAP_HEADER_TOKENS` applies in both themes. For different looks per theme, pass `{ dark?, light? }` (`ThemedHeaderTokens`): `setTheme` applies the matching set and removes the other's properties, leaving other inline styles alone. A theme without a set keeps the default `.cts-theme` or `.cts-light` look. `BLOXWAP_HEADER_THEME` is `{ dark: BLOXWAP_HEADER_TOKENS }`, the bloxwap.pro look on dark and the default light tokens on light:
+
+```ts
+const header = createChartHeader({ chart, document, container, tokens: BLOXWAP_HEADER_THEME, theme: 'dark' });
+const strip = createScaleButtons({ chart, document, overlay: stage, tokens: BLOXWAP_HEADER_THEME });
+header.setTheme('light'); // bloxwap tokens cleared from the bar and its menus
+strip.setTheme('light');
+```
+
+To use CSS instead, put the `--cts-header-*` properties on `.cts-header, .cts-scale-buttons`, and the toolbar tokens for the menus on `.cts-theme .cts-header-menu`:
+
+```css
+.cts-header, .cts-scale-buttons {
+  --cts-header-bg: #171717; --cts-header-text: #a1a1a1; --cts-header-text-active: #fafafa;
+  --cts-header-hover-bg: #262626; --cts-header-active-bg: #262626;
+  --cts-header-accent: #00ff3f; --cts-header-on-accent: #0a0a0a; --cts-header-radius: 9999px;
+}
+.cts-theme .cts-header-menu {
+  --cts-panel: #171717; --cts-panel-raised: #262626; --cts-edge: transparent;
+  --cts-idle: #a1a1a1; --cts-hover: #fafafa; --cts-accent: #00ff3f; --cts-accent-soft: #262626; --cts-on-accent: #0a0a0a;
+}
+```
+
+`HEADER_CSS` and `injectHeaderStyles(doc)` are exported for shadow-DOM and server-rendered hosts. The injected style element carries the `data-chart-ts-header` attribute (`HEADER_STYLE_MARKER`).
+
+See [theming and presets](/docs/guides/theming-presets) for the chart colors and the rest of the UI tokens.

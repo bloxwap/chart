@@ -32,8 +32,10 @@ Nested objects merge recursively. Arrays and functions replace. `undefined` entr
 | `indicators`, `drawings` | `[]` | Configured instances |
 | `indicatorPaneWeight` | `1` | Sub-pane weight; the main pane weighs 3 |
 | `priceAxis`, `timeAxis` | Visible | Axis appearance and transforms |
+| `timeScale` | Bar-indexed | Bar-indexed or time-continuous horizontal layout |
 | `statusLine` | Hidden | Symbol and candle/indicator information |
 | `theme`, `grid`, `crosshair` | See defaults | Canvas styling |
+| `volume` | Off | Volume overlay at the bottom of the main pane |
 | `watermark` | Hidden | Text/image behind the chart |
 | `formatters` | Built-in functions | Price and UNIX-second time label formatting |
 
@@ -41,7 +43,7 @@ Nested objects merge recursively. Arrays and functions replace. `undefined` entr
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `type` | `candlestick` | `candlestick`, `line`, `area`, `bar`, `histogram` |
+| `type` | `candlestick` | `candlestick`, `hollow-candlestick`, `heikin-ashi`, `line`, `area`, `bar`, `histogram` |
 | `upColor`, `downColor` | `#26a69a`, `#ef5350` | Direction colors |
 | `colorByPreviousClose` | `false` | Determine direction from previous close |
 | `bodyVisible`, `wickVisible` | `true` | Candle body and wick visibility |
@@ -69,26 +71,70 @@ Nested objects merge recursively. Arrays and functions replace. `undefined` entr
 | `precision` | `null` | Fixed decimal digits (0–12); null retains formatter behavior |
 | `plusButton` | `false` | Show the toolbar's add-price-line button on axis hover |
 
-`priceAxis.labels` contains `lastPrice`, `highLow`, and `indicator`. `priceAxis.lines` contains `lastPrice`, `previousClose`, and `highLow`. All start disabled. High/low references use the visible candle range.
+`priceAxis.labels` contains `lastPrice`, `highLow`, `indicator`, and `countdown` (the bar-close countdown under the last-price badge). `priceAxis.lines` contains `lastPrice`, `previousClose`, and `highLow`. All start disabled. High/low references use the visible candle range.
 
 Price transforms preserve raw data coordinates: `yToPrice`, drawing points, and candles continue to use actual prices even when the axis displays percentages.
 
 ## Time axis and status line
 
-`timeAxis` includes `visible` (true), `height` (24), and `tickCount` (6).
+`timeAxis` includes `visible` (true), `height` (24), `tickCount` (6), and `intervalMs` (`null`). `intervalMs` is the bar interval the countdown uses; `null` falls back to `timeScale.intervalMs`, then to the time between the last two candles.
 
-`statusLine` includes `visible` (false), `symbol` (`'Symbol'`), `symbolVisible`, `ohlc`, `change`, `volume`, and `indicators`. All detail toggles except volume start enabled. The line follows the hovered candle or falls back to the latest candle. OHLC values take the candle's direction color, the change value takes the color of its sign, and both use the series up/down colors.
+`statusLine` includes `visible` (false), `symbol` (`'Symbol'`), `symbolVisible`, `ohlc`, `change`, `volume`, `indicators`, and `countdown`. All detail toggles except volume and countdown start enabled. The line follows the hovered candle or falls back to the latest candle. When the values don't fit the plot's width, as on a phone, they wrap onto more rows between values, keeping the countdown with the value before it, and the indicator rows move down. OHLC values take the candle's direction color, the change value takes the color of its sign, and both use the series up/down colors. Indicator values are labelled with a single-line study's short name or each line's style label, or with the line key in capitals for custom studies without style metadata.
+
+See [snapshots and countdown](/docs/guides/snapshots-countdown) for the countdown and its ticker.
+
+## Time scale
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `continuous` | `false` | Place candles by time so gaps show as empty space |
+| `intervalMs` | `null` | Slot width in milliseconds; `null` infers the most common gap between candles |
+
+See [time scale](/docs/guides/time-scale) for what continuous mode changes and what stays bar-indexed.
+
+## Indicator instances
+
+Each entry of `indicators` is an `IndicatorConfig`:
+
+| Field | Purpose |
+| --- | --- |
+| `id`, `name` | Instance id and registered indicator name |
+| `params` | Parameter overrides merged over the definition's defaults |
+| `pane` | `'main'` or `'sub'` |
+| `colors` | Color overrides, indexed like the definition's `defaultColors`; the `'up'` and `'down'` tokens follow the series colors |
+| `visible` | Show or hide the whole study |
+| `lineWidths` | Stroke width per line plot; missing or non-positive entries keep 1px. Default `[]` |
+| `hiddenLines` | Keys of lines, bars, fills, or levels to hide. Default `[]` |
+
+Use `chart.updateIndicator(id, patch)` to change one. See [indicators](/docs/guides/indicators#style-an-instance).
+
+## Volume overlay
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `overlay` | `false` | Draw volume bars along the bottom of the main pane, under the series |
+| `upColor`, `downColor` | `'up'`, `'down'` | Bar colors; the tokens follow `series.upColor` and `series.downColor` |
+| `opacity` | `0.5` | Multiplies the bar color's alpha (0 to 1) |
+| `height` | `0.2` | Fraction of the pane height reached by the tallest visible bar |
+
+The overlay has its own vertical scale, so it never changes the price range. It is independent of the `vol` sub-pane indicator. On a Heikin Ashi series, bars take the Heikin Ashi direction.
 
 ## Canvas styling
 
 | Group | Fields |
 | --- | --- |
-| `theme` | `background`, `textColor`, `borderColor`, `fontFamily`, `monoFamily`, `fontSize` |
+| `theme` | `background`, `textColor`, `borderColor`, `fontFamily`, `monoFamily`, `fontSize`, `scaleFontSize`, `scaleFontFamily` |
 | `grid` | `visible`, `horizontal`, `vertical`, `color` |
 | `crosshair` | `visible`, `mode`, `color`, `dashed`, `labelBackground`, `labelColor` |
 | `watermark` | `visible`, `text`, `image`, `color`, `opacity`, `fontSize`, `fontFamily` |
 | `formatters` | `price(value)`, `time(timestamp)` |
 
 Crosshair modes are `cross`, `dot`, `arrow`, and `demonstration`. `labelColor: 'auto'` chooses black or white for contrast. An empty watermark font family inherits the theme font.
+
+`theme.borderColor` paints the separators between panes. `theme.scaleFontSize` (`null`) and `theme.scaleFontFamily` (`''`) set the price and time scale text; they follow `fontSize` and `monoFamily` when unset. See [theming and presets](/docs/guides/theming-presets#scale-text).
+
+## Presets
+
+`createChart({ preset })` layers a named preset or any partial under `theme` and `config`. `CHART_PRESETS` holds the built-in presets, currently `bloxwapDark`. `withPreset(preset, partial)` layers them in your own code, and `presetChartTheme(preset)` keeps a preset's colors when the toolbar switches themes. See [theming and presets](/docs/guides/theming-presets).
 
 For browser UI controls over these fields, see [toolbar and settings](/docs/guides/toolbar-settings).

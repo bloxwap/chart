@@ -5,8 +5,8 @@
  * editor, favorites bar, icon picker, box zoom, hints and toasts.
  *
  * ```ts
- * import { createChart } from 'chart-ts';
- * import { createDrawingToolbar } from 'chart-ts/ui';
+ * import { createChart } from '@bloxwap/chart';
+ * import { createDrawingToolbar } from '@bloxwap/chart/ui';
  *
  * const chart = createChart({ container: canvas, config });
  * const toolbar = createDrawingToolbar({
@@ -22,6 +22,7 @@
  */
 
 import type { Chart } from '../core/chart.js';
+import type { ChartConfig, DeepPartial } from '../config.js';
 import { CURSOR_MODES, TOOL_GROUPS } from '../drawings/catalog.js';
 import type { CanvasImageSourceLike } from '../dom.js';
 import { CHART_THEMES, type ThemeName } from '../themes.js';
@@ -34,6 +35,8 @@ import { SmoothScroll } from '../core/scroll.js';
 import { SmoothZoom, type FrameScheduler } from '../core/zoom.js';
 import { createFrameScheduler } from './frames.js';
 import { attachScrollableRail } from './rail-scroll.js';
+import { claimTouch, createTouchRouter, TOUCH_HANDLE_HIT_PX, TOUCH_HIT_PX, TOUCH_POINTER_TYPES } from './gestures.js';
+import { toolbarContextMenu, type ChartContextMenu, type ChartContextMenuHooks } from './context-menu.js';
 
 /** Options for {@link createDrawingToolbar}. */
 export interface DrawingToolbarOptions {
@@ -48,14 +51,32 @@ export interface DrawingToolbarOptions {
   overlay: UIElement;
   /** Initial theme; also applied to the chart unless `applyChartTheme` is false. Default `'dark'`. */
   theme?: ThemeName;
-  /** Apply {@link CHART_THEMES} to the chart on {@link DrawingToolbar.setTheme}. Default true. */
+  /**
+   * Apply {@link CHART_THEMES} (or {@link DrawingToolbarOptions.chartTheme}) to the chart on mount and on every
+   * {@link DrawingToolbar.setTheme}. Default true. The theme layers over the chart's config, so it
+   * replaces a preset's colors; pass false to leave them alone.
+   */
   applyChartTheme?: boolean;
+  /**
+   * The config applied for each theme instead of {@link CHART_THEMES}; keep a brand preset's
+   * colors with `presetChartTheme('bloxwapDark')`. Return colors only: the result is re-applied on
+   * every theme change, so anything else in it (a whole preset, say) overrides the chart's config
+   * and the user's settings. Ignored when `applyChartTheme` is false.
+   */
+  chartTheme?: (theme: ThemeName) => DeepPartial<ChartConfig>;
   /** Persists favorites (e.g. `localStorage`). */
   storage?: UIStorage | null;
   /** Default favorite tools when storage has none. */
   favorites?: readonly string[];
   /** Drag-to-pan, wheel zoom, crosshair and scroll arrows. Default true. */
   navigation?: boolean;
+  /**
+   * Finger pan, pinch, fling and long-press crosshair (see `attachTouchGestures`). They give
+   * the canvas the `cts-touch` class (`touch-action: none`), so a finger dragging over the
+   * chart no longer scrolls the page. Default true; false leaves fingers to the mouse paths
+   * and the page's own scrolling while keeping mouse and wheel navigation. Needs `navigation`.
+   */
+  touchGestures?: boolean;
   /** Show paging arrows when zoomed out. Default true. */
   scrollArrows?: boolean;
   /** Share a frame clock with chart indicator animations and host input. */
@@ -64,6 +85,15 @@ export interface DrawingToolbarOptions {
   keyboard?: boolean;
   /** Decodes a picked image file. Defaults to `window.createImageBitmap`. */
   loadImage?: (file: unknown) => Promise<CanvasImageSourceLike>;
+  /**
+   * Right-click menus on drawings, indicators and the chart (see
+   * `createChartContextMenu`); pass hooks to add Settings… rows. A drawing's
+   * Settings… opens its style bar unless `onDrawingSettings` replaces it. An
+   * armed tool still takes the right-click to cancel; mouse and pen only (a
+   * finger's long press stays the touch crosshair). Default false:
+   * right-clicks only cancel an armed tool.
+   */
+  contextMenu?: boolean | ChartContextMenuHooks;
 }
 
 /** Handle returned by {@link createDrawingToolbar}. */
@@ -72,6 +102,8 @@ export interface DrawingToolbar {
   readonly controller: DrawingController;
   /** Flyout manager; use it for host control rails so menus behave identically. */
   readonly flyouts: Flyouts;
+  /** The right-click menu when the `contextMenu` option is on, else null. */
+  readonly contextMenu: ChartContextMenu | null;
   /** Switches the UI (and, by default, the chart) theme. */
   setTheme(theme: ThemeName): void;
   /** Re-evaluates the scroll arrows after the host scrolls or zooms. */
@@ -121,16 +153,24 @@ const GROUP_ICONS: Readonly<Record<string, string>> = {
 /** Bars-per-pixel threshold under which the scroll arrows appear. */
 const COMPRESS_SPACING_PX = 4;
 
-/** Builds the drawing toolbar and its on-chart UI. */
+/**
+ * Builds the drawing toolbar and its on-chart UI. Mounting it (and each
+ * {@link DrawingToolbar.setTheme}) applies `CHART_THEMES[theme]` to the chart
+ * over any `createChart` preset, unless `applyChartTheme: false`; keep a
+ * preset's colors with `chartTheme: presetChartTheme(preset)`.
+ */
 export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToolbar {
   const { chart, document: doc, canvas } = options;
   const win = requireWindow(doc);
   const navigation = options.navigation ?? true;
+  const touchGestures = navigation && (options.touchGestures ?? true);
   const applyChartTheme = options.applyChartTheme ?? true;
   const storage = options.storage ?? null;
   const controller = new DrawingController(chart, { navigation });
   const frames = options.scheduler ?? createFrameScheduler(win, (update) => chart.batch(update));
   const reducedMotion = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  // Phones and tablets open with the touch idle hint; each press keeps it current.
+  controller.touch = touchGestures && win.matchMedia?.('(pointer: coarse)').matches === true;
   const zoom = new SmoothZoom(chart.scale, frames, { timeConstant: reducedMotion ? 0 : 55, onFrame: () => refreshViewport() });
   const scroll = new SmoothScroll(chart, frames, { duration: reducedMotion ? 0 : 240, onFrame: () => refreshViewport() });
   let scrollArrows = options.scrollArrows ?? true;
@@ -157,6 +197,19 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
   const overlayRoot = el(doc, 'div', 'cts-theme cts-overlay');
   options.overlay.append(overlayRoot);
   const flyouts = new Flyouts(doc, portal);
+  const contextMenu = toolbarContextMenu(
+    options.contextMenu,
+    { chart, document: doc, canvas, controller, flyouts },
+    () => refreshViewport(),
+    () => { flushPointer(); cancelNavigation(); commitEditor(); },
+    {
+      // A drawing's Settings… is its style bar: select it (even under Lock all) and hand the bar the keyboard.
+      onDrawingSettings: (id) => {
+        controller.select(id);
+        styleBar.focus();
+      },
+    },
+  );
   const themed = [railRoot, portal, overlayRoot];
   const pricePlus = el(doc, 'button', 'cts-price-plus', '+');
   pricePlus.setAttribute('type', 'button');
@@ -169,7 +222,7 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
     const id = chart.addDrawing({ name: 'hline', points: [{ index: 0, price: plusPrice }] });
     controller.select(id);
   });
-  listen(options.overlay, 'pointerleave', () => { pricePlus.style.display = 'none'; });
+  listen(options.overlay, 'pointerleave', (e) => { if (!touch.leave(e)) pricePlus.style.display = 'none'; });
 
   // ------------------------------------------------------------ rail
 
@@ -312,6 +365,17 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
         flyouts.close();
       },
     }),
+    // The context menu's reset, reachable by touch and the keyboard too.
+    menuItem(doc, {
+      icon: 'undo',
+      label: 'Reset chart view',
+      onClick: () => {
+        cancelNavigation();
+        chart.resetScale();
+        refreshViewport();
+        flyouts.close();
+      },
+    }),
   );
   railGroup('zoom', 'Zoom in', 'zoom-in', zoomMenu, () => controller.arm(ZOOM_TOOL));
 
@@ -430,7 +494,8 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
   editor.setAttribute('aria-label', 'Drawing text');
   const hint = el(doc, 'div', 'cts-hint');
   let hintTimer: number | undefined;
-  let hintQuiet = false;
+  /** The idle hint text on show (null while instructions show): a new text shows again. */
+  let hintIdle: string | null = null;
   const scrollLeft = el(doc, 'button', 'cts-scroll', icon('chevron-left', 18));
   scrollLeft.title = 'Scroll back (older bars)';
   scrollLeft.style.left = '8px';
@@ -674,11 +739,11 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
   function refreshViewport(): void {
     if (!chart.getConfig().priceAxis.plusButton || !chart.getConfig().priceAxis.visible) pricePlus.style.display = 'none';
     if (!navigation) return;
-    const range = chart.scale.visibleRange();
+    const range = chart.scale.visibleSlots();
     const count = range.to - range.from;
-    const compressed = scrollArrows && count > 0 && chart.scale.indexToX(1) - chart.scale.indexToX(0) < COMPRESS_SPACING_PX;
+    const compressed = scrollArrows && count > 0 && chart.scale.barSpacing() < COMPRESS_SPACING_PX;
     scrollLeft.classList.toggle('cts-visible', compressed && range.from > 0);
-    scrollRight.classList.toggle('cts-visible', compressed && range.to < chart.dataLength);
+    scrollRight.classList.toggle('cts-visible', compressed && range.to < range.length);
     scrollRight.style.left = `${canvas.clientWidth - 72}px`;
   }
   function setScrollArrows(visible: boolean): void {
@@ -762,11 +827,11 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
     const h = controller.hint();
     hint.innerHTML = `${h.title !== '' ? `<b>${h.title}</b> — ` : ''}${h.detail}`;
     hint.classList.toggle('cts-quiet', h.quiet);
-    if (hintQuiet !== h.quiet) {
+    if (hintIdle !== (h.quiet ? h.detail : null)) {
       win.clearTimeout(hintTimer);
       hint.classList.remove('cts-hint-hidden');
       hint.setAttribute('aria-hidden', 'false');
-      hintQuiet = h.quiet;
+      hintIdle = h.quiet ? h.detail : null;
       if (h.quiet) hintTimer = win.setTimeout(() => {
         hint.classList.add('cts-hint-hidden');
         hint.setAttribute('aria-hidden', 'true');
@@ -796,6 +861,9 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
     controller.on('request-image', () => fileInput.click()),
     controller.on('toast', toast),
     controller.on('viewport', refreshViewport),
+    // Loads the host never sees (a datafeed paging history in or switching symbols) move the viewport too;
+    // live bars (every tick) leave the arrows as they are.
+    chart.subscribeDataLoad((e) => { if (e.reason === 'set' || e.reason === 'prepend') refreshViewport(); }),
   );
 
   // ------------------------------------------------------------ input
@@ -804,7 +872,45 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
     const r = canvas.getBoundingClientRect();
     return [e.clientX! - r.left, e.clientY! - r.top];
   };
+  // Fingers pan, pinch and long-press through the gesture router; mouse and pen take the paths below.
+  const touch = createTouchRouter({
+    chart,
+    canvas,
+    win,
+    frames,
+    pointerTypes: touchGestures ? TOUCH_POINTER_TYPES : [],
+    press: (finger) => {
+      controller.hitTolerance = finger ? TOUCH_HIT_PX : undefined;
+      controller.handleTolerance = finger ? TOUCH_HANDLE_HIT_PX : undefined;
+      controller.setTouch(finger);
+    },
+    claim: (x, y) => claimTouch(controller, x, y),
+    start: () => { flushPointer(); cancelNavigation(); commitEditor(); flyouts.close(); },
+    // The selected drawing wins where another lies on top, as it does for a drag (see claimTouch).
+    tap: (x, y) => controller.select(controller.locked ? null : chart.drawingAt(x, y, TOUCH_HIT_PX, chart.selectedDrawing)),
+    doubleTap: (x, y) => controller.doubleClick(x, y),
+    release: (x, y) => {
+      flushPointer();
+      controller.pointerUp(x, y);
+      canvas.classList.remove('cts-dragging');
+      controller.pointerLeave();
+    },
+    abort: () => {
+      flushPointer();
+      controller.cancelDrag();
+      canvas.classList.remove('cts-dragging');
+      controller.pointerLeave();
+    },
+    crosshair: (_x, y) => placePlus(null, y),
+    crosshairEnd: () => { pricePlus.style.display = 'none'; },
+    viewport: refreshViewport,
+  });
+  holdStops.push(touch.cancelFling);
+  cleanups.push(touch.destroy);
+  listen(canvas, 'pointercancel', touch.cancel);
+  listen(canvas, 'lostpointercapture', touch.cancel);
   listen(canvas, 'pointerdown', (e) => {
+    if (touch.down(e)) return;
     if (e.button !== 0) return;
     flushPointer();
     cancelNavigation();
@@ -816,9 +922,17 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
   const movePointer = (e: UIEvent): void => {
     const [x, y] = local(e);
     controller.pointerMove(x, y);
+    placePlus(x, y);
+    if (controller.tool === null && controller.cursor !== 'eraser' && !controller.dragging) {
+      canvas.classList.toggle('cts-over-drawing', !controller.locked && (chart.drawingAt(x, y) !== null || chart.handleAt(x, y) >= 0));
+    }
+    if (controller.dragging) canvas.classList.add('cts-dragging');
+  };
+  /** Shows the price-axis "+" at canvas `y` while the pointer is over the axis at `x`, or beside a touch crosshair (`x` null). */
+  function placePlus(x: number | null, y: number): void {
     const axis = chart.getConfig().priceAxis;
     const plot = chart.plotArea;
-    const onAxis = axis.visible && (axis.position === 'left' ? x <= plot.left : x >= plot.width);
+    const onAxis = axis.visible && (x === null || (axis.position === 'left' ? x <= plot.left : x >= plot.width));
     const showPlus = axis.plusButton && onAxis && y >= 12 && y < plot.height - 12;
     pricePlus.style.display = showPlus ? 'block' : 'none';
     if (showPlus) {
@@ -829,11 +943,7 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
       pricePlus.title = `Add price line at ${chart.getConfig().formatters.price(plusPrice)}`;
       pricePlus.setAttribute('aria-label', pricePlus.title);
     }
-    if (controller.tool === null && controller.cursor !== 'eraser' && !controller.dragging) {
-      canvas.classList.toggle('cts-over-drawing', !controller.locked && (chart.drawingAt(x, y) !== null || chart.handleAt(x, y) >= 0));
-    }
-    if (controller.dragging) canvas.classList.add('cts-dragging');
-  };
+  }
   let pointerFrame: number | null = null;
   let pointerQueue: UIEvent[] = [];
   function flushPointer(): void {
@@ -844,18 +954,21 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
     chart.batch(() => { for (const event of queue) movePointer(event); });
   }
   listen(canvas, 'pointermove', (e) => {
+    if (touch.move(e)) return;
     if (controller.cursor === 'eraser' || (controller.tool !== null && controller.def(controller.tool)?.freehand)) pointerQueue.push(e);
     else pointerQueue = [e];
     if (pointerFrame === null) pointerFrame = frames.request(flushPointer);
   });
   listen(canvas, 'pointerup', (e) => {
+    if (touch.up(e)) return;
     flushPointer();
     controller.pointerUp(...local(e));
     canvas.classList.remove('cts-dragging');
   });
-  listen(canvas, 'dblclick', (e) => controller.doubleClick(...local(e)));
-  listen(canvas, 'pointerleave', () => { flushPointer(); controller.pointerLeave(); });
+  listen(canvas, 'dblclick', (e) => { if (!touch.suppress(e)) controller.doubleClick(...local(e)); });
+  listen(canvas, 'pointerleave', (e) => { if (touch.leave(e)) return; flushPointer(); controller.pointerLeave(); });
   listen(canvas, 'contextmenu', (e) => {
+    if (touch.suppress(e)) return;
     if (controller.contextMenu()) e.preventDefault();
   });
   if (navigation) {
@@ -902,7 +1015,7 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
 
   function setTheme(theme: ThemeName): void {
     for (const node of themed) node.classList.toggle('cts-light', theme === 'light');
-    if (applyChartTheme) chart.updateConfig(CHART_THEMES[theme]);
+    if (applyChartTheme) chart.updateConfig(options.chartTheme?.(theme) ?? CHART_THEMES[theme]);
   }
 
   setTheme(options.theme ?? 'dark');
@@ -913,6 +1026,7 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
   return {
     controller,
     flyouts,
+    contextMenu,
     setTheme,
     refreshViewport,
     setScrollArrows,
@@ -927,8 +1041,10 @@ export function createDrawingToolbar(options: DrawingToolbarOptions): DrawingToo
       win.clearTimeout(toastTimer);
       win.clearTimeout(hintTimer);
       win.clearTimeout(widthTimer);
+      contextMenu?.destroy();
       flyouts.destroy();
       controller.disarm(false);
+      controller.dispose();
       railRoot.remove();
       portal.remove();
       overlayRoot.remove();

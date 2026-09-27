@@ -23,12 +23,39 @@ to open the playground at http://localhost:8641/demo/ (requires Bun).
 - **Injected DOM ("ABI document injection")** — the library never touches global `document`/`window`; inject a canvas or a `ChartDocument`
 - **Display-P3 wide-gamut colors** — `color(display-p3 r g b / a)`, hex, and rgb(a) flow straight to the canvas
 - **Automatic label contrast** — boxed drawing labels and crosshair badges choose black or white text using relative luminance, including Display-P3 colors. Explicit drawing text colors and `crosshair.labelColor` override the automatic default (`'auto'`).
-- **Indicators** — SMA, EMA, BOLL, MACD, RSI, KDJ, VOL built in, plus a registry for custom ones
+- **Series** — candlestick, hollow candles, Heikin Ashi, OHLC bars, line, area, and histogram, plus a volume overlay in the price pane
+- **20 indicators** — SMA, EMA, BOLL, VWAP, MA ribbon, Supertrend, Ichimoku, Donchian, Parabolic SAR, MACD, RSI, KDJ, VOL, ADX, CCI, MFI, OBV, ATR, Stochastic and Stochastic RSI, with TradingView-style metadata, per-plot colors/widths/visibility (`updateIndicator`), fills and levels, plus a registry for custom ones
+- **Paging datafeed** (`@bloxwap/chart/datafeed`) — one `fetchBars` function loads history, pages older bars in as the user scrolls (`prependData`), aborts superseded reads and folds live ticks into bars with gap backfill; the drop-in for a TradingView UDF datafeed
+- **Brand presets** — `preset: 'bloxwapDark'` layers under `theme` and `config`; independent scale fonts; CSS custom properties for every UI surface
+- **Price lines and markers** — `chart.series.createPriceLine` for mark/entry/liquidation levels and `setMarkers` for fills and signals
+- **Events** — visible range, crosshair, data load and layout subscriptions with re-entrancy-safe delivery
+- **Time-continuous axis** — `timeScale.continuous` shows weekends and outages as gaps (bar-indexed by default)
+- **Snapshots and countdown** — `takeScreenshot`/`toBlob`/`toDataURL`, and a bar-close countdown in the status line and on the price label
+- **TradingView-style UI** — header bar with timeframes, chart types and Auto/%/Log toggles, indicator picker and settings dialog, right-click context menus, and touch gestures (pan, pinch, fling, long-press crosshair)
 - **89 drawing tools** in TradingView's toolbar groups — lines, channels, pitchforks, Fibonacci, Gann, harmonic/chart patterns, Elliott waves, cycles, long/short positions, forecasting, anchored VWAP, fixed range volume profile, measurers, brushes, shapes, arrows, text/notes/callouts/tables, images, emoji — plus a registry for custom models
 - **Interactive editing API** — live draft preview, hit-testing, selection handles, point dragging, translation, magnet snapping (weak/strong), hide/clear, per-drawing color/width/line style/text/lock
 - **Cursor modes** — cross, dot, arrow and presenter halo (`crosshair.mode`)
 - **Watermark** — text and/or image layer rendered under the series
 - **Test coverage** — line, branch, and function coverage measured by `npm run coverage`, with a 100% target
+
+## Entry points
+
+| Import | Contents |
+| --- | --- |
+| `@bloxwap/chart` | `createChart`, `Chart`, config, presets and themes, events, snapshots, scales, registries, canvas abstractions |
+| `@bloxwap/chart/config` | `defineConfig`, `resolveConfig`, `DEFAULT_CONFIG` |
+| `@bloxwap/chart/color` | Color parsing and contrast helpers |
+| `@bloxwap/chart/dom` | Canvas/document interfaces and recording mocks |
+| `@bloxwap/chart/indicators` | Indicator registry, built-ins and calculation helpers |
+| `@bloxwap/chart/drawings` | Drawing registry, catalog and built-ins |
+| `@bloxwap/chart/wasm` | WASM initialization |
+| `@bloxwap/chart/ui` | Drawing toolbar, settings card, header, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker |
+| `@bloxwap/chart/icons` | `ICONS`, `icon(name, size?)` |
+| `@bloxwap/chart/react` | `<Chart>` component |
+| `@bloxwap/chart/datafeed` | `createDatafeedChart`, `attachDatafeed`, `loadHistory`, `createLiveBarFolder` and paging helpers |
+
+Migrating from the TradingView Charting Library? See the
+[migration guide](https://bloxwap.github.io/chart/docs/guides/tradingview-migration/).
 
 ## Quick start
 
@@ -73,12 +100,72 @@ import { createChart, MockDocument } from '@bloxwap/chart';
 const chart = createChart({ document: new MockDocument(), config: { data: candles } });
 ```
 
+Paged history and live ticks (`@bloxwap/chart/datafeed`):
+
+```ts
+import { createDatafeedChart } from '@bloxwap/chart/datafeed';
+
+const { chart, datafeed, destroy } = createDatafeedChart({
+  container: canvas,
+  autoResize: true,
+  preset: 'bloxwapDark',
+  // Bars opening within [fromMs, toMs], both inclusive; pass `signal` to fetch.
+  fetchBars: ({ symbol, intervalMs, fromMs, toMs, signal }) => readCandles(symbol, intervalMs, fromMs, toMs, signal),
+  symbol: 'BTC',
+  intervalMs: 15 * 60_000,
+});
+priceFeed.subscribe('BTC', (mid) => datafeed.pushTick(mid, 'BTC'));
+await datafeed.setSymbol('ETH', 60_000); // aborts BTC reads, loads 500 ETH bars
+```
+
+Pass `scheduler: createFrameScheduler(window, (update) => chart.batch(update))`
+(from `@bloxwap/chart/ui`) to fold every tick at once but render them once per
+frame, together with pointer work; `startCountdownTicker({ chart, window, scheduler })`
+shares the same frame. `createAbortController` swaps the global `AbortController`
+behind each symbol's reads. The React `<Chart>` runs the countdown ticker by
+itself whenever its config shows a countdown.
+
+Price lines, markers, events and snapshots:
+
+```ts
+const mark = chart.series.createPriceLine({ price: 64_250, color: '#35b5ff', lineStyle: 'dashed', title: 'mark' });
+mark.applyOptions({ price: 64_300 });
+chart.series.setMarkers([{ time: 1700003600, position: 'belowBar', shape: 'arrowUp', color: '#00ff3f', text: 'Buy' }]);
+
+const off = chart.subscribeVisibleRangeChange(({ barsBefore }) => { if (barsBefore < 50) loadOlder(); });
+chart.subscribeCrosshairMove(({ candle }) => showLegend(candle));
+chart.subscribeConfigChange(({ keys }) => { if (keys.includes('indicators')) saveStudies(); });
+
+const png = await chart.toBlob({ type: 'image/png' });
+```
+
+Header, indicator dialog and context menu (`@bloxwap/chart/ui`):
+
+```ts
+import { createChartHeader, createIndicatorsDialog, createDrawingToolbar, BLOXWAP_HEADER_THEME } from '@bloxwap/chart/ui';
+import { presetChartTheme } from '@bloxwap/chart';
+
+const indicators = createIndicatorsDialog({ chart, document });
+const toolbar = createDrawingToolbar({
+  chart, document, canvas, rail, overlay,
+  chartTheme: presetChartTheme('bloxwapDark'), // keep the preset's colors
+  contextMenu: { onIndicatorSettings: (id) => indicators.openSettings(id) }, // the dialog follows the menu's edits
+});
+const header = createChartHeader({
+  chart, document, container: headerEl, datafeed,
+  flyouts: toolbar.flyouts, tokens: BLOXWAP_HEADER_THEME, // bloxwap.pro look on dark; setTheme swaps it
+  onIndicators: () => indicators.openPicker(),
+});
+```
+
 Custom indicators and drawings:
 
 ```ts
 chart.indicators.register({ name: 'my-ind', defaultParams: {}, defaultColors: ['#fff'], defaultPane: 'sub', compute: (candles, params, colors, kernels) => ({ pane: 'sub', lines: [/* ... */] }) });
 chart.drawings.register({ name: 'my-drawing', minPoints: 2, geometry: (points, view) => [/* pixel primitives */] });
 ```
+
+Text primitives with `inside: true` slide back into the plot instead of clipping at the price axis; built-in measurement labels set it while their drawing is on screen (`spansPlot`).
 
 ## Library icons
 

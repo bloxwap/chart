@@ -21,7 +21,7 @@ const GUIDES: [string, string, string, string][] = [
   ['/docs/getting-started', '01', 'Quick start', 'Install, render, resize, and clean up.'],
   ['/docs/api/chart', '02', 'Chart API', 'Data updates, studies, drawings, rendering.'],
   ['/docs/api/configuration', '03', 'Configuration reference', 'One typed object for every option.'],
-  ['/docs/playground', '04', 'Sandbox playground', 'The full chart with a simulated live feed.'],
+  ['/docs/playground', '04', 'Sandbox playground', 'The full chart on live Hyperliquid data.'],
 ];
 
 const RESOURCES: [string, string, string, string][] = [

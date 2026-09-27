@@ -12,6 +12,7 @@ import {
   extendedLine,
   changeText,
   seg,
+  spansPlot,
   text,
   timeAt,
   type FullView,
@@ -27,7 +28,7 @@ export function priceTag(view: FullView, y: number, price: number): DrawPrimitiv
 export function timeTag(view: FullView, x: number, index: number): DrawPrimitive[] {
   const t = timeAt(view.candles, index);
   if (t === null) return [];
-  return [text(view.formatTime(t), { x, y: view.height - 2 }, { align: 'center', baseline: 'bottom', bg: true })];
+  return [text(view.formatTime(t), { x, y: view.height - 2 }, { align: 'center', baseline: 'bottom', bg: true, inside: spansPlot(x, x, view.width) })];
 }
 
 /** Trend line (name `'trendline'`, 2 points). */
@@ -74,7 +75,7 @@ export const infoLineDrawing = defineDrawing({
     ];
     return [
       seg(a!, b!),
-      text(lines.join('\n'), { x: b!.x + 8, y: b!.y }, { baseline: 'middle', bg: true, font: 'sans' }),
+      text(lines.join('\n'), { x: b!.x + 8, y: b!.y }, { baseline: 'middle', bg: true, font: 'sans', inside: spansPlot(a!.x, b!.x, v.width) }),
     ];
   },
 });
@@ -83,7 +84,7 @@ export const infoLineDrawing = defineDrawing({
 export const trendAngleDrawing = defineDrawing({
   name: 'trend-angle',
   minPoints: 2,
-  build: ([a, b]) => {
+  build: ([a, b], v) => {
     const deg = screenAngle(a!, b!);
     const r = 40;
     const rad = (deg * Math.PI) / 180;
@@ -94,7 +95,8 @@ export const trendAngleDrawing = defineDrawing({
       seg(a!, b!),
       seg(a!, { x: a!.x + r + 16, y: a!.y }, { dash: [4, 4] }),
       { type: 'ellipse', cx: a!.x, cy: a!.y, rx: r, ry: r, start, end },
-      text(`${deg.toFixed(2)}°`, { x: a!.x + r + 20, y: a!.y - Math.sign(deg) * 10 }, { font: 'sans' }),
+      // Beside the arc: stays whole while the arc and its reference line are on screen.
+      text(`${deg.toFixed(2)}°`, { x: a!.x + r + 20, y: a!.y - Math.sign(deg) * 10 }, { font: 'sans', inside: spansPlot(a!.x, a!.x + r + 16, v.width) }),
     ];
   },
 });

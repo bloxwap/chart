@@ -1,6 +1,6 @@
 ---
 title: Interactive playground
-description: Explore the complete chart, drawing tools, and simulated live feed.
+description: Explore the complete chart on live Hyperliquid data, with the header, drawing tools, and settings.
 ---
 
 <ChartPreview />
@@ -9,20 +9,25 @@ This is the same playground served by `npm run demo`, using the local `@bloxwap/
 
 ## Try the controls
 
-1. Drag the canvas to pan and scroll to zoom.
-2. Use the **15m** button in the left control rail to switch timeframes.
-3. Open **Chart type** or **Indicators** to try all five series types and seven built-in indicators.
-4. Choose a drawing tool in the rail and place its points on the chart.
-5. Use **Undo** and **Redo** to experiment with your drawings.
-6. Open the bottom-left gear to change candles, scales, labels, canvas appearance, and sample datasets.
-7. Pick a light, dark, or system theme from the theme menu, or collapse the drawing rail for more canvas space.
+1. Drag the canvas to pan and scroll to zoom. Scroll toward the left edge and older history pages in.
+2. Pick a timeframe from **1m** to **1M** in the header. The [paging datafeed](/docs/guides/datafeed) reloads the chart for it.
+3. Open the header's chart-type menu to try six series types, including Heikin Ashi and hollow candles, or **Indicators** to search and add any of the 20 built-in indicators.
+4. Switch the price scale between **Auto**, **%**, and **Log** in the header or at the foot of the price axis, and save a PNG with the snapshot button.
+5. Choose a drawing tool in the rail and place its points on the chart. Use **Undo** and **Redo** to experiment with your drawings.
+6. Right-click the chart, an indicator, or a drawing for its [context menu](/docs/guides/toolbar-settings#context-menus). **Settings…** opens the chart settings, the study's settings, or the drawing's style bar.
+7. Open the gear at the bottom of the control rail to change candles, scales, labels, and canvas appearance.
+8. Pick a light, dark, or system theme from the theme menu, or collapse the drawing rail for more canvas space.
 
-On small screens, the drawing rail starts collapsed. Use the bottom-left toolbar toggle to show it.
+On screens under 600px wide, the control rail's buttons move into the header and the drawing rail starts collapsed. Use the toolbar toggle to show it.
 
-Prices are simulated and update every second. Pause them with **Live feed** in the settings card's **Canvas** tab. Volume and example drawings are included to get you started.
+## Data
+
+The chart shows the BTC perpetual from Hyperliquid, with live prices from its websocket. A dashed blue **mark** line follows the live price. A dotted **last** line starts on the latest close and moves to the previous bar's close each time a new bar opens, read back with `chart.getData()` as in [the migration guide](/docs/guides/tradingview-migration#price-lines). If Hyperliquid can't be reached, the playground switches to a simulated random walk served through the same datafeed.
+
+The settings card's **Playback and data** section pauses prices with **Live feed**, toggles the navigation arrows, and switches datasets. **Gaps (1h)** turns on the [continuous time axis](/docs/guides/time-scale), so missing buckets show as gaps. Volume, markers, and example drawings are included to get you started.
 
 Click inside the chart to use its keyboard shortcuts, including undo/redo. The embedded playground keeps those shortcuts separate from documentation search and page navigation.
 
 ## Build the same integration
 
-Follow the [toolbar and settings guide](/docs/guides/toolbar-settings), or inspect [the complete demo on GitHub](https://github.com/bloxwap/chart/blob/main/apps/playground/index.html).
+Follow the [TradingView migration guide](/docs/guides/tradingview-migration) and the [toolbar and settings guide](/docs/guides/toolbar-settings), or inspect [the complete demo on GitHub](https://github.com/bloxwap/chart/blob/main/apps/playground/index.html).

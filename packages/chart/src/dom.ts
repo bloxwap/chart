@@ -81,6 +81,10 @@ export interface ChartCanvas {
   removeEventListener?(type: 'contextrestored', listener: () => void): void;
   /** Optional browser document used to lazily allocate the crosshair's raster cache. */
   readonly ownerDocument?: { createElement?(tag: 'canvas'): ChartCanvas; readonly defaultView?: unknown } | null;
+  /** Encodes the bitmap (e.g. a `Blob`); the callback receives `null` when encoding fails. Used by snapshots. */
+  toBlob?(callback: (blob: unknown) => void, type?: string, quality?: number): void;
+  /** Encodes the bitmap as a data URL. Used by snapshots. */
+  toDataURL?(type?: string, quality?: number): string;
 }
 
 /** A `ResizeObserver` as the canvas's own window provides it. */
@@ -229,6 +233,13 @@ export class MockContext2D implements Canvas2DLike {
   }
 }
 
+/** The deterministic stand-in for a `Blob` that {@link MockCanvas.toBlob} produces. */
+export interface MockBlob {
+  /** Uncompressed RGBA byte count of the encoded bitmap. */
+  readonly size: number;
+  readonly type: string;
+}
+
 /** A {@link ChartCanvas} whose 2D context records all calls. */
 export class MockCanvas implements ChartCanvas {
   width: number;
@@ -242,6 +253,16 @@ export class MockCanvas implements ChartCanvas {
 
   getContext(contextId: '2d'): Canvas2DLike | null {
     return contextId === '2d' ? this.context : null;
+  }
+
+  /** Synchronously yields a {@link MockBlob}, or `null` for an empty bitmap like browsers do. */
+  toBlob(callback: (blob: MockBlob | null) => void, type = 'image/png'): void {
+    callback(this.width > 0 && this.height > 0 ? { size: this.width * this.height * 4, type } : null);
+  }
+
+  /** `data:<type>;mock,<width>x<height>`, or `data:,` for an empty bitmap like browsers do. */
+  toDataURL(type = 'image/png'): string {
+    return this.width > 0 && this.height > 0 ? `data:${type};mock,${this.width}x${this.height}` : 'data:,';
   }
 }
 

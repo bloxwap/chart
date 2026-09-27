@@ -62,9 +62,20 @@ export function stddevValues(values: readonly number[], period: number): (number
 /** BOLL indicator definition (params `period` = 20, `mult` = 2). */
 export const bollIndicator: IndicatorDef = {
   name: 'boll',
+  label: 'Bollinger Bands',
+  shortName: 'BB',
   defaultParams: { period: 20, mult: 2 },
   defaultColors: ['#2962ff', '#ab47bc', '#ab47bc'],
   defaultPane: 'main',
+  inputs: [
+    { key: 'period', label: 'Length', min: 1, step: 1, integer: true },
+    { key: 'mult', label: 'StdDev', min: 0.001, max: 50, step: 0.1 },
+  ],
+  styles: [
+    { key: 'mid', label: 'Basis', colorIndex: 0 },
+    { key: 'upper', label: 'Upper', colorIndex: 1 },
+    { key: 'lower', label: 'Lower', colorIndex: 2 },
+  ],
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = Math.max(1, Math.floor(params['period'] ?? 20));
     const mult = params['mult'] ?? 2;

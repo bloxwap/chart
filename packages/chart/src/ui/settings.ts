@@ -2,7 +2,9 @@
 import type { Chart } from '../core/chart.js';
 import { mergeDeep, type ChartConfig, type DeepPartial, type PriceScaleMode } from '../config.js';
 import { parseColor } from '../color.js';
+import { scaleFontSize } from '../render/scale-font.js';
 import { CHART_THEMES, type ThemeName } from '../themes.js';
+import { DOWN_COLOR, UP_COLOR } from '../indicators/types.js';
 import type { UIDocument, UIElement, UIEvent, UITextInput } from './host.js';
 import { el, iconButton } from './menu.js';
 import { injectStyles } from './styles.js';
@@ -12,11 +14,38 @@ interface Control extends UITextInput { checked: boolean; disabled: boolean }
 interface SearchRow { element: UIElement; fields: string[] }
 interface SearchGroup { element: UIElement; fields: string[]; rows: SearchRow[]; groups: SearchGroup[] }
 
+/** Sizes offered by 'Scale text size' (a size set elsewhere gets its own entry). */
+const SCALE_TEXT_SIZES: readonly number[] = [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24];
+
+/** `patch` limited to the keys `shape` has, recursively: a theme's share of the reset defaults. */
+function within(patch: unknown, shape: unknown): unknown {
+  if (typeof patch !== 'object' || patch === null || typeof shape !== 'object' || shape === null) return patch;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) if (key in shape) out[key] = within(value, (shape as Record<string, unknown>)[key]);
+  return out;
+}
+
+/** A 0-1 fraction as a percentage with at most one decimal. */
+const percent = (fraction: number): string => String(Math.round(fraction * 1000) / 10);
+/** A percentage input as a 0-1 fraction, without float noise (33.3 → 0.333). */
+const fraction = (value: string): number => Number((Number(value) / 100).toFixed(6));
+
 export interface ChartSettingsOptions {
   chart: Chart;
   document: UIDocument;
   trigger: UIElement;
   theme?: ThemeName;
+  /**
+   * Whether the chart follows {@link ChartSettings.setTheme} (as the drawing toolbar's
+   * `applyChartTheme` does), so Reset defaults restores that theme's colors. Default true;
+   * pass false when the host keeps a preset's colors across theme changes.
+   */
+  applyChartTheme?: boolean;
+  /**
+   * The config a theme applies, for Reset defaults; match the toolbar's `chartTheme`
+   * (e.g. `presetChartTheme('bloxwapDark')`). Default {@link CHART_THEMES}.
+   */
+  chartTheme?: (theme: ThemeName) => DeepPartial<ChartConfig>;
   /** Optional host controls, appended inside the same card. */
   extraContent?: UIElement;
   onOpen?: () => void;
@@ -28,6 +57,7 @@ export interface ChartSettings {
   open(): void;
   close(): void;
   toggle(): void;
+  /** Restyles the card; unless `applyChartTheme` is false, Reset defaults then restores that theme's colors. */
   setTheme(theme: ThemeName): void;
   destroy(): void;
 }
@@ -59,7 +89,10 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
       wickUpColor: initial.series.wickUpColor, wickDownColor: initial.series.wickDownColor,
     },
     statusLine: initial.statusLine, priceAxis: initial.priceAxis,
-    timeAxis: initial.timeAxis, theme: initial.theme, grid: initial.grid,
+    // The bar interval belongs to the data (a datafeed sets it with each symbol), as `timeScale.intervalMs` does.
+    timeAxis: { visible: initial.timeAxis.visible, height: initial.timeAxis.height, tickCount: initial.timeAxis.tickCount },
+    theme: initial.theme, grid: initial.grid,
+    timeScale: { continuous: initial.timeScale.continuous }, volume: initial.volume,
     crosshair: { visible: initial.crosshair.visible, dashed: initial.crosshair.dashed, color: initial.crosshair.color },
     watermark: { visible: initial.watermark.visible, text: initial.watermark.text },
   }, {});
@@ -199,8 +232,8 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     return line.row;
   }
 
-  function select(parent: UIElement, key: string, label: string, items: [string, string][], read: () => string, write: (value: string) => void): void {
-    const line = row(parent, label);
+  function select(parent: UIElement, key: string, label: string, items: [string, string][], read: () => string, write: (value: string) => void, hint?: string): Control {
+    const line = row(parent, label, hint);
     rowIndex.get(line.row)!.fields.push(key, ...items.flat());
     const input = el(doc, 'select', 'cts-settings-select') as Control;
     input.setAttribute('id', `${id}-${key}`); input.setAttribute('name', key);
@@ -209,6 +242,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     syncers.push(() => { input.value = read(); });
     input.addEventListener('change', () => write(input.value));
     line.row.append(input);
+    return input;
   }
 
   function textInput(parent: UIElement, key: string, label: string, read: () => string, write: (value: string) => void, numeric?: { min: number; max: number }, enabled = (): boolean => true): void {
@@ -247,6 +281,44 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     swatch.append(input); parent.append(swatch);
   }
 
+  const option = (value: string, caption: string): UIElement => { const node = el(doc, 'option'); node.setAttribute('value', value); node.textContent = caption; return node; };
+
+  /** Theme.scaleFontSize: Default (null) follows Text size, whose value it shows. */
+  function scaleTextSize(parent: UIElement): void {
+    const read = (): string => { const size = get().theme.scaleFontSize; return size === null ? 'default' : String(size); };
+    const input = select(parent, 'scale-font-size', 'Scale text size', [['default', 'Default'], ...SCALE_TEXT_SIZES.map((size): [string, string] => [String(size), `${size}px`])],
+      read, (v) => change({ theme: { scaleFontSize: v === 'default' ? null : Number(v) } }), 'Price and time scales; Default follows Text size.');
+    syncers.push(() => {
+      const { fontSize, scaleFontSize: size } = get().theme;
+      const sizes = size === null || SCALE_TEXT_SIZES.includes(size) ? SCALE_TEXT_SIZES : [...SCALE_TEXT_SIZES, size].sort((a, b) => a - b);
+      input.replaceChildren(option('default', `Default (${fontSize}px)`), ...sizes.map((s) => option(String(s), `${s}px`)));
+      input.value = read();
+    });
+  }
+
+  /** The `config.volume` overlay; its colors show the 'up'/'down' tokens as the candle colors they follow. */
+  function volumeGroup(parent: UIElement): void {
+    const group = el(doc, 'div', 'cts-settings-group');
+    const heading = el(doc, 'h4'); heading.textContent = 'Volume'; group.append(heading); parent.append(group);
+    indexGroup(group, ['Volume'], parent);
+    const on = (): boolean => get().volume.overlay;
+    checkbox(group, 'volume-overlay', 'Volume overlay', on, (v) => change({ volume: { overlay: v } }), 'Bars along the bottom of the price pane.');
+    const line = row(group, 'Bar colors', 'Default follows the candle colors.');
+    const pair = el(doc, 'div', 'cts-settings-colors');
+    rowIndex.set(pair, rowIndex.get(line.row)!);
+    for (const [key, token, label, series] of [['upColor', UP_COLOR, 'Volume up color', 'upColor'], ['downColor', DOWN_COLOR, 'Volume down color', 'downColor']] as const) {
+      color(pair, `volume-${key}`, label, () => { const value = get().volume[key]; return value === token ? get().series[series] : value; },
+        (v) => change({ volume: { [key]: v } }), on);
+    }
+    const follow = iconButton(doc, 'undo', 'Use the candle colors', 18) as Control;
+    follow.setAttribute('aria-label', 'Use the candle colors for volume');
+    syncers.push(() => { const { overlay, upColor, downColor } = get().volume; follow.disabled = !overlay || (upColor === UP_COLOR && downColor === DOWN_COLOR); });
+    follow.addEventListener('click', () => change({ volume: { upColor: UP_COLOR, downColor: DOWN_COLOR } }));
+    pair.append(follow); line.row.append(pair);
+    textInput(group, 'volume-opacity', 'Opacity (%)', () => percent(get().volume.opacity), (v) => change({ volume: { opacity: fraction(v) } }), { min: 0, max: 100 }, on);
+    textInput(group, 'volume-height', 'Height (% of pane)', () => percent(get().volume.height), (v) => change({ volume: { height: fraction(v) } }), { min: 0, max: 100 }, on);
+  }
+
   function build(): void {
     body.replaceChildren(); nav.replaceChildren(); syncers = [];
     searchGroups = []; groupIndex.clear(); rowIndex.clear();
@@ -266,11 +338,12 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     }
     select(candles, 'precision', 'Precision', [['default', 'Default'], ...Array.from({ length: 13 }, (_, i): [string, string] => [String(i), `${i} decimal${i === 1 ? '' : 's'}`])],
       () => get().priceAxis.precision === null ? 'default' : String(get().priceAxis.precision), (v) => change({ priceAxis: { precision: v === 'default' ? null : Number(v) } }));
+    volumeGroup(candles);
 
     const status = section('Status line', 'Status line');
     checkbox(status, 'status-visible', 'Show status line', () => get().statusLine.visible, (v) => change({ statusLine: { visible: v } }));
     textInput(status, 'symbol', 'Symbol name', () => get().statusLine.symbol, (v) => change({ statusLine: { symbol: v } }));
-    for (const [key, label] of [['symbolVisible', 'Symbol'], ['ohlc', 'OHLC values'], ['change', 'Bar change'], ['volume', 'Volume'], ['indicators', 'Indicator values']] as const) {
+    for (const [key, label] of [['symbolVisible', 'Symbol'], ['ohlc', 'OHLC values'], ['change', 'Bar change'], ['volume', 'Volume'], ['indicators', 'Indicator values'], ['countdown', 'Countdown to bar close']] as const) {
       checkbox(status, `status-${key}`, label, () => get().statusLine[key], (v) => change({ statusLine: { [key]: v } }));
     }
 
@@ -286,8 +359,10 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
     select(scales, 'scale-position', 'Scale position', [['right', 'Right'], ['left', 'Left']], () => get().priceAxis.position, (v) => change({ priceAxis: { position: v as 'left' | 'right' } }));
     checkbox(scales, 'price-axis', 'Price scale', () => get().priceAxis.visible, (v) => change({ priceAxis: { visible: v } }));
     checkbox(scales, 'time-axis', 'Time scale', () => get().timeAxis.visible, (v) => change({ timeAxis: { visible: v } }));
+    checkbox(scales, 'time-continuous', 'Time-continuous axis', () => get().timeScale.continuous, (v) => change({ timeScale: { continuous: v } }), 'Space bars by time, so gaps such as weekends show.');
+    scaleTextSize(scales);
     for (const [group, title, fields] of [
-      ['labels', 'Labels', [['lastPrice', 'Last price label'], ['highLow', 'High and low labels'], ['indicator', 'Indicator labels']]],
+      ['labels', 'Labels', [['lastPrice', 'Last price label'], ['highLow', 'High and low labels'], ['indicator', 'Indicator labels'], ['countdown', 'Countdown on price label']]],
       ['lines', 'Lines', [['lastPrice', 'Last price line'], ['previousClose', 'Previous close line'], ['highLow', 'High and low lines']]],
     ] as const) {
       const subgroup = el(doc, 'div', 'cts-settings-group');
@@ -303,7 +378,9 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
       const line = row(canvas, label);
       color(line.row, key, `${label} color`, () => get().theme[key], (v) => change({ theme: { [key]: v } }));
     }
-    textInput(canvas, 'font-size', 'Text size', () => String(get().theme.fontSize), (v) => change({ theme: { fontSize: Number(v) } }), { min: 8, max: 24 });
+    // Shows the scale size (what TV's Text size edits); a set scaleFontSize is resized with fontSize.
+    textInput(canvas, 'font-size', 'Text size', () => String(scaleFontSize(get().theme)),
+      (v) => change({ theme: get().theme.scaleFontSize === null ? { fontSize: Number(v) } : { fontSize: Number(v), scaleFontSize: Number(v) } }), { min: 8, max: 24 });
     for (const [key, label] of [['visible', 'Grid'], ['horizontal', 'Horizontal grid lines'], ['vertical', 'Vertical grid lines']] as const) {
       checkbox(canvas, `grid-${key}`, label, () => get().grid[key], (v) => change({ grid: { [key]: v } }));
     }
@@ -357,11 +434,9 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
   const escape = (event: UIEvent): void => { if (opened && event.key === 'Escape') { event.preventDefault(); close(); } };
   const setTheme = (theme: ThemeName): void => {
     root.classList.toggle('cts-light', theme === 'light');
-    if (theme !== currentTheme) {
-      const preset = CHART_THEMES[theme];
-      defaults.theme = mergeDeep(initial.theme, preset.theme);
-      defaults.grid = mergeDeep(initial.grid, preset.grid);
-      defaults.crosshair = mergeDeep(defaults.crosshair!, preset.crosshair);
+    // Reset defaults follow the chart as the toolbar re-themes it: the theme's config over the last defaults.
+    if (theme !== currentTheme && (options.applyChartTheme ?? true)) {
+      Object.assign(defaults, mergeDeep(defaults, within(options.chartTheme?.(theme) ?? CHART_THEMES[theme], defaults)));
     }
     currentTheme = theme;
   };

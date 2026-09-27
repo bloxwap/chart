@@ -16,6 +16,8 @@ chart.scale.zoomToRange(50, 150); // fit this inclusive index interval
 
 Bar spacing is clamped between 0.5 and 500 CSS pixels, so a very large history may exceed the viewport even after `zoomToRange`.
 
+`chart.resetScale()` returns to the default view: 6px bar spacing, scrolled to the latest bar, with price autoscale back on and a locked price-to-bar ratio captured again. The scale mode is kept.
+
 ## Coordinate conversion
 
 | Method | Input → output |
@@ -26,6 +28,8 @@ Bar spacing is clamped between 0.5 and 500 CSS pixels, so a very large history m
 | `priceToY(price)` | Raw price → main-pane canvas y |
 | `visibleRange()` | Half-open index interval `{ from, to }` used for rendering |
 | `priceToBarRatio()` | Current scale units per horizontal bar |
+| `barSpacing()` | Pixels per bar, the unit of `scrollBy` |
+| `visibleSlots()` | The viewport in `scrollBy` units counted from the first candle, `{ from, to, length }` |
 
 The render range includes boundary padding. Fractional indices may fall outside your dataset; clamp or round them as appropriate for your interaction.
 
@@ -37,6 +41,8 @@ const x = event.clientX - rect.left;
 const y = event.clientY - rect.top;
 const point = { index: chart.scale.xToIndex(x), price: chart.scale.yToPrice(y) };
 ```
+
+Prefer `barSpacing()` over `indexToX(1) - indexToX(0)`, which also spans any time gap between those two candles on a continuous axis.
 
 The `scale` API converts prices on the main pane. An indicator sub-pane has its own internal price scale. When the main pane does not exist, price conversion returns `NaN`.
 
@@ -56,3 +62,7 @@ chart.updateConfig({
 ```
 
 The ratio uses the selected scale's units. It is raw price units in regular mode and transformed units in percent, indexed, and logarithmic modes.
+
+## Continuous time axis
+
+With `timeScale.continuous: true`, candles sit at their time slots and gaps show as empty space. Scroll and zoom units become time slots: `scrollBy(n)` moves `n` slots, `barSpacing()` is pixels per slot, `priceToBarRatio()` is units per slot, and `visibleSlots()` measures the viewport in slots. Every method that takes or returns an index still uses candle indices, and `xToIndex` inside a gap returns a fractional index between its two candles. See [time scale](/docs/guides/time-scale).

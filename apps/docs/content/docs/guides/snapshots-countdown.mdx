@@ -1,0 +1,107 @@
+---
+title: Snapshots and countdown
+description: Export the chart as an image and show the time left until the current bar closes.
+---
+
+## Take a screenshot
+
+```ts
+const blob = await chart.toBlob({ type: 'image/png' });   // a Blob in browsers
+const url = chart.toDataURL({ type: 'image/jpeg', quality: 0.9 });
+const snapshot = chart.takeScreenshot({ pixelRatio: 2 }); // a new canvas you own
+```
+
+`takeScreenshot(options)` renders the current view into a new canvas at the same CSS size. The canvas comes from the injected `ChartDocument` when the chart was created with one, otherwise from the container's `ownerDocument`. `toBlob` and `toDataURL` encode that canvas and then release its memory.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `pixelRatio` | The chart's ratio | Backing pixels per CSS pixel |
+| `crosshair` | `false` | Include the crosshair and the hovered bar in the status line |
+| `background` | `theme.background` | Background override, for example `'transparent'` |
+| `watermark` | The chart's | Watermark fields merged over the chart's for this image only |
+| `type` | `'image/png'` | MIME type for `toBlob` and `toDataURL` |
+| `quality` | Encoder default | Lossy quality from 0 to 1 |
+
+Overrides apply to the snapshot only; the live chart is untouched. The image keeps the live canvas's color space, so Display-P3 colors survive.
+
+```ts
+// Brand the exported image without changing the chart.
+const blob = await chart.toBlob({ watermark: { visible: true, text: 'bloxwap.pro', opacity: 0.1 } });
+await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+```
+
+`toBlob` resolves to a `SnapshotBlob`: the `Blob` type your typings declare (DOM or Node), so the result goes straight to `ClipboardItem` or `URL.createObjectURL` without a cast. Without such typings it is `unknown`.
+
+`takeScreenshot` and `toDataURL` throw, and `toBlob` rejects, when the chart is destroyed, has no 2D context, or has no document to create a canvas with, or when the canvas cannot encode. `MockCanvas` implements `toBlob` and `toDataURL` for tests.
+
+There is no built-in screenshot button. Add one to the [header's](/docs/guides/header) `slots` or your own toolbar.
+
+## Countdown to bar close
+
+TradingView shows the time left in the current bar in the legend and under the last-price label. Both are opt-in:
+
+```ts
+import { startCountdownTicker } from '@bloxwap/chart/ui';
+
+chart.updateConfig({
+  statusLine: { visible: true, countdown: true },                      // after the OHLC values
+  priceAxis: { labels: { lastPrice: true, countdown: true } },         // a badge under the last price
+  timeAxis: { intervalMs: 15 * 60_000 },                               // optional; see below
+});
+
+const ticker = startCountdownTicker({ chart, window });
+// later
+ticker.stop();
+```
+
+- **Format:** `mm:ss` under an hour, `hh:mm:ss` under a day, and `Nd hh:mm` beyond. Partial seconds round up, so a bar reads `00:00` only once it has closed.
+- **Interval:** `timeAxis.intervalMs`, else `timeScale.intervalMs`, else the time between the last two candles. Set one of them when your data can have gaps. The [paging datafeed](/docs/guides/datafeed) sets both.
+- **Monthly bars:** an interval of N×28 to N×31 days closes N calendar months (UTC) after the bar opens.
+- **Badge:** it takes the last-price badge's color and sits under it, or above it when there is no room below. With `labels.lastPrice` off, it takes that badge's place.
+- **Markets:** the countdown assumes 24/7 trading; there is no session calendar.
+
+## Clock and ticker
+
+The chart reads time from `CreateChartOptions.now`, which defaults to `() => Date.now()`. Inject a server-synchronized clock, or a fake one in tests:
+
+```ts
+import { createChart } from '@bloxwap/chart';
+
+const chart = createChart({ container: canvas, now: () => Date.now() + serverOffsetMs });
+chart.now(); // the injected clock
+```
+
+A countdown only changes when something repaints. Live ticks repaint the chart, but a quiet market would freeze the countdown. `startCountdownTicker({ chart, window })` fixes that. It uses the window you pass (never globals) to call `chart.refreshOverlay()` just after each whole second of the chart's clock:
+
+- `refreshOverlay()` repaints only the status line, countdown, and crosshair over the cached chart, without recomputing indicators.
+- Each tick realigns to the second, so timer drift never builds up.
+- The ticker stops on its own once the chart is destroyed. `stop()` cancels it earlier and can be called more than once.
+
+Start the ticker only while a countdown is visible. The settings card's **Countdown to bar close** and **Countdown on price label** switches only change config, so follow the `statusLine` and `priceAxis` sections with [`subscribeConfigChange`](/docs/guides/events):
+
+```ts
+import { startCountdownTicker, type CountdownTicker } from '@bloxwap/chart/ui';
+
+let ticker: CountdownTicker | null = null;
+chart.subscribeConfigChange(({ keys }) => {
+  if (!keys.includes('statusLine') && !keys.includes('priceAxis')) return;
+  const { statusLine, priceAxis } = chart.getConfig();
+  if (statusLine.countdown || priceAxis.labels.countdown) ticker ??= startCountdownTicker({ chart, window });
+  else { ticker?.stop(); ticker = null; }
+});
+```
+
+The React [`<Chart>`](/docs/guides/react) does this for you: it runs a ticker on the page's timers whenever the config shows a countdown.
+
+### Paint in the next frame
+
+By default the ticker paints inside its timer callback. Pass the `FrameScheduler` your toolbar, gestures, or [datafeed](/docs/guides/datafeed#once-per-frame) share, and each second's repaint is requested for the next frame instead, in the same render as pointer work and live ticks:
+
+```ts
+import { createFrameScheduler, startCountdownTicker } from '@bloxwap/chart/ui';
+
+const frames = createFrameScheduler(window, (update) => chart.batch(update));
+const ticker = startCountdownTicker({ chart, window, scheduler: frames });
+```
+
+At most one repaint is pending at a time. A hidden tab gets no animation frames, so the countdown doesn't repaint there. `stop()` cancels a pending repaint, and a destroyed chart is never repainted.

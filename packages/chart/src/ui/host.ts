@@ -19,6 +19,10 @@ export interface UIStyle {
   transform: string;
   transition: string;
   background: string;
+  /** Sets a (custom) property inline; the header's `tokens` use it when present. */
+  setProperty?(name: string, value: string): void;
+  /** Removes an inline (custom) property. */
+  removeProperty?(name: string): string;
 }
 
 /** `element.classList` subset. */
@@ -59,6 +63,8 @@ export interface UIEvent {
   readonly deltaMode?: number;
   readonly detail?: number;
   readonly propertyName?: string;
+  /** Whether a listener already called `preventDefault()`. */
+  readonly defaultPrevented?: boolean;
   preventDefault(): void;
   stopPropagation(): void;
 }
@@ -136,6 +142,9 @@ export interface UIWindow extends UITimers {
     removeEventListener?(type: 'change', listener: () => void): void;
   };
   createImageBitmap?(source: never): Promise<{ readonly width: number; readonly height: number }>;
+  /** Window events (`resize`, `blur`, capturing `scroll`) that dismiss transient menus. */
+  addEventListener?(type: string, listener: UIListener, options?: boolean): void;
+  removeEventListener?(type: string, listener: UIListener, options?: boolean): void;
 }
 
 /** The document surface the toolbar uses. */
@@ -145,6 +154,11 @@ export interface UIDocument {
   readonly head: UIElement;
   readonly body: UIElement;
   readonly defaultView: UIWindow | null;
+  /**
+   * The focused element; menus use it to hand focus back to their button,
+   * and transient menus hand focus back to it when they close.
+   */
+  readonly activeElement?: unknown;
   addEventListener(type: string, listener: UIListener): void;
   removeEventListener(type: string, listener: UIListener): void;
 }

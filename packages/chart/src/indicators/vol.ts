@@ -10,9 +10,16 @@ import { DOWN_COLOR, UP_COLOR, type IndicatorDef } from './types.js';
 /** VOL indicator definition (no params; colors = up/down bars, following the candles by default). */
 export const volIndicator: IndicatorDef = {
   name: 'vol',
+  label: 'Volume',
+  shortName: 'Vol',
   defaultParams: {},
   defaultColors: [UP_COLOR, DOWN_COLOR],
   defaultPane: 'sub',
+  inputs: [],
+  styles: [
+    { key: 'volume', label: 'Growing', colorIndex: 0, kind: 'histogram' },
+    { key: 'volume', label: 'Falling', colorIndex: 1, kind: 'histogram' },
+  ],
   update(output, candles, from) {
     const values = output.bars!.values as number[];
     const up = output.bars!.up as boolean[];
@@ -29,6 +36,7 @@ export const volIndicator: IndicatorDef = {
       pane: 'sub',
       lines: [],
       bars: {
+        key: 'volume',
         values,
         up,
         upColor: colors[0] ?? '#26a69a',

@@ -12,8 +12,21 @@ import { macdIndicator } from './macd.js';
 import { rsiIndicator } from './rsi.js';
 import { kdjIndicator } from './kdj.js';
 import { volIndicator } from './vol.js';
+import { vwapIndicator } from './vwap.js';
+import { adxIndicator } from './adx.js';
+import { cciIndicator } from './cci.js';
+import { mfiIndicator } from './mfi.js';
+import { obvIndicator } from './obv.js';
+import { maRibbonIndicator } from './ma-ribbon.js';
+import { atrIndicator } from './atr.js';
+import { supertrendIndicator } from './supertrend.js';
+import { ichimokuIndicator } from './ichimoku.js';
+import { donchianIndicator } from './donchian.js';
+import { stochIndicator } from './stoch.js';
+import { stochRsiIndicator } from './stochrsi.js';
+import { psarIndicator } from './psar.js';
 
-/** The seven built-in indicator definitions. */
+/** The built-in indicator definitions. */
 export const BUILTIN_INDICATORS: readonly IndicatorDef[] = [
   smaIndicator,
   emaIndicator,
@@ -22,6 +35,19 @@ export const BUILTIN_INDICATORS: readonly IndicatorDef[] = [
   rsiIndicator,
   kdjIndicator,
   volIndicator,
+  vwapIndicator,
+  adxIndicator,
+  cciIndicator,
+  mfiIndicator,
+  obvIndicator,
+  maRibbonIndicator,
+  atrIndicator,
+  supertrendIndicator,
+  ichimokuIndicator,
+  donchianIndicator,
+  stochIndicator,
+  stochRsiIndicator,
+  psarIndicator,
 ];
 
 /** A mutable registry of indicator definitions keyed by name. */
@@ -56,7 +82,7 @@ export class IndicatorRegistry {
 }
 
 /**
- * Creates a registry pre-loaded with the seven built-ins.
+ * Creates a registry pre-loaded with the built-ins.
  *
  * @param withBuiltins - Pass `false` for an empty registry.
  */

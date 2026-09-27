@@ -11,9 +11,22 @@ import { emaValues } from './ema.js';
 /** MACD indicator definition (params `fast` = 12, `slow` = 26, `signal` = 9). */
 export const macdIndicator: IndicatorDef = {
   name: 'macd',
+  label: 'MACD',
+  shortName: 'MACD',
   defaultParams: { fast: 12, slow: 26, signal: 9 },
   defaultColors: ['#2962ff', '#ff6d00', UP_COLOR, DOWN_COLOR],
   defaultPane: 'sub',
+  inputs: [
+    { key: 'fast', label: 'Fast length', min: 1, step: 1, integer: true },
+    { key: 'slow', label: 'Slow length', min: 1, step: 1, integer: true },
+    { key: 'signal', label: 'Signal smoothing', min: 1, step: 1, integer: true },
+  ],
+  styles: [
+    { key: 'dif', label: 'MACD', colorIndex: 0 },
+    { key: 'dea', label: 'Signal', colorIndex: 1 },
+    { key: 'hist', label: 'Histogram positive', colorIndex: 2, kind: 'histogram' },
+    { key: 'hist', label: 'Histogram negative', colorIndex: 3, kind: 'histogram' },
+  ],
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const fast = Math.max(1, Math.floor(params['fast'] ?? 12));
     const slow = Math.max(fast + 1, Math.floor(params['slow'] ?? 26));
@@ -47,6 +60,7 @@ export const macdIndicator: IndicatorDef = {
     return {
       pane: 'sub',
       bars: {
+        key: 'hist',
         values: hist,
         up,
         upColor: colors[2] ?? '#26a69a',

@@ -40,10 +40,10 @@ function assertSeries(actual: readonly (number | null)[], expected: readonly (nu
 }
 
 describe('indicator registry', () => {
-  it('pre-loads the seven built-ins', () => {
+  it('pre-loads the built-ins', () => {
     const registry = createIndicatorRegistry();
-    assert.deepEqual(registry.names().sort(), ['boll', 'ema', 'kdj', 'macd', 'rsi', 'sma', 'vol']);
-    assert.equal(BUILTIN_INDICATORS.length, 7);
+    for (const name of ['boll', 'ema', 'kdj', 'macd', 'rsi', 'sma', 'vol']) assert.ok(registry.has(name), name);
+    assert.deepEqual(registry.names(), BUILTIN_INDICATORS.map((def) => def.name));
   });
   it('can be created empty and accept custom indicators', () => {
     const registry = createIndicatorRegistry(false);

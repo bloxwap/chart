@@ -21,6 +21,15 @@ export interface WasmKernels {
   sma(src: Float32Array, period: number): Float32Array;
   /** Exponential moving average, SMA-seeded; NaN before `period - 1`. */
   ema(src: Float32Array, period: number): Float32Array;
+  /**
+   * Sliding-window maximum over `period` values (floored); NaN before
+   * `period - 1`, for windows containing NaN, and everywhere when `period`
+   * is below 1 or above the length. Selection only, so results are exact
+   * f32 inputs.
+   */
+  rollingMax(src: Float32Array, period: number): Float32Array;
+  /** Sliding-window minimum; semantics as {@link rollingMax}. */
+  rollingMin(src: Float32Array, period: number): Float32Array;
 }
 
 /** Options for {@link initWasm}. */
@@ -38,6 +47,8 @@ interface RawKernelExports {
   minmax_f32(ptr: number, len: number): [number, number];
   sma_f32(src: number, dst: number, len: number, period: number): void;
   ema_f32(src: number, dst: number, len: number, period: number): void;
+  rolling_max_f32(src: number, dst: number, tmp: number, len: number, period: number): void;
+  rolling_min_f32(src: number, dst: number, tmp: number, len: number, period: number): void;
 }
 
 const WASM_PAGE_SIZE = 65536;
@@ -114,6 +125,16 @@ function wrapExports(raw: RawKernelExports, usingSimd: boolean): WasmKernels {
     new Float32Array(raw.memory.buffer, 0, src.length).set(src);
   };
 
+  const rolling = (kernel: RawKernelExports['rolling_max_f32'], src: Float32Array, period: number): Float32Array => {
+    const window = Math.floor(period);
+    if (!(window >= 1 && window <= src.length)) return new Float32Array(src.length).fill(NaN);
+    const bytes = src.byteLength;
+    ensureCapacity(bytes * 3);
+    writeInput(src);
+    kernel(0, bytes, bytes * 2, src.length, window);
+    return new Float32Array(raw.memory.buffer, bytes, src.length).slice();
+  };
+
   return {
     usingSimd,
     minmax(values: Float32Array): { min: number; max: number } {
@@ -135,6 +156,8 @@ function wrapExports(raw: RawKernelExports, usingSimd: boolean): WasmKernels {
       raw.ema_f32(0, dstOffset, src.length, period);
       return new Float32Array(raw.memory.buffer, dstOffset, src.length).slice();
     },
+    rollingMax: (src, period) => rolling(raw.rolling_max_f32, src, period),
+    rollingMin: (src, period) => rolling(raw.rolling_min_f32, src, period),
   };
 }
 

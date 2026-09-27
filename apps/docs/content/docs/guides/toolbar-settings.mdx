@@ -43,14 +43,14 @@ Also wire resizing as in the [quick start](/docs/getting-started). The UI inject
 
 ## What the card controls
 
-- **Symbol:** previous-close coloring, body/border/wick visibility and colors, and numeric precision.
-- **Status line:** symbol name, OHLC, price change, volume, and indicator values.
-- **Scales and lines:** autoscale, ratio lock, scale mode, inversion, axis side, labels, reference lines, and the plus button.
+- **Symbol:** previous-close coloring, body/border/wick visibility and colors, and numeric precision. Under **Volume**: the volume overlay, its bar colors, opacity, and height. Until you pick a color, the swatches show the candle colors they follow; the button next to them goes back to following them.
+- **Status line:** symbol name, OHLC, price change, volume, indicator values, and the countdown to bar close.
+- **Scales and lines:** autoscale, ratio lock, scale mode, inversion, axis side, labels (including the countdown on the price label), reference lines, the plus button, the time-continuous axis, and the scale text size. **Default** scale text follows **Text size**.
 - **Canvas:** background, text, grid, crosshair, and watermark.
 
 Changes apply immediately and remain selected when the card reopens. Reset restores the initial settings without replacing the chart data, indicator instances, drawings, chart type, or cursor selection.
 
-Search at the top of the card filters settings across all sections, including option names and help text. Partial names, abbreviations, and common typos work: try `gird`, `wick color`, or `log scale`. Matching controls still update the chart live. Clear the field or choose a section to restore the full list. Escape clears an active search; press it again to close the card.
+Search at the top of the card filters settings across all sections, including option names and help text. Partial names, abbreviations, and common typos work: try `gird`, `wick color`, `log scale`, `countdown`, `volume`, `continuous`, or `scale text`. Matching controls still update the chart live. Clear the field or choose a section to restore the full list. Escape clears an active search; press it again to close the card.
 
 The scale's plus button is implemented by the toolbar and adds an undoable horizontal price line. Enable it using `priceAxis.plusButton` or the card.
 
@@ -63,6 +63,8 @@ toolbar.setTheme('light');
 settings.setTheme('light');
 ```
 
+The toolbar applies `CHART_THEMES[theme]` to the chart when it mounts and on every `setTheme`, over any `createChart` preset. To keep a brand preset's colors, pass `chartTheme: presetChartTheme('bloxwapDark')` to both `createDrawingToolbar` and `createChartSettings`, so **Reset defaults** agrees. Pass `applyChartTheme: false` to both to leave the chart's colors alone. After `settings.setTheme(theme)`, **Reset defaults** restores that theme's colors. See [theming and presets](/docs/guides/theming-presets).
+
 By default the toolbar listens for keyboard shortcuts on the document. Set `keyboard: false` for an embedded example or a page where other controls own those keys.
 
 | Shortcut | Action |
@@ -74,11 +76,75 @@ By default the toolbar listens for keyboard shortcuts on the document. Set `keyb
 | Cmd/Ctrl + Z | Undo a toolbar edit |
 | Shift + Cmd/Ctrl + Z | Redo a toolbar edit |
 
-The idle navigation hint fades after three seconds. Active drawing instructions remain visible.
+The idle navigation hint fades after three seconds. Active drawing instructions remain visible. After a finger press, the hint names the touch gestures instead, and on a coarse-pointer device it starts that way.
+
+## Context menus
+
+Right-click menus are off by default. Turn them on with the toolbar's `contextMenu` option:
+
+```ts
+const toolbar = createDrawingToolbar({
+  chart, document, canvas, rail, overlay,
+  contextMenu: {
+    onChartSettings: () => settings.open(),
+    onIndicatorSettings: (id) => indicators.openSettings(id),
+    onAction: () => saveLayout(), // the indicators dialog follows on its own
+  },
+});
+```
+
+What the menu offers depends on what is under the pointer:
+
+| Under the pointer | Menu |
+| --- | --- |
+| A drawing | **Settings…** (the drawing's style bar, unless you pass `onDrawingSettings`), **Clone**, **Lock** or **Unlock**, **Hide**, **Remove**. These can be undone |
+| An indicator plot (line, step, dots, or histogram bars, in any pane) | **Settings…** (when you pass `onIndicatorSettings`), **Hide**, **Remove** |
+| Empty space in an indicator sub-pane | **Reset chart view**, then the pane's study: **Settings…** (when you pass `onIndicatorSettings`), **Hide**, **Remove**. Then **Chart settings…** and the **Remove all** rows as below. The menu's target is `{ kind: 'chart', x, y, paneId }`; the study rows report `{ kind: 'indicator', id, key: '', x, y }` to `onAction`, like a right-click on a plot |
+| Anything else | **Reset chart view**, the **Auto (fits data to screen)**, **Logarithmic**, and **Percent** scale toggles, **Chart settings…** (when you pass `onChartSettings`), and **Remove all drawings** and **Remove all indicators** with counts, when there is something to remove |
+
+- `contextMenu: true` turns the menu on without hooks. With the default `false`, a right-click only cancels an armed drawing tool.
+- An armed tool still gets the right-click first: it is cancelled and no menu opens.
+- The menu uses the toolbar's undo history, flyouts, and theme. `toolbar.contextMenu` is the menu handle, or `null` when off.
+- It opens at the pointer and flips to stay in the viewport. Arrow keys, Home, and End move between rows, Enter or Space runs one, and Escape or Tab closes it. It also closes on an outside click, scroll, resize, window blur, or a wheel over the chart.
+- Touch never opens it: a long press is the crosshair. Pen right-clicks work like a mouse. **Reset chart view** is also in the rail's Zoom menu, and a double tap on the price axis resets the view by touch.
+- **Hide** on a drawing sets `visible: false`. Bring it back with undo or `chart.updateDrawing(id, { visible: true })`. Hiding or removing an indicator is not recorded in the undo history.
+- Horizontal indicator levels and fills are not targets, so a right-click on RSI's 70/30 lines opens RSI's sub-pane menu. The price scale toggles act on the main price axis, so they show only on the main pane and the time axis.
+
+Hooks: `onChartSettings()`, `onIndicatorSettings(id)`, `onDrawingSettings(id)`, `extraItems(target)` for your own rows, and `onAction(action, target)` after each built-in action. Without the toolbar, use `createChartContextMenu`:
+
+```ts
+import { createChartContextMenu } from '@bloxwap/chart/ui';
+
+const menu = createChartContextMenu({
+  chart, document, canvas,
+  onAction: (action, target) => saveLayout(),
+  extraItems: (target) => target.kind === 'chart'
+    ? [{ label: 'Add alert…', onClick: () => addAlert(chart.scale.yToPrice(target.y)) }]
+    : [],
+});
+menu.controller.undo(); // undoes the last drawing edit made from the menu
+menu.destroy();
+```
+
+Pass `controller` to share an existing controller's undo history and armed tool. A controller you pass stays yours: `menu.destroy()` disposes only the one the menu created, so call `controller.dispose()` when you discard yours while the chart lives on. Pass `flyouts` and `theme` to share menus, and `listen: false` to open it yourself with `menu.open(x, y)` in canvas CSS pixels. `menu.targetAt(x, y)` reports what a right-click there would target without opening anything. After a finger press (`controller.touch`), the selected drawing wins where another lies on top of it, as it does for a tap or a drag, so a menu you open on touch acts on the drawing the finger edits. `extraItems` rows can be items, `'separator'`, or checkbox rows with `checked`.
+
+## Header, scale buttons, and indicators
+
+The toolbar pairs with the other UI modules:
+
+- [`createChartHeader`](/docs/guides/header) adds a top bar with the symbol, timeframes that drive a datafeed, chart types, an Indicators button, and Auto / % / Log toggles. Pass `flyouts: toolbar.flyouts` so only one menu is open at a time.
+- [`createScaleButtons`](/docs/guides/header#scale-buttons-on-the-chart) adds TradingView's `A` / `%` / `L` strip at the foot of the price axis.
+- [`createIndicatorsDialog`](/docs/guides/indicators#indicators-dialog) adds the indicator picker and per-study settings.
+
+## Touch
+
+The toolbar routes finger input through the [touch gestures](/docs/guides/touch): drag to pan with fling, pinch to zoom, long-press for the crosshair, and double tap the price axis to reset the view. Armed tools place points with taps. A tap selects a drawing, and only the selected drawing follows a finger, so one-finger drags pan across the others.
 
 ## Cleanup
 
 ```ts
+header.destroy();     // if you created one
+indicators.destroy(); // if you created one
 settings.destroy();
 toolbar.destroy();
 chart.destroy();

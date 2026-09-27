@@ -104,6 +104,22 @@ export function text(value: string, at: Pt, style: TextStyle = {}): DrawPrimitiv
 }
 
 /**
+ * Whether the horizontal span `x0`–`x1` (either order) overlaps a plot
+ * `width` px wide: the {@link TextStyle.inside} test for a labelled shape.
+ */
+export function spansPlot(x0: number, x1: number, width: number): boolean {
+  return Math.max(x0, x1) >= 0 && Math.min(x0, x1) <= width;
+}
+
+/**
+ * Left edge of a `w`-wide label box moved just far enough to lie within a
+ * plot `width` px wide; a box wider than the plot pins to its left edge.
+ */
+export function slideInside(left: number, w: number, width: number): number {
+  return Math.max(0, Math.min(left, width - w));
+}
+
+/**
  * Largest `t ≥ 0` such that `a + t·d` stays inside the padded viewport.
  * Returns 0 when the direction is zero.
  */

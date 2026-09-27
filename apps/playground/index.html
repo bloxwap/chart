@@ -2,24 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>@bloxwap/chart playground</title>
+  <link rel="icon" href="data:," />
   <style>
     @font-face { font-family: 'Geist'; src: url('../assets/fonts/Geist-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'Geist'; src: url('../assets/fonts/Geist-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
     @font-face { font-family: 'Geist Mono'; src: url('../assets/fonts/GeistMono-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'Geist Mono'; src: url('../assets/fonts/GeistMono-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
-    /* The app only lays out regions; toolbar and on-chart styling ship with chart-ts/ui. */
+    /* The app only lays out regions and sets brand tokens; header, toolbar and on-chart styling ship with chart-ts/ui. */
     html, body { margin: 0; height: 100%; background: #0a0a0a; }
     body.light { background: #f5f7fa; }
-    #app { display: flex; height: 100vh; }
-    #stage { position: relative; flex: 1; min-width: 0; }
+    #app { display: flex; height: 100vh; height: 100dvh; }
+    #main { flex: 1; min-width: 0; display: flex; flex-direction: column; margin: 6px 6px 6px 0; border-radius: 12px; overflow: hidden; background: #171717; }
+    body.light #main { background: #ffffff; }
+    #header { flex: none; min-width: 0; }
+    #stage { position: relative; flex: 1; min-height: 0; }
     #tools { flex: none; width: 52px; overflow: hidden; transition: width 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
     #tools.collapsed { width: 0; }
     #tools > nav { transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease-out; }
     #tools.collapsed > nav { transform: translateX(-100%); opacity: 0; }
     @media (prefers-reduced-motion: reduce) { #tools, #tools > nav { transition: none; } }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+    /* bloxwap.pro chrome on dark for the rails, menus and dialogs: zero-stroke surfaces, #262626 hover fill, #00ff3f accent.
+       The header and the on-chart A / % / L strip take BLOXWAP_HEADER_THEME instead, which clears itself on light. */
+    body:not(.light) .cts-theme:not(.cts-light) {
+      --cts-edge: transparent; --cts-panel-raised: #262626; --cts-accent: #00ff3f;
+      --cts-accent-soft: #262626; --cts-on-accent: #0a0a0a;
+    }
+    /* Pill header buttons on light too (the dark tokens already round them). */
+    .cts-header { --cts-header-radius: 9999px; }
+    /* A header too wide for its bar compacts (timeframes → dropdown), then wraps onto a second row. */
+    .cts-header.cts-header-compact { flex-wrap: wrap; height: auto; min-height: 40px; padding-block: 6px; row-gap: 4px; }
+    .app-header-controls { display: flex; align-items: center; gap: 2px; }
+    .app-header-controls .cts-btn { width: 28px; height: 28px; border-radius: 9999px; }
+    .app-header-controls .cts-btn svg { width: 18px; height: 18px; }
+    .app-header-controls .cts-caret { display: none; }
+
+    /* History paging and feed notices, over the top of the plot. */
+    #feed-status {
+      position: absolute; z-index: 7; top: 36px; left: 50%; transform: translateX(-50%); padding: 4px 10px;
+      border-radius: 9999px; background: #262626; color: #fafafa; font: 500 12px/1.4 'Geist', system-ui, sans-serif;
+      pointer-events: none; opacity: 0; transition: opacity 160ms ease-out;
+    }
+    body.light #feed-status { background: #f0f3fa; color: #131722; }
+    #feed-status.shown { opacity: 1; }
+
+    /* Narrow screens: the chart takes the width, rail controls move into the header, the drawing rail starts collapsed. */
+    @media (max-width: 599px) {
+      #ctrl-rail { display: none; }
+      #main { margin: 0; border-radius: 0; }
+    }
   </style>
 </head>
 <body>
@@ -29,184 +63,161 @@
       <div id="ctrl-bottom" class="cts-rail-footer" style="display: flex; flex-direction: column; gap: 4px;"></div>
     </nav>
     <div id="tools"></div>
-    <div id="stage"><canvas id="chart"></canvas></div>
+    <main id="main">
+      <div id="header"></div>
+      <div id="stage"><canvas id="chart"></canvas><div id="feed-status" role="status" aria-live="polite"></div></div>
+    </main>
   </div>
 
   <script type="module">
-    import { createChart, defineConfig } from '../dist/index.js';
+    import { defineConfig, presetChartTheme } from '../dist/index.js';
+    import { createDatafeedChart, bucketStartMs } from '../dist/datafeed/index.js';
     import {
-      createDrawingToolbar, createChartSettings, createThemeControl, createFrameScheduler, attachScrollableRail, el, iconButton, labelButton, setButtonLabel, setButtonIcon, menuItem, menuLabel, menuSeparator,
+      createDrawingToolbar, createChartSettings, createIndicatorsDialog, createThemeControl, createFrameScheduler,
+      createChartHeader, createScaleButtons, DEFAULT_TIMEFRAMES, attachScrollableRail, el, iconButton, setButtonIcon,
+      menuItem, menuLabel, menuSeparator, startCountdownTicker,
     } from '../dist/ui/index.js';
+    import { BLOXWAP_HEADER_THEME } from '../dist/ui/index.js';
 
-    // ---------------- data (deterministic random walk) ----------------
-    let seed = 42;
-    const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-    function genWalk(count, intervalSec, { gapChance = 0, startPrice = 100 } = {}) {
-      const out = [];
-      let price = startPrice;
-      let time = Math.floor(Date.now() / 1000) - count * intervalSec;
-      const volScale = intervalSec >= 86400 ? 4 : intervalSec >= 3600 ? 1.6 : 0.6;
-      for (let i = 0; i < count; i++) {
-        time += intervalSec;
-        if (gapChance > 0 && next() < gapChance) continue;
-        const open = price;
-        const close = Math.max(1, open + (next() - 0.48) * volScale);
-        out.push({
-          time, open, close,
-          high: Math.max(open, close) + next() * volScale * 0.4,
-          low: Math.min(open, close) - next() * volScale * 0.4,
-          volume: Math.round(500 + next() * 4500),
-        });
-        price = close;
-      }
-      return out;
-    }
-    const TIMEFRAMES = [
-      { label: '1m', seconds: 60, count: 1500 }, { label: '5m', seconds: 300, count: 1500 },
-      { label: '15m', seconds: 900, count: 1500 }, { label: '1h', seconds: 3600, count: 1200 },
-      { label: '4h', seconds: 14400, count: 1000 }, { label: '1d', seconds: 86400, count: 500 },
-    ];
-    const DATA_PRESETS = [
-      { label: '1m × 2000', make: () => genWalk(2000, 60) },
-      { label: '1d × 500', make: () => genWalk(500, 86400) },
-      { label: 'Gaps (1h)', make: () => genWalk(1500, 3600, { gapChance: 0.15 }) },
-    ];
-
-    // ---------------- Hyperliquid live feed (BTC perpetual) ----------------
+    const $ = (id) => document.getElementById(id);
     const COIN = 'BTC';
-    const symbolFor = (label) => `${COIN} perpetual · ${label} · Hyperliquid`;
-    const toCandle = (k) => ({ time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v });
-    const fetchHyperliquid = async (tf) => {
+    const WALK = 'Random walk';
+    const GAPS = 'Walk with gaps';
+    const TF_LABELS = new Map(DEFAULT_TIMEFRAMES.map((tf) => [tf.intervalMs, tf.label]));
+    const labelOf = (ms) => TF_LABELS.get(ms) ?? `${Math.round(ms / 60_000)}m`;
+
+    // ---------------- history sources: Hyperliquid, or a local random walk ----------------
+    // Hyperliquid candleSnapshot: bars opening in [startTime, endTime], at most 5000 rows, only the latest
+    // ~5000 candles per interval. Every interval is epoch-aligned (1w opens Thursday, 1M spans 30 days).
+    const toCandle = (k) => ({ time: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v });
+    async function fetchHyperliquid({ symbol, intervalMs, fromMs, toMs, signal }) {
       const res = await fetch('https://api.hyperliquid.xyz/info', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'candleSnapshot', req: { coin: COIN, interval: tf.label, startTime: Date.now() - tf.count * tf.seconds * 1000, endTime: Date.now() } }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+        body: JSON.stringify({ type: 'candleSnapshot', req: { coin: symbol, interval: labelOf(intervalMs), startTime: fromMs, endTime: toMs } }),
       });
       if (!res.ok) throw new Error(`Hyperliquid candleSnapshot failed: ${res.status}`);
       return (await res.json()).map(toCandle);
-    };
-
-    let timeframe = TIMEFRAMES[2];
-    let feed = 'live'; // 'live' streams Hyperliquid; 'synthetic' runs the local random walk
-    let candles;
-    try {
-      candles = await fetchHyperliquid(timeframe);
-    } catch {
-      feed = 'synthetic';
-      candles = genWalk(timeframe.count, timeframe.seconds);
     }
-    let intervalSeconds = timeframe.seconds;
+
+    // A deterministic walk per symbol and interval with a finite history (5000 bars, like Hyperliquid;
+    // 1500 slots with ~15% missing for the gaps dataset), served through the same paging datafeed.
+    const walks = new Map();
+    const seeded = (seed) => () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const hash = (text) => [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) & 0x7fffffff, 7);
+    const walkStep = (intervalMs) => (intervalMs >= 86_400_000 ? 4 : intervalMs >= 3_600_000 ? 1.6 : 0.6);
+    function walkBar(rand, timeMs, open, step) {
+      const close = Math.max(1, open + (rand() - 0.48) * step);
+      return {
+        time: timeMs / 1000, open, close, volume: Math.round(500 + rand() * 4500),
+        high: Math.max(open, close) + rand() * step * 0.4, low: Math.min(open, close) - rand() * step * 0.4,
+      };
+    }
+    function walkFor(symbol, intervalMs) {
+      const key = `${symbol}@${intervalMs}`;
+      const now = bucketStartMs(Date.now(), intervalMs);
+      let walk = walks.get(key);
+      if (!walk) {
+        const rand = seeded(hash(key)), step = walkStep(intervalMs), gaps = symbol === GAPS;
+        const bars = [];
+        let price = 100;
+        for (let i = (gaps ? 1500 : 5000) - 1; i >= 0; i--) {
+          const bar = walkBar(rand, now - i * intervalMs, price, step);
+          price = bar.close;
+          if (!(gaps && i > 0 && rand() < 0.15)) bars.push(bar);
+        }
+        walks.set(key, walk = { bars, rand, step });
+      }
+      // Revisiting later continues from the last bar up to now, so no bucket goes missing.
+      for (let t = walk.bars.at(-1).time * 1000 + intervalMs; t <= now; t += intervalMs) {
+        walk.bars.push(walkBar(walk.rand, t, walk.bars.at(-1).close, walk.step));
+      }
+      return walk.bars;
+    }
+    async function fetchSynthetic({ symbol, intervalMs, fromMs, toMs }) {
+      return walkFor(symbol, intervalMs).filter((c) => c.time * 1000 >= fromMs && c.time * 1000 <= toMs);
+    }
 
     await Promise.all([document.fonts.load('12px "Geist"'), document.fonts.load('12px "Geist Mono"')]).catch(() => {});
 
-    // ---------------- chart + the library's drawing toolbar ----------------
-    const $ = (id) => document.getElementById(id);
+    // ---------------- chart + paging datafeed ----------------
     const canvas = $('chart');
     const stage = $('stage');
     const frames = createFrameScheduler(window, (update) => chart.batch(update));
-    const chart = createChart({
+    const { chart, datafeed } = createDatafeedChart({
       container: canvas,
+      preset: 'bloxwapDark',
       animation: { scheduler: frames, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240 },
       config: defineConfig({
-        data: candles,
-        series: { type: 'candlestick' },
-        theme: { fontFamily: "'Geist', system-ui, sans-serif", monoFamily: "'Geist Mono', ui-monospace, monospace", fontSize: 12 },
-        watermark: { visible: true, text: 'BLOXWAP', opacity: 0.06, fontFamily: "'Geist'" },
-        statusLine: { visible: true, symbol: feed === 'live' ? symbolFor(timeframe.label) : 'Random walk', volume: true },
+        watermark: { visible: true, text: 'BLOXWAP', opacity: 0.06 },
+        statusLine: { visible: true, countdown: true },
+        // Like bloxwap.pro: the mark and last lines below replace the built-in last-price line (its axis label stays).
+        priceAxis: { lines: { lastPrice: false } },
         formatters: { price: (value) => value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) },
       }),
+      fetchBars: (request) => (request.symbol === COIN ? fetchHyperliquid(request) : fetchSynthetic(request)),
+      // Ticks fold as they arrive; their bars reach the chart once per frame, in the same batch as pointer work.
+      scheduler: frames,
+      onError: (error) => console.warn('chart data:', error),
     });
+
+    // ---------------- mark (live mid) and last (previous close) price lines, as bloxwap.pro draws them ----------------
+    let markLine = null, lastLine = null;
+    const lastLineColor = () => (document.body.classList.contains('light') ? 'rgba(19, 23, 34, 0.55)' : 'rgba(255, 255, 255, 0.6)');
+    function setMarkLine(price) {
+      if (markLine) markLine.applyOptions({ price });
+      else markLine = chart.series.createPriceLine({ price, color: '#35b5ff', lineWidth: 1, lineStyle: 'dashed', title: 'mark' });
+    }
+    function setLastLine(price) {
+      if (lastLine) lastLine.applyOptions({ price });
+      else lastLine = chart.series.createPriceLine({ price, color: lastLineColor(), lineWidth: 1, lineStyle: 'dotted', title: 'last' });
+    }
+    function clearLines() {
+      markLine?.remove(); lastLine?.remove();
+      markLine = lastLine = null;
+    }
+    chart.subscribeDataLoad((e) => {
+      const data = chart.getData();
+      // A load shows the latest close; a bucket roll moves the line to the bar that just closed.
+      if (e.reason === 'set') {
+        if (data.length > 0) setLastLine(data.at(-1).close);
+        else clearLines();
+        placeMarkers(data);
+      } else if (e.reason === 'append' && data.length > 1) setLastLine(data.at(-2).close);
+    });
+
+    // Dark maps to the bloxwapDark colors; light to the stock light theme. Colors only, so settings survive.
+    const chartTheme = presetChartTheme('bloxwapDark');
+
     const safeGet = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
     const safeSet = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable */ } };
     const arrowsKey = 'chart-ts:scroll-arrows';
     let arrowsOn = safeGet(arrowsKey) !== 'false';
-    const toolbar = createDrawingToolbar({ chart, document, canvas, rail: $('tools'), overlay: stage,
-      storage: { getItem: safeGet, setItem: safeSet }, scheduler: frames, scrollArrows: arrowsOn });
+
+    // ---------------- snapshot (app code: real globals are fine here) ----------------
+    const CAMERA = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg>';
+    async function downloadSnapshot() {
+      const blob = await chart.toBlob({ type: 'image/png' });
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement('a'), {
+        href: url, download: `${datafeed.symbol ?? 'chart'}-${labelOf(datafeed.intervalMs ?? 0)}-${new Date().toISOString().slice(0, 19)}.png`.replace(/[\s:]+/g, '-'),
+      });
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // ---------------- drawing toolbar (touch gestures, right-click menus) ----------------
+    const toolbar = createDrawingToolbar({ chart, document, canvas, rail: $('tools'), overlay: stage, chartTheme,
+      storage: { getItem: safeGet, setItem: safeSet }, scheduler: frames, scrollArrows: arrowsOn,
+      // Right-click menus: Settings… opens the settings card or the study's settings (a drawing's opens its style bar).
+      // The indicators dialog follows what the menu hides or removes on its own (Chart.subscribeConfigChange).
+      contextMenu: {
+        onChartSettings: () => settings.open(),
+        onIndicatorSettings: (id) => indicators.openSettings(id),
+        extraItems: (target) => (target.kind === 'chart' ? [{ label: 'Download snapshot', onClick: () => void downloadSnapshot() }] : []),
+      } });
     const { controller, flyouts } = toolbar;
 
-    // ---------------- app control rail, built from the same UI primitives ----------------
-    const divider = () => el(document, 'div', 'cts-rail-divider');
-    const loadData = (data) => {
-      toolbar.cancelNavigation();
-      candles = data;
-      intervalSeconds = data.length > 1 ? data[1].time - data[0].time : intervalSeconds;
-      chart.setData(candles);
-      chart.scale.scrollTo(candles.length - 1);
-      toolbar.refreshViewport();
-    };
-
-    const tfBtn = labelButton(document, TIMEFRAMES[2].label, 'Timeframe');
-    const tfMenu = flyouts.create();
-    tfMenu.append(menuLabel(document, 'Timeframe'));
-    for (const tf of TIMEFRAMES) {
-      tfMenu.append(menuItem(document, {
-        label: tf.label, meta: `${tf.count} bars`,
-        onClick: async () => {
-          setButtonLabel(tfBtn, tf.label); flyouts.close();
-          timeframe = tf;
-          if (feed === 'live') {
-            try {
-              loadData(await fetchHyperliquid(tf));
-              chart.updateConfig({ statusLine: { symbol: symbolFor(tf.label) } });
-              connectFeed();
-              return;
-            } catch { feed = 'synthetic'; }
-          }
-          disconnectFeed();
-          loadData(genWalk(tf.count, tf.seconds));
-          chart.updateConfig({ statusLine: { symbol: 'Random walk' } });
-        },
-      }));
-    }
-    flyouts.attach(tfBtn, tfMenu);
-
-    const SERIES_TYPES = [['candlestick', 'Candlestick'], ['line', 'Line'], ['area', 'Area'], ['bar', 'Bar (OHLC)'], ['histogram', 'Histogram']];
-    const ctBtn = iconButton(document, 'chart-candlestick', 'Chart type', 20);
-    const ctMenu = flyouts.create();
-    ctMenu.append(menuLabel(document, 'Chart type'));
-    const ctItems = SERIES_TYPES.map(([type, label]) => {
-      const item = menuItem(document, {
-        icon: `chart-${type}`, label, tick: true,
-        onClick: () => {
-          chart.updateConfig({ series: { type } });
-          for (const it of ctItems) it.classList.toggle('cts-active', it === item);
-          setButtonIcon(ctBtn, `chart-${type}`, 20);
-          flyouts.close();
-        },
-      });
-      item.classList.toggle('cts-active', type === 'candlestick');
-      ctMenu.append(item);
-      return item;
-    });
-    flyouts.attach(ctBtn, ctMenu);
-
-    const INDICATORS = [
-      ['sma', 'SMA (20)', { period: 20 }], ['ema', 'EMA (50)', { period: 50 }], ['boll', 'Bollinger bands (20, 2)', {}],
-      ['vol', 'Volume', {}], ['macd', 'MACD (12, 26, 9)', {}], ['rsi', 'RSI (14)', {}], ['kdj', 'KDJ (9)', {}],
-    ];
-    const fxBtn = iconButton(document, 'function-square', 'Indicators', 20);
-    const fxMenu = flyouts.create();
-    fxMenu.append(menuLabel(document, 'Indicators'));
-    const indicatorItems = new Map();
-    const syncIndicators = () => {
-      const active = new Set(chart.getConfig().indicators.map((i) => i.name));
-      for (const [name, item] of indicatorItems) item.classList.toggle('cts-active', active.has(name));
-    };
-    for (const [name, label, params] of INDICATORS) {
-      const item = menuItem(document, {
-        label, tick: true,
-        onClick: () => {
-          const existing = chart.getConfig().indicators.find((i) => i.name === name);
-          if (existing) chart.removeIndicator(existing.id);
-          else chart.addIndicator({ id: `demo-${name}`, name, params, visible: !controller.indicatorsHidden });
-          syncIndicators();
-        },
-      });
-      indicatorItems.set(name, item);
-      fxMenu.append(item);
-    }
-    flyouts.attach(fxBtn, fxMenu);
-    controller.on('change', syncIndicators);
-
+    // ---------------- rail controls, built from the same UI primitives ----------------
     const undoBtn = iconButton(document, 'undo', 'Undo (⌘Z)', 20);
     const redoBtn = iconButton(document, 'redo', 'Redo (⇧⌘Z)', 20);
     undoBtn.addEventListener('click', () => controller.undo());
@@ -221,9 +232,12 @@
     const liveItem = menuItem(document, { label: 'Live feed', tick: true, onClick: () => {
       live = !live;
       liveItem.classList.toggle('cts-active', live);
-      if (feed === 'live') { if (live) connectFeed(); else disconnectFeed(); }
+      liveItem.setAttribute('aria-checked', String(live));
+      syncFeed();
     } });
     liveItem.classList.add('cts-active');
+    liveItem.setAttribute('role', 'checkbox');
+    liveItem.setAttribute('aria-checked', 'true');
     const arrowsItem = menuItem(document, { label: 'Navigation arrows', tick: true, onClick: () => {
       arrowsOn = !arrowsOn;
       toolbar.setScrollArrows(arrowsOn);
@@ -234,37 +248,80 @@
       arrowsItem.classList.toggle('cts-active', arrowsOn);
       arrowsItem.setAttribute('aria-checked', String(arrowsOn));
     }
-    arrowsItem.setAttribute('role', 'menuitemcheckbox');
-    syncArrowsSetting();
-    liveItem.setAttribute('role', 'checkbox');
-    liveItem.setAttribute('aria-checked', 'true');
-    liveItem.addEventListener('click', () => liveItem.setAttribute('aria-checked', String(live)));
     arrowsItem.setAttribute('role', 'checkbox');
+    syncArrowsSetting();
     settingsExtras.append(liveItem, arrowsItem, menuSeparator(document), menuLabel(document, 'Datasets'));
-    for (const p of DATA_PRESETS) settingsExtras.append(menuItem(document, { label: p.label, onClick: () => {
-      feed = 'synthetic';
-      disconnectFeed();
-      loadData(p.make());
-      chart.updateConfig({ statusLine: { symbol: 'Random walk' } });
-    } }));
-    const settings = createChartSettings({ chart, document, trigger: settingsBtn, extraContent: settingsExtras,
-      onOpen: () => { toolbar.cancelNavigation(); flyouts.close(); },
+    const DATASETS = [
+      { label: 'BTC perpetual · Hyperliquid', symbol: COIN, intervalMs: null }, // keeps the current timeframe
+      { label: 'Random walk · 1m', symbol: WALK, intervalMs: 60_000 },
+      { label: 'Random walk · 1d', symbol: WALK, intervalMs: 86_400_000 },
+      { label: 'Gaps (1h) · continuous time', symbol: GAPS, intervalMs: 3_600_000 },
+    ];
+    for (const d of DATASETS) settingsExtras.append(menuItem(document, { label: d.label, onClick: () => { settings.close(); void load(d.symbol, d.intervalMs ?? datafeed.intervalMs ?? 900_000); } }));
+
+    // The bar-close countdown repaints once a second while it shows, in the same frame as pointer work.
+    let countdownTicker;
+    const syncCountdown = () => {
+      const { statusLine, priceAxis } = chart.getConfig();
+      const shown = statusLine.countdown || priceAxis.labels.countdown;
+      if (shown && !countdownTicker) countdownTicker = startCountdownTicker({ chart, window, scheduler: frames });
+      if (!shown && countdownTicker) { countdownTicker.stop(); countdownTicker = undefined; }
+    };
+    // Like the header and the indicators dialog, the ticker and the status-line symbol follow every rendered
+    // change (the settings card, its Reset defaults, host code) through Chart.subscribeConfigChange.
+    chart.subscribeConfigChange(({ keys }) => {
+      if (keys.includes('statusLine') || keys.includes('priceAxis')) syncCountdown();
+      if (keys.includes('statusLine')) syncStatusSymbol();
+    });
+    const settings = createChartSettings({ chart, document, trigger: settingsBtn, extraContent: settingsExtras, chartTheme,
+      onOpen: () => { toolbar.cancelNavigation(); flyouts.close(); indicators.close(); },
+      onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
+    });
+    syncCountdown();
+    // One popover at a time: each dialog closes the other (and any flyout) as it opens.
+    const indicators = createIndicatorsDialog({ chart, document,
+      onOpen: () => { toolbar.cancelNavigation(); flyouts.close(); settings.close(); },
       onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
     });
 
-    // Embeds can pin a host theme with ?lockedTheme=dark (or light).
+    // ---------------- header: symbol, timeframes → datafeed, chart type, indicators, scale toggles ----------------
+    const shotBtn = iconButton(document, 'image', 'Download snapshot', 18);
+    shotBtn.innerHTML = CAMERA;
+    shotBtn.addEventListener('click', () => void downloadSnapshot());
+    const headerControls = el(document, 'div', 'app-header-controls');
+    headerControls.append(shotBtn);
+    // Timeframe picks go through `load`, which falls back to the random walk when Hyperliquid is unreachable.
+    const source = {
+      setSymbol: (symbol, intervalMs) => load(symbol, intervalMs),
+      get symbol() { return datafeed.symbol; },
+      get intervalMs() { return datafeed.intervalMs; },
+      subscribeState: (listener) => datafeed.subscribeState(listener),
+    };
+    const header = createChartHeader({ chart, document, container: $('header'), datafeed: source, flyouts,
+      intervalMs: 900_000, tokens: BLOXWAP_HEADER_THEME,
+      onIndicators: () => indicators.openPicker(),
+      slots: { right: [headerControls] },
+    });
+    const scaleButtons = createScaleButtons({ chart, document, overlay: stage, tokens: BLOXWAP_HEADER_THEME });
+
+    // Embeds can pin a host theme with ?lockedTheme=dark (or light). Without a saved choice, start on dark (bloxwapDark).
     const themeKey = 'chart-ts:theme';
     const requestedLock = new URLSearchParams(location.search).get('lockedTheme');
     const lockedTheme = ['dark', 'light'].includes(requestedLock) ? requestedLock : undefined;
     const savedTheme = safeGet(themeKey);
     const themeControl = createThemeControl({ document, flyouts, lockedTheme,
-      theme: ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system',
+      theme: ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'dark',
       onSelect: mode => safeSet(themeKey, mode),
       onChange: theme => {
         document.body.classList.toggle('light', theme === 'light');
         $('ctrl-rail').classList.toggle('cts-light', theme === 'light');
         toolbar.setTheme(theme);
         settings.setTheme(theme);
+        header.setTheme(theme);
+        scaleButtons.setTheme(theme);
+        lastLine?.applyOptions({ color: lastLineColor() });
+        placeMarkers(chart.getData()); // in the theme's candle colors
+        indicators.setTheme(theme); // after the toolbar, so candle-following colors in open settings match
       },
     });
 
@@ -284,19 +341,29 @@
       railToggle.title = show ? 'Hide drawing toolbar' : 'Show drawing toolbar';
     });
 
-    $('ctrl-scroll').append(tfBtn, ctBtn, fxBtn, divider(), undoBtn, redoBtn);
-    if (themeControl.element) $('ctrl-scroll').append(divider(), themeControl.element);
-    $('ctrl-bottom').append(settingsBtn, railToggle);
+    // Wide: a control rail. Narrow (< 600px): the rail hides and its buttons join the header, which compacts and wraps.
+    const divider = el(document, 'div', 'cts-rail-divider');
+    const narrow = matchMedia('(max-width: 599px)');
+    const placeControls = () => {
+      const rail = [undoBtn, redoBtn, ...(themeControl.element ? [divider, themeControl.element] : [])];
+      flyouts.close();
+      if (narrow.matches) headerControls.append(...rail.filter((node) => node !== divider), settingsBtn, railToggle);
+      else {
+        $('ctrl-scroll').append(...rail);
+        $('ctrl-bottom').append(settingsBtn, railToggle);
+      }
+    };
+    placeControls();
     attachScrollableRail(document, $('ctrl-scroll'));
-
+    narrow.addEventListener('change', placeControls);
     // Keep the chart usable in a narrow embed; drawing tools are one click away.
-    if (window.innerWidth < 600) railToggle.click();
+    if (narrow.matches) railToggle.click();
 
-    // ---------------- sizing + live feed ----------------
+    // ---------------- sizing ----------------
     const fullTimeFormatter = chart.getConfig().formatters.time;
     const shortTimeFormatter = (seconds) => {
       const iso = new Date(seconds * 1000).toISOString();
-      return intervalSeconds >= 86400 ? iso.slice(5, 10) : iso.slice(11, 16);
+      return (datafeed.intervalMs ?? 0) >= 86_400_000 ? iso.slice(5, 10) : iso.slice(11, 16);
     };
     const resize = () => {
       toolbar.cancelNavigation();
@@ -316,49 +383,139 @@
     window.addEventListener('pagehide', () => toolbar.cancelNavigation());
     window.addEventListener('blur', () => toolbar.cancelNavigation());
 
-    // ---------------- Hyperliquid websocket: live candle updates ----------------
-    let ws;
-    const disconnectFeed = () => { ws?.close(); ws = undefined; };
-    const connectFeed = () => {
-      disconnectFeed();
-      ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
-      ws.onopen = () => ws.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'candle', coin: COIN, interval: timeframe.label } }));
-      ws.onmessage = (event) => {
-        if (!live) return;
-        const message = JSON.parse(event.data);
-        if (message.channel !== 'candle' || !message.data) return;
-        const candle = toCandle(message.data);
-        const last = candles[candles.length - 1];
-        if (last && candle.time < last.time) return;
-        if (last && candle.time === last.time) candles[candles.length - 1] = candle;
-        else candles.push(candle);
-        chart.appendData(candle);
-      };
+    // ---------------- feed status, status-line symbol ----------------
+    const status = $('feed-status');
+    let notice = null;
+    const showStatus = () => {
+      const text = notice ?? (datafeed.loading ? 'Loading history…' : '');
+      if (text) status.textContent = text;
+      status.classList.toggle('shown', text !== '');
     };
-    if (feed === 'live') connectFeed();
+    const flash = (text) => {
+      notice = text;
+      showStatus();
+      setTimeout(() => { if (notice === text) { notice = null; showStatus(); } }, 4000);
+    };
+    // Also re-applied after any status-line write (above), e.g. the settings card's Reset defaults, which restores the status line it started with.
+    function syncStatusSymbol() {
+      const { symbol, intervalMs } = datafeed;
+      if (symbol === null || intervalMs === null) return;
+      const text = symbol === COIN ? `${COIN}-PERP · ${labelOf(intervalMs)} · Hyperliquid` : `${symbol} · ${labelOf(intervalMs)} · synthetic`;
+      if (chart.getConfig().statusLine.symbol !== text) chart.updateConfig({ statusLine: { symbol: text } });
+    }
+    datafeed.subscribeState(() => { showStatus(); syncStatusSymbol(); });
+
+    // Two demo markers on the latest swing low and high (time-anchored, so paging history keeps them in place).
+    function placeMarkers(data) {
+      if (data.length < 120) { chart.series.setMarkers([]); return; }
+      const extreme = (from, to, pick) => data.slice(from, to).reduce((a, c) => (pick(c) > pick(a) ? c : a));
+      const low = extreme(data.length - 120, data.length - 60, (c) => -c.low);
+      const high = extreme(data.length - 60, data.length - 10, (c) => c.high);
+      const { upColor, downColor } = chart.getConfig().series;
+      chart.series.setMarkers([
+        { time: low.time, position: 'belowBar', shape: 'arrowUp', color: upColor, text: 'Buy' },
+        { time: high.time, position: 'aboveBar', shape: 'arrowDown', color: downColor, text: 'Sell' },
+      ]);
+    }
+
+    // ---------------- live mids: Hyperliquid allMids, or random-walk ticks ----------------
+    // The datafeed folds each tick into its bucket at once and applies the bars on the next frame (scheduler: frames);
+    // the mark line follows the latest mid in that same frame. A hidden tab gets no frames: it catches up in one batch.
+    let mid = null, markFrame = null;
+    function onMid(price, symbol) {
+      if (!live || !(price > 0)) return;
+      datafeed.pushTick(price, symbol);
+      if (symbol !== datafeed.symbol) return;
+      mid = price;
+      markFrame ??= frames.request(() => { markFrame = null; setMarkLine(mid); });
+    }
+
+    let ws = null, wsRetry = null, wsDelay = 1000;
+    function connectFeed() {
+      if (ws) return;
+      const socket = ws = new WebSocket('wss://api.hyperliquid.xyz/ws');
+      socket.onopen = () => {
+        wsDelay = 1000;
+        socket.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'allMids' } }));
+      };
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.channel === 'allMids') onMid(Number(message.data?.mids?.[COIN]), COIN);
+      };
+      socket.onclose = () => {
+        if (ws !== socket) return;
+        ws = null;
+        wsRetry = setTimeout(syncFeed, wsDelay = Math.min(wsDelay * 2, 30_000)); // reconnect while still wanted, backing off
+      };
+    }
+    function disconnectFeed() {
+      clearTimeout(wsRetry);
+      const socket = ws;
+      ws = null;
+      socket?.close();
+    }
+    // The walk steps from its own last price: a hidden tab's bars reach the chart only once it shows again.
+    let walkTimer = null, walkPrice = null;
+    function syncFeed() {
+      const symbol = datafeed.symbol;
+      if (live && symbol === COIN) connectFeed(); else disconnectFeed();
+      const walking = live && symbol !== null && symbol !== COIN;
+      if (walking && walkTimer === null) walkTimer = setInterval(() => {
+        walkPrice ??= chart.getData().at(-1)?.close ?? null;
+        if (walkPrice === null) return;
+        walkPrice = Math.max(1, walkPrice + (Math.random() - 0.5) * walkStep(datafeed.intervalMs ?? 0));
+        onMid(walkPrice, datafeed.symbol);
+      }, 1000);
+      if (!walking && walkTimer !== null) { clearInterval(walkTimer); walkTimer = null; }
+    }
     window.addEventListener('pagehide', disconnectFeed);
 
-    setInterval(() => {
-      if (!live || feed !== 'synthetic' || candles.length === 0) return;
-      const last = { ...candles[candles.length - 1] };
-      last.close = Math.max(1, last.close + (next() - 0.5) * 1.2);
-      last.high = Math.max(last.high, last.close);
-      last.low = Math.min(last.low, last.close);
-      last.volume += Math.round(next() * 50);
-      candles[candles.length - 1] = last;
-      chart.appendData(last);
-    }, 1000);
+    // ---------------- loading: Hyperliquid first, the random walk when it is unreachable ----------------
+    async function load(symbol, intervalMs) {
+      toolbar.cancelNavigation();
+      if (markFrame !== null) { frames.cancel(markFrame); markFrame = null; } // the datafeed drops its own queued bars
+      if (symbol !== datafeed.symbol) clearLines();
+      const gaps = symbol === GAPS;
+      if (chart.getConfig().timeScale.continuous !== gaps) chart.updateConfig({ timeScale: { continuous: gaps } });
+      await datafeed.setSymbol(symbol, intervalMs);
+      if (datafeed.symbol !== symbol || datafeed.intervalMs !== intervalMs) return; // superseded
+      if (symbol === COIN && datafeed.error !== null && chart.dataLength === 0) {
+        flash('Hyperliquid is unreachable · showing a random walk');
+        return load(WALK, intervalMs);
+      }
+      walkPrice = null; // the walk resumes from the loaded history's last close
+      syncFeed(); // mids for the loaded symbol; the datafeed ignores ticks for any other
+    }
+
+    // QA hook: what the chart holds, checked bucket by bucket.
+    window.__chartStats = () => {
+      const data = chart.getData(), step = (datafeed.intervalMs ?? 0) / 1000;
+      let duplicates = 0, missingBuckets = 0;
+      for (let i = 1; i < data.length; i++) {
+        const gap = data[i].time - data[i - 1].time;
+        if (gap <= 0) duplicates++;
+        else if (step > 0) missingBuckets += Math.round(gap / step) - 1;
+      }
+      const { symbol, intervalMs, loading, exhausted, error } = datafeed.state;
+      return { symbol, intervalMs, bars: data.length, duplicates, missingBuckets, exhausted, loading,
+        error: error === null ? null : String(error), firstTime: data[0]?.time ?? null, lastTime: data.at(-1)?.time ?? null };
+    };
+
+    await load(COIN, 900_000);
 
     // ---------------- boot content ----------------
-    indicatorItems.get('vol').click();
     {
-      const n = candles.length;
-      const lo = candles.slice(n - 120, n - 60).reduce((a, c, i) => (c.low < a.p ? { p: c.low, i: n - 120 + i } : a), { p: Infinity, i: 0 });
-      const hi = candles.slice(n - 60, n - 10).reduce((a, c, i) => (c.high > a.p ? { p: c.high, i: n - 60 + i } : a), { p: -Infinity, i: 0 });
-      chart.addDrawing({ name: 'fib', points: [{ index: lo.i, price: lo.p }, { index: hi.i, price: hi.p }], color: '#787b86' });
-      chart.addDrawing({ name: 'long-position', points: [{ index: n - 30, price: candles[n - 30].close }, { index: n + 10, price: candles[n - 30].close * 1.012 }] });
+      const data = chart.getData(), n = data.length;
+      if (n >= 120) {
+        const lo = data.slice(n - 120, n - 60).reduce((a, c, i) => (c.low < a.p ? { p: c.low, i: n - 120 + i } : a), { p: Infinity, i: 0 });
+        const hi = data.slice(n - 60, n - 10).reduce((a, c, i) => (c.high > a.p ? { p: c.high, i: n - 60 + i } : a), { p: -Infinity, i: 0 });
+        // On a phone these fill most of the view: a one-finger drag still pans across them, a tap selects one,
+        // and only the selected drawing follows a finger.
+        chart.addDrawing({ name: 'fib', points: [{ index: lo.i, price: lo.p }, { index: hi.i, price: hi.p }], color: '#787b86' });
+        chart.addDrawing({ name: 'long-position', points: [{ index: n - 30, price: data[n - 30].close }, { index: n + 10, price: data[n - 30].close * 1.012 }] });
+      }
     }
-    Object.assign(window, { chart, toolbar });
+    Object.assign(window, { chart, datafeed, toolbar, header, indicators, settings });
   </script>
 </body>
 </html>

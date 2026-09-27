@@ -1,0 +1,53 @@
+---
+title: Time scale
+description: Choose between a bar-indexed axis and a time-continuous axis that shows market gaps.
+---
+
+## Bar-indexed by default
+
+By default the horizontal axis is **bar-indexed**: every candle takes one bar width, and time gaps collapse. This is how TradingView and lightweight-charts lay out bars. It suits 24/7 crypto, but for session-based markets it puts Friday's close right next to Monday's open, and a feed outage leaves no visible hole.
+
+## Time-continuous mode
+
+```ts
+chart.updateConfig({ timeScale: { continuous: true } });
+```
+
+With `timeScale.continuous: true`, each candle sits in the slot of its timestamp:
+
+```text
+slot = round((time - firstTime) * 1000 / intervalMs)
+```
+
+Weekends, halts, and missing candles then show as empty space. Every candle keeps a slot of its own even if two timestamps round to the same one.
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `timeScale.continuous` | `false` | Lay candles out by time |
+| `timeScale.intervalMs` | `null` | Slot width in milliseconds. `null`, zero, negative, or non-finite values infer it as the most common gap between consecutive candles |
+
+Set `intervalMs` when you know it. The [paging datafeed](/docs/guides/datafeed) sets it on every load. The bar-close [countdown](/docs/guides/snapshots-countdown) also uses it when `timeAxis.intervalMs` is `null`, so the first bar after a weekend never reads as a multi-day bar.
+
+Switching modes keeps the rightmost visible bar in place. Slots are rebuilt when data is replaced and extended in constant time on a live tail append (unless that append changes an inferred interval), never per frame. The bar-indexed path costs nothing extra.
+
+The settings card exposes the mode as **Time-continuous axis** under Scales.
+
+## What changes in continuous mode
+
+- **Scrolling and zoom** are measured in slots. `scale.scrollBy(n)` moves `n` slots, `scale.barSpacing()` is pixels per slot, and `scale.priceToBarRatio()` is scale units per slot.
+- **Paging** through gaps wider than the viewport moves by the viewport and never skips candles. The toolbar's arrows and SmoothScroll use `scale.visibleSlots()`, the viewport in scroll units counted from the first candle.
+- **Time axis labels** are placed by slot, so a gap is still labelled; labels inside it carry interpolated times.
+- **Autoscale and the high/low references** use only candles inside the viewport. When a gap fills the whole viewport, the two candles around it frame the range.
+- **Lines** (line and area series, indicator lines) connect across a gap, including at the viewport's edges.
+
+## Limitations: indices stay bar-based
+
+Continuous mode changes where candles are drawn, not how they are addressed. Everything that takes a position still uses **candle indices**:
+
+- `scale.visibleRange()`, `scrollTo(index)`, `zoomToRange(from, to)`, `indexToX(index)`, and `xToIndex(x)` take or return candle indices. `xToIndex` inside a gap returns a fractional index between its two candles.
+- [Drawing points](/docs/guides/drawings) are `{ index, price }`. A point placed inside a gap stores a fractional index, so it stays between the same two candles when the layout changes.
+- Indicators compute per candle, not per slot: a 20-period SMA spans 20 candles, however much time that is.
+- Indices beyond the data, such as Ichimoku's forward-displaced spans or points in the whitespace after the last bar, extend one slot per bar.
+- Timestamps never become positions directly. To place something at a time, find the candle index for that time in your own data.
+
+Use `computeTimeSlots(candles, intervalMs?)` and `inferIntervalMs(candles)` to reproduce the layout in your own code.

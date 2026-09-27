@@ -11,6 +11,7 @@
 import type { Canvas2DLike } from '../dom.js';
 import { contrastingTextColor } from '../color.js';
 import type { DrawPrimitive, PrimitiveStyle, TextStyle } from '../drawings/types.js';
+import { slideInside } from '../drawings/geom.js';
 
 /** A resolved drawing with its pixel-space primitives. */
 export interface ResolvedDrawing {
@@ -31,6 +32,8 @@ export interface DrawingPaint {
   /** Chart background; fills selection handles and backs translucent labels. */
   readonly background: string;
   readonly pixelRatio: number;
+  /** Plot width (CSS px): labels with `inside` stay within it. Unset, they are drawn where placed. */
+  readonly width?: number;
 }
 
 /**
@@ -81,6 +84,7 @@ function roundedRect(ctx: Canvas2DLike, x: number, y: number, w: number, h: numb
 /**
  * Multi-line text; `\n` separates lines. With `bg`, the anchor refers to the
  * padded box's edge (per `align`/`baseline`); without, to the text block.
+ * An `inside` label slides horizontally to stay within `paintCfg.width`.
  */
 function drawText(
   ctx: Canvas2DLike,
@@ -99,7 +103,8 @@ function drawText(
   const h = size + (lines.length - 1) * lh + pad * 2;
   const align = p.align ?? 'left';
   const baseline = p.baseline ?? 'middle';
-  const left = align === 'left' ? p.x : align === 'center' ? p.x - w / 2 : p.x - w;
+  const anchored = align === 'left' ? p.x : align === 'center' ? p.x - w / 2 : p.x - w;
+  const left = p.inside === true && paintCfg.width !== undefined ? slideInside(anchored, Math.ceil(w), paintCfg.width) : anchored;
   const top = baseline === 'top' ? p.y : baseline === 'middle' ? p.y - h / 2 : p.y - h;
   if (p.bg !== undefined) {
     const x = Math.round(left);

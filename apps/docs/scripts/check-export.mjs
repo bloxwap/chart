@@ -15,7 +15,7 @@ async function walk(path) {
 for (const required of [
   'index.html', '404.html', 'docs/index.html', 'developers/index.html', 'search.json', 'icon.svg',
   'llms.txt', 'robots.txt', 'openapi.json', '404.md',
-  'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js',
+  'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js', 'chart-demo/dist/datafeed/index.js',
   'chart-demo/assets/fonts/Geist-Regular.woff2', 'chart-demo/assets/fonts/GeistMono-Regular.woff2',
 ]) {
   if (!await exists(join(root, required))) failures.push(`Missing ${required}`);

@@ -1,0 +1,88 @@
+---
+title: Touch gestures
+description: Pan, pinch, fling, and long-press for the crosshair on phones and tablets.
+---
+
+Touch follows TradingView's mobile model:
+
+| Gesture | Result |
+| --- | --- |
+| One-finger drag | Pan; a fast release flings the chart with an ease-out |
+| Two-finger pinch | Zoom around the midpoint between the fingers, and pan with it |
+| Long press (450 ms) | Show the crosshair, which then follows the finger instead of panning |
+| Drag after a long press | Nudge the crosshair, which stays after you lift your finger |
+| Hold still again | Jump the crosshair to the finger |
+| Tap | Hide the crosshair |
+| Double tap on the price axis | Reset the chart view, like the context menu's **Reset chart view** (`chart.resetScale()`) |
+
+Pens and mice are not affected: a pen behaves like a mouse unless you opt in.
+
+## With the drawing toolbar
+
+The [drawing toolbar](/docs/guides/toolbar-settings) routes finger input through these gestures on its own. On top of navigation:
+
+- **Placing drawings:** an armed tool keeps the finger, so taps place points and a second finger doesn't start a pinch.
+- **Selecting drawings:** a tap selects the drawing under the finger, within 16 CSS pixels (`TOUCH_HIT_PX`) instead of the mouse's 6. A tap on empty space clears the selection, even next to the selected drawing's handle. Where drawings overlap, the selected one keeps a tap.
+- **Editing drawings:** as on TradingView's mobile app, only the selected drawing follows a finger: its handles within 24 CSS pixels (`TOUCH_HANDLE_HIT_PX`, a mouse gets 8) and its body within `TOUCH_HIT_PX`, even where another drawing lies on top of it. The drag has to set off before the long press: holding still, on the selected drawing or anywhere else, shows the crosshair and leaves the drawing where it was. A one-finger drag that starts anywhere else pans, even across filled drawings such as Fibonacci bands and position boxes that cover a phone's plot. A tap edits nothing, and a second finger turns a drawing drag into a pinch. Locked drawings are never dragged.
+- **Double tap:** two taps within 300 ms (`DOUBLE_TAP_MS`) act as a double click on drawings and tools. On the price axis they reset the view instead.
+- **Hints:** after a finger press, the idle hint reads *Drag to scroll · pinch to zoom · long-press for crosshair*. On a coarse-pointer device it starts that way; a mouse press switches it back. For custom UI, read `controller.touch` or call `controller.setTouch(touch)`.
+- **No context menu:** a long press is the crosshair, so touch never opens the [right-click menu](/docs/guides/toolbar-settings#context-menus). The browser's compatibility `contextmenu` and `dblclick` events that follow a finger press are swallowed.
+
+The canvas gets the `cts-touch` class, which sets `touch-action: none` and disables the callout and text selection, so iOS Safari leaves the gestures to the chart.
+
+A finger dragging over the chart therefore no longer scrolls the page. For a chart embedded in a scrolling mobile page, pass `touchGestures: false` to `createDrawingToolbar`. The canvas then gets no `cts-touch` class, and fingers act like a mouse, as they did before touch gestures, while mouse drag, wheel zoom, and the crosshair keep working. `navigation: false` turns the gestures off as well.
+
+## Without the toolbar
+
+```ts
+import { attachTouchGestures } from '@bloxwap/chart/ui';
+
+const gestures = attachTouchGestures({ chart, canvas, document });
+// later
+gestures.destroy();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `chart`, `canvas`, `document` | Required | Timers come from the document's window |
+| `scheduler` | Its own | Share a frame clock with chart animations and other input |
+| `pointerTypes` | `['touch']` | Pointer types handled as fingers; add `'pen'` to treat a stylus like a finger |
+
+`destroy()` removes the listeners, timers, running motion, and the `cts-touch` class, and hides a long-press crosshair. Mouse and pen input is left for your own handlers.
+
+## Custom gesture handling
+
+`GestureRecognizer` is the DOM-free state machine behind both. Feed it pointer ids and canvas CSS pixels, and it calls your handlers:
+
+```ts
+import { GestureRecognizer } from '@bloxwap/chart/ui';
+
+const gestures = new GestureRecognizer(
+  {
+    pan: (dx) => chart.scale.scrollBy(dx / chart.scale.barSpacing()), // finger right: older bars
+    pinch: (factor, anchorX) => chart.scale.zoom(factor, anchorX),
+    pressStart: (x, y) => chart.setCrosshair(x, y),
+    pressMove: (x, y) => chart.setCrosshair(x, y),
+    pressEnd: () => chart.clearCrosshair(),
+  },
+  { timers: window, now: () => performance.now() },
+);
+
+canvas.addEventListener('pointerdown', (e) => gestures.down(e.pointerId, e.offsetX, e.offsetY));
+canvas.addEventListener('pointermove', (e) => gestures.move(e.pointerId, e.offsetX, e.offsetY));
+canvas.addEventListener('pointerup', (e) => gestures.up(e.pointerId, e.offsetX, e.offsetY));
+canvas.addEventListener('pointercancel', () => gestures.cancel());
+```
+
+Handlers you leave out do nothing. The full set is `pan(dx)`, `pinch(factor, anchorX)`, `pressStart(x, y)`, `pressMove(x, y)`, `pressEnd()`, `tap(x, y)`, and `fling(velocity)`. Two pointers are tracked; others are ignored. `active`, `tracking`, and `has(pointerId)` report its state. `hold(pointerId, x, y)` takes a finger your own code held for `LONG_PRESS_MS` and shows the crosshair at once.
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `LONG_PRESS_MS` | `450` | Hold time before the crosshair shows |
+| `TAP_SLOP_PX` | `8` | Travel that still counts as a tap or a hold |
+| `DOUBLE_TAP_MS` | `300` | Window for a double tap |
+| `FLING_MIN_VELOCITY` | `0.25` | Release speed (px/ms) that flings |
+| `FLING_DURATION_MS` | `700` | Length of the fling |
+| `TOUCH_HIT_PX` | `16` | Finger reach on drawings (tap to select, drag the selected one) |
+| `TOUCH_HANDLE_HIT_PX` | `24` | Finger reach on the selected drawing's handles |
+| `TOUCH_POINTER_TYPES` | `['touch']` | Default finger pointer types |

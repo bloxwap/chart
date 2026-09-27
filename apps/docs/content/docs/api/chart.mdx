@@ -19,9 +19,12 @@ Provide either `container` or `document`. `container` takes precedence if both a
 | `document` | `ChartDocument` | Factory for a canvas when no container is supplied |
 | `config` | `DeepPartial<ChartConfig>` | Configuration merged with defaults |
 | `theme` | `'dark' \| 'light'` | Built-in color theme applied under `config`; fields in `config` win |
+| `preset` | `'bloxwapDark' \| DeepPartial<ChartConfig>` | Brand preset applied under `theme` and `config` (`preset < theme < config`). See [theming and presets](/docs/guides/theming-presets) |
 | `autoResize` | `boolean` | Fill the canvas's parent and follow its size and the device pixel ratio; stops on `destroy()`. The canvas is placed out of flow (`position: absolute; inset: 0`), so give the parent a height |
 | `pixelRatio` | `number` | Backing pixels per CSS pixel; default 1 (managed for you with `autoResize`) |
 | `animation` | `{ scheduler, duration? }` | Optional injected frame clock; default duration 240ms |
+| `now` | `() => number` | Wall clock in milliseconds for the bar-close countdown; default `() => Date.now()` |
+| `crosshairCache` | `boolean` | Cache static pixels during pointer movement on browser canvases; default `true` |
 | `registries` | `{ indicators?, drawings? }` | Custom registries; omitted registries include built-ins |
 
 ## State and lifecycle
@@ -34,14 +37,19 @@ Provide either `container` or `document`. `container` takes precedence if both a
 | `plotArea` | `{ left, width, height }` | Main-pane bounds in canvas CSS pixels |
 | `resize(width, height, pixelRatio?)` | `void` | Resize using CSS dimensions |
 | `render()` | `void` | Force a full redraw |
-| `destroy()` | `void` | Dispose chart resources; does not remove the host canvas |
+| `refreshOverlay()` | `void` | Repaint only the status line, countdown, and crosshair over the cached frame |
+| `now()` | `number` | The injected clock's current time in milliseconds |
+| `destroy()` | `void` | Dispose chart resources and every event listener; does not remove the host canvas |
+| `isDestroyed()` | `boolean` | Whether `destroy()` has run |
 
 ## Data and configuration
 
 | Method | Behavior |
 | --- | --- |
 | `setData(candles)` | Replace history and redraw |
-| `appendData(candle)` | Insert a timestamp or replace its existing candle |
+| `appendData(candle)` | Insert a timestamp or replace its existing candle; one older than the first candle is prepended like `prependData` |
+| `prependData(candles)` | Add older history in front and return how many candles were added; the view stays put. See [data](/docs/guides/data#add-older-history) |
+| `getData()` | The loaded candles, oldest first, as the chart holds them after `setData`, `appendData`, `prependData`, and datafeed loads. Not a copy: don't mutate it, and call it again after a data change. See [data](/docs/guides/data#reading-state) |
 | `updateConfig(partial)` | Merge a partial config and redraw |
 | `batch(callback)` | Group synchronous changes into one redraw and return the callback result |
 
@@ -59,7 +67,14 @@ const id = chart.addIndicator({
 chart.removeIndicator(id);
 ```
 
-`addIndicator(input)` returns a string ID. It accepts `name`, optional `id`, `params`, `colors`, `pane`, and `visible`. Unknown names throw. `removeIndicator(id)` returns whether a matching instance existed.
+`addIndicator(input)` returns a string ID. It accepts `name`, optional `id`, `params`, `colors`, `pane`, `visible`, `lineWidths`, and `hiddenLines`. Unknown names throw. `removeIndicator(id)` returns whether a matching instance existed.
+
+| Method | Purpose |
+| --- | --- |
+| `getIndicator(id)` | The instance's config with `lineWidths` and `hiddenLines` filled in, or `undefined` |
+| `updateIndicator(id, patch)` | Patch `params` (merged per key), `colors`, `lineWidths`, `hiddenLines`, `pane`, or `visible`; returns whether it existed. Only param and color changes recompute |
+| `indicatorAt(x, y, tolerance = 6)` | `{ id, key }` of the topmost visible indicator plot near a canvas point, or `null` |
+| `paneAt(y)` | The pane under canvas `y` in the last frame: `'main'`, the id of the indicator owning a sub-pane, or `null` below the panes |
 
 Register calculations using `chart.indicators.register(definition)`. See [indicators](/docs/guides/indicators).
 
@@ -77,7 +92,7 @@ Register calculations using `chart.indicators.register(definition)`. See [indica
 | `setDraft(draft)` | Preview an in-progress drawing; pass `null` to clear |
 | `selectDrawing(id)` | Display handles; pass `null` to clear selection |
 | `selectedDrawing` | Selected ID or `null` |
-| `drawingAt(x, y, tolerance?)` | Hit-test the topmost visible drawing |
+| `drawingAt(x, y, tolerance?, prefer?)` | Hit-test the topmost visible drawing; the drawing id `prefer` names (such as the selection) wins wherever it is hit |
 | `handleAt(x, y, tolerance?)` | Selected handle index, or `-1` |
 | `pointFromPixel(x, y, name?)` | Convert a pixel to a data/anchored drawing point |
 | `snapPoint(x, y, magnet)` | Convert and apply OHLC magnet snapping |
@@ -90,4 +105,38 @@ Drawing edits return `false` when the requested instance or point does not exist
 
 `setCrosshair(x, y)` accepts canvas-local CSS pixels. `clearCrosshair()` hides it. The optional toolbar handles these calls during pointer interaction.
 
-The stable `chart.scale` object exposes [navigation and coordinate conversion](/docs/api/scale).
+The stable `chart.scale` object exposes [navigation and coordinate conversion](/docs/api/scale). `resetScale()` resets the view like TradingView's "Reset chart view": default bar spacing, scrolled to the latest bar, price autoscale on, and a locked price-to-bar ratio captured again. The scale mode is kept.
+
+## Price lines and markers
+
+`chart.series` holds [price lines and markers](/docs/guides/price-lines-markers) on the main series:
+
+| Member | Purpose |
+| --- | --- |
+| `createPriceLine(options)` | Add a horizontal price line; returns a handle with `id`, `options()`, `applyOptions(patch)`, and `remove()` |
+| `priceLines()` | Live lines in creation order |
+| `removePriceLine(line)` | Remove a line; returns whether it was live |
+| `setMarkers(markers)` | Replace every bar marker |
+| `markers()` | Copies of the markers, sorted by time |
+
+## Events
+
+Each method returns an unsubscribe function. See [chart events](/docs/guides/events) for payloads and delivery rules.
+
+| Method | Fires after |
+| --- | --- |
+| `subscribeVisibleRangeChange(listener)` | A render that moved the visible bars |
+| `subscribeCrosshairMove(listener)` | `setCrosshair` or `clearCrosshair` changed the crosshair, or a render changed the bar or price under it |
+| `subscribeDataLoad(listener)` | `setData`, `appendData`, `prependData`, or new `data` in `updateConfig` rendered |
+| `subscribeLayoutChange(listener)` | A render that changed the canvas size, the main plot's bounds, or the config |
+| `subscribeConfigChange(listener)` | A render after config changes; `keys` names the sections written (`updateConfig` keys, `'indicators'`, `'drawings'`) |
+
+## Snapshots
+
+| Method | Returns |
+| --- | --- |
+| `takeScreenshot(options?)` | A new canvas with the current view |
+| `toBlob(options?)` | `Promise<SnapshotBlob>` of an encoded image: your `Blob` type when your typings declare one (DOM or Node) |
+| `toDataURL(options?)` | A data URL |
+
+Options are `pixelRatio`, `crosshair`, `background`, `watermark`, and, for encoding, `type` and `quality`. See [snapshots and countdown](/docs/guides/snapshots-countdown).

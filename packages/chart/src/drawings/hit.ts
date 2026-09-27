@@ -6,6 +6,7 @@
  */
 
 import type { DrawPrimitive } from './types.js';
+import { slideInside } from './geom.js';
 
 /** Distance from `(px, py)` to the segment `(x1, y1)–(x2, y2)`. */
 export function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -43,9 +44,10 @@ function nearPolyline(pts: readonly number[], closed: boolean, x: number, y: num
 /**
  * Whether `(x, y)` hits `prim` within `tol` pixels. Filled shapes hit
  * anywhere inside; outlines hit near the stroke. Text and images hit
- * inside their (estimated) box.
+ * inside their (estimated) box; with the plot `width`, an `inside` label's
+ * box slides into the plot as the renderer draws it.
  */
-export function hitTest(prim: DrawPrimitive, x: number, y: number, tol: number): boolean {
+export function hitTest(prim: DrawPrimitive, x: number, y: number, tol: number, width?: number): boolean {
   switch (prim.type) {
     case 'line':
       return distToSegment(x, y, prim.x1, prim.y1, prim.x2, prim.y2) <= tol + (prim.width ?? 1) / 2;
@@ -84,7 +86,8 @@ export function hitTest(prim: DrawPrimitive, x: number, y: number, tol: number):
       const w = Math.max(...lines.map((l) => l.length)) * size * 0.6 + (prim.pad ?? 4) * 2;
       const h = lines.length * size * 1.3 + (prim.pad ?? 4) * 2;
       const align = prim.align ?? 'left';
-      const left = align === 'left' ? prim.x : align === 'center' ? prim.x - w / 2 : prim.x - w;
+      const anchored = align === 'left' ? prim.x : align === 'center' ? prim.x - w / 2 : prim.x - w;
+      const left = prim.inside === true && width !== undefined ? slideInside(anchored, w, width) : anchored;
       const baseline = prim.baseline ?? 'middle';
       const top = baseline === 'top' ? prim.y : baseline === 'middle' ? prim.y - h / 2 : prim.y - h;
       return x >= left - tol && x <= left + w + tol && y >= top - tol && y <= top + h + tol;

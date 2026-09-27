@@ -59,9 +59,17 @@ export function kdjValues(
 /** KDJ indicator definition (name `'kdj'`, param `period`, default 9). */
 export const kdjIndicator: IndicatorDef = {
   name: 'kdj',
+  label: 'KDJ',
+  shortName: 'KDJ',
   defaultParams: { period: 9 },
   defaultColors: ['#2962ff', '#ff6d00', '#ab47bc'],
   defaultPane: 'sub',
+  inputs: [{ key: 'period', label: 'Period', min: 1, step: 1, integer: true }],
+  styles: [
+    { key: 'k', label: 'K', colorIndex: 0 },
+    { key: 'd', label: 'D', colorIndex: 1 },
+    { key: 'j', label: 'J', colorIndex: 2 },
+  ],
   update(output, candles, from, params) {
     const period = Math.max(1, Math.floor(params['period'] ?? 9));
     // Large batches/periods are cheaper with the linear monotonic-queue pass.

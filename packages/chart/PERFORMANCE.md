@@ -121,8 +121,9 @@ CHART_BENCH_DIST=/path/to/baseline/dist node packages/chart/bench/workloads.benc
 
 `--headed=true` opens a visible Chrome window; `--frames=180` extends sampling.
 Run versions sequentially on an otherwise idle machine. The Node benchmarks
-measure recording-context CPU, not browser graphics. They cover all five series
-and streaming all seven built-in indicators in addition to scalar/WASM math,
+measure recording-context CPU, not browser graphics. They cover the five original
+series types and streaming the seven original indicators (SMA, EMA, BOLL, MACD,
+RSI, KDJ, VOL) in addition to scalar/WASM math,
 rolling algorithms and ingestion. Browser benchmarks have no runtime library
 dependency; Playwright is a development-only runner.
 
