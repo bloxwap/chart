@@ -14,6 +14,7 @@
     "build:icons": "npm --workspace @bloxwap/chart run build:icons",
     "test": "npm --workspace @bloxwap/chart run test",
     "coverage": "npm --workspace @bloxwap/chart run coverage",
+    "coverage:lcov": "npm --workspace @bloxwap/chart run coverage:lcov",
     "bench": "npm --workspace @bloxwap/chart run bench",
     "demo": "npm --workspace @bloxwap/chart-playground run dev",
     "docs:dev": "npm --workspace @bloxwap/chart-docs run dev",

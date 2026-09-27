@@ -1,0 +1,44 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/chart/**', 'package.json', 'package-lock.json', '.github/workflows/coverage.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Generate coverage report
+        run: |
+          npm run coverage:lcov
+          test -s packages/chart/coverage/lcov.info
+          # Node reports package-relative source paths (via source maps); Codecov needs repository-relative ones.
+          sed -i 's|^SF:|SF:packages/chart/|' packages/chart/coverage/lcov.info
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./packages/chart/coverage/lcov.info
+          disable_search: true
+          fail_ci_if_error: true
