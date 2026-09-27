@@ -1,0 +1,66 @@
+name: Publish to npm
+
+# Publishing a GitHub release publishes @bloxwap/chart at the version in packages/chart/package.json.
+# Release flow: bump the version in a PR, merge it, then create a release tagged v<version>.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+      # npm publishes via OIDC trusted publishing (no token here), which needs npm >= 11.5.1.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Determine version and npm tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # The private workspace root has no release version; the chart package owns it.
+          VERSION=$(jq -r .version packages/chart/package.json)
+          # A release must be tagged for the version it publishes, or npm and GitHub disagree.
+          if [[ -n "$RELEASE_TAG" && "$RELEASE_TAG" != "v$VERSION" ]]; then
+            echo "::error::Release tag $RELEASE_TAG does not match packages/chart/package.json version v$VERSION"
+            exit 1
+          fi
+          # Extract tag (alpha, beta, rc) from the version if present
+          TAG=$(echo "$VERSION" | sed -n 's/.*-\(alpha\|beta\|rc\).*/\1/p')
+          # If no known tag but the version has a prerelease part, use "prerelease"
+          if [[ -z "$TAG" && "$VERSION" == *-* ]]; then
+            TAG="prerelease"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Default to "latest" if no tag was determined
+          echo "value=${TAG:-latest}" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm supports trusted publishing
+        run: |
+          npm --version
+          npx --yes semver -r '>=11.5.1' "$(npm --version)" > /dev/null || npm install -g npm@latest
+
+      # prepack builds and prepublishOnly runs the full test suite before anything is uploaded;
+      # publishConfig.access is public, and trusted publishing attaches provenance.
+      - name: Publish @bloxwap/chart@${{ steps.tag.outputs.version }}
+        run: npm publish --workspace @bloxwap/chart --tag ${{ steps.tag.outputs.value }}
