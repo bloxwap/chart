@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createChart, version } from '../dist/index.js';
 import { MockCanvas, MockDocument, type ChartCanvas, type Canvas2DLike } from '../dist/dom.js';
 import type { Candle } from '../dist/core/data.js';
@@ -14,8 +15,10 @@ function candles(n: number): Candle[] {
 }
 
 describe('createChart', () => {
-  it('exposes a version', () => {
-    assert.equal(version, '0.0.1');
+  it('exposes the package.json version', () => {
+    // Compiled to dist-test/, so the manifest is one level up. Keeps the export in step with release bumps.
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
+    assert.equal(version, manifest.version);
   });
   it('throws without a container or document', () => {
     assert.throws(() => createChart({}), /inject a container/);

@@ -58,4 +58,12 @@ The preview server reads the exported base path, so this build opens at `http://
 | `npm run pack:chart` | Build the library and create a tarball in `packages/chart` |
 | `npm run demo` | Start the standalone playground; requires Bun |
 
+## Release to npm
+
+Publishing a GitHub release publishes `@bloxwap/chart` from CI (`.github/workflows/publish_npm.yml`) through npm trusted publishing, so no npm token is stored in the repository.
+
+1. In a pull request, bump `version` in `packages/chart/package.json` (and the `version` export in `packages/chart/src/index.ts`), then merge it. A test fails if the two disagree.
+2. Create a GitHub release tagged `v<version>`, for example `v0.0.2`. The workflow fails if the tag and the package version disagree.
+3. The workflow builds, runs the full test suite, and publishes. Versions with `-alpha`, `-beta`, or `-rc` go to that npm dist-tag, other prereleases to `prerelease`, and everything else to `latest`.
+
 See the [repository](https://github.com/bloxwap/chart) for the source and MIT license.
