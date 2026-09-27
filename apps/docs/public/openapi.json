@@ -1,0 +1,208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bloxwap Chart SDK — Documentation Site API",
+    "version": "0.0.1",
+    "summary": "Machine-readable endpoints published by the @bloxwap/chart documentation site.",
+    "description": "The Bloxwap Chart SDK (`@bloxwap/chart`) is a client-side TypeScript library for interactive financial charts on HTML canvas. It has no hosted HTTP API: charts are rendered by JavaScript running in your own page, worker, or test. This specification documents every machine-readable HTTP resource the documentation site itself publishes — the llms.txt agent index, the sitemap, the full-text search index, and this specification — so agents can discover and consume them automatically. The library's JavaScript API (createChart, indicators, drawings, the React component) is documented at https://bloxwap.github.io/chart/docs/api/chart/ and indexed in https://bloxwap.github.io/chart/llms.txt.",
+    "contact": {
+      "name": "Bloxwap, Inc. support",
+      "email": "support@bloxwap.com",
+      "url": "https://bloxwap.github.io/chart/developers/"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "externalDocs": {
+    "description": "Full documentation and JavaScript API reference",
+    "url": "https://bloxwap.github.io/chart/docs/"
+  },
+  "servers": [
+    { "url": "https://bloxwap.github.io/chart", "description": "GitHub Pages static hosting (GET only)" }
+  ],
+  "tags": [
+    { "name": "indexes", "description": "Machine-readable indexes of the site and library documentation." },
+    { "name": "pages", "description": "Human-readable HTML entry points." }
+  ],
+  "paths": {
+    "/llms.txt": {
+      "get": {
+        "operationId": "getLlmsTxt",
+        "summary": "Agent-oriented index of the library and documentation",
+        "description": "Markdown index following the llms.txt convention: what the library does, when to use it, install and usage snippets, and links to every docs page and the API reference. Start here.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The llms.txt index as Markdown.",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "Markdown document in llms.txt format." }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiSpecification",
+        "summary": "This OpenAPI specification",
+        "description": "The OpenAPI 3.1 document describing every machine-readable endpoint on this site.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The OpenAPI specification.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "description": "An OpenAPI 3.1 document." }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/sitemap.xml": {
+      "get": {
+        "operationId": "getSitemap",
+        "summary": "XML sitemap of every public page",
+        "description": "Standard XML sitemap listing every public HTML page with its last modification date. Regenerated on each deploy.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The XML sitemap.",
+            "content": {
+              "application/xml": {
+                "schema": { "type": "string", "description": "A sitemap conforming to https://www.sitemaps.org/protocol.html." }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/robots.txt": {
+      "get": {
+        "operationId": "getRobotsTxt",
+        "summary": "Robots policy and sitemap pointer",
+        "description": "Crawler policy. All agents are allowed; points at the XML sitemap.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The robots policy.",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "A robots.txt file." }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/search.json": {
+      "get": {
+        "operationId": "getSearchIndex",
+        "summary": "Full-text search index of all documentation",
+        "description": "Serialized Orama search index covering the title, description, and body text of every documentation page. Load it to answer questions over the docs without crawling each page.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The serialized search index.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchIndex" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/404.md": {
+      "get": {
+        "operationId": "getNotFoundMarkdown",
+        "summary": "Markdown explanation of a 404 error",
+        "description": "Markdown error body for missing pages: explains the error and links to the documentation, llms.txt, sitemap, and developer portal. Fetch this after receiving a 404 HTML response to get an agent-readable explanation.",
+        "tags": ["indexes"],
+        "responses": {
+          "200": {
+            "description": "The Markdown error explanation.",
+            "content": {
+              "text/markdown": {
+                "schema": { "type": "string", "description": "Markdown error explanation with recovery links." }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/developers/": {
+      "get": {
+        "operationId": "getDeveloperPortal",
+        "summary": "Developer portal",
+        "description": "Developer portal page: install quickstart, API reference links, machine-readable resources, and the live chart sandbox.",
+        "tags": ["pages"],
+        "responses": {
+          "200": {
+            "description": "The developer portal page.",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/docs/": {
+      "get": {
+        "operationId": "getDocumentationHome",
+        "summary": "Documentation home",
+        "description": "Entry point to the guides and the JavaScript API reference for @bloxwap/chart.",
+        "tags": ["pages"],
+        "responses": {
+          "200": {
+            "description": "The documentation home page.",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SearchIndex": {
+        "type": "object",
+        "description": "Serialized Orama full-text search index of the documentation, as produced by fumadocs. Opaque storage format; consume it with an Orama client or treat it as a data blob.",
+        "properties": {
+          "type": { "type": "string", "enum": ["advanced"], "description": "Index serialization format." },
+          "internalDocumentIDStore": { "type": "object", "description": "Mapping of internal document IDs to page URLs." },
+          "index": { "type": "object", "description": "Inverted term index over document fields." },
+          "docs": { "type": "object", "description": "Stored documents: title, description, URL, and content per docs page." }
+        },
+        "required": ["type"]
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "No resource exists at this path. Because the site is statically hosted, the error body is an HTML page (Content-Type: text/html) whose visible text explains the error and links to the documentation, llms.txt, and sitemap; the same explanation in Markdown is available at /404.md (linked from the error page with rel=\"alternate\").",
+        "content": {
+          "text/html": {
+            "schema": { "type": "string", "description": "Human- and agent-readable 404 page with recovery links." }
+          }
+        }
+      }
+    }
+  }
+}

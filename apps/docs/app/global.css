@@ -245,6 +245,7 @@ html > body[data-scroll-locked] {
 /* Same box as the Fumadocs header (max-w --fd-layout-width, 16px padding), so content lines up with the nav. */
 .home { width: 100%; max-width: var(--fd-layout-width, 1400px); padding: var(--space-5xl) var(--space-lg) 0; margin: 0 auto; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--space-6xl); padding-bottom: var(--space-5xl); }
+.hero--single { grid-template-columns: minmax(0, 1fr); max-width: 47.5rem; }
 .hero-copy { min-width: 0; }
 .eyebrow { display: flex; align-items: center; gap: var(--space-sm); color: var(--color-fd-muted-foreground); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
 .status-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--color-fd-primary); }
@@ -418,6 +419,9 @@ button[data-search-full] kbd {
 .not-found { max-width: 37.5rem; padding: 7.5rem var(--space-2xl); margin: 0 auto; }
 .not-found h1 { font-size: var(--text-4xl); margin: var(--space-2xl) 0; }
 .not-found .btn { margin-top: var(--space-3xl); }
+.not-found-links { display: flex; flex-wrap: wrap; gap: var(--space-sm) var(--space-xl); margin-top: var(--space-3xl); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
+.not-found-links a { color: var(--color-fd-muted-foreground); transition: color var(--duration-fast) var(--ease-spring); }
+.not-found-links a:hover { color: var(--color-fd-foreground); }
 @media (max-width: 800px) {
   .home { padding-top: var(--space-3xl); }
   .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-3xl); padding-bottom: var(--space-3xl); }

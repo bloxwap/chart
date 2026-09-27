@@ -29,6 +29,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${display.variable} dark`}>
-    <body className="flex min-h-screen flex-col antialiased"><Provider>{children}</Provider></body>
+    <body className="flex min-h-screen flex-col antialiased">
+      <link rel="service-desc" type="application/json" href={`${basePath}/openapi.json`} />
+      <Provider>{children}</Provider>
+    </body>
   </html>;
 }
