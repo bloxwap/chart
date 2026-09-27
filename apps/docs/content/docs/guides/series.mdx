@@ -33,7 +33,7 @@ For a separate volume pane alongside price candles, add the built-in `vol` indic
 
 ## Colors and themes
 
-Colors accept hex, RGB/RGBA, and `color(display-p3 ...)` strings. The core's built-in presets are partial configs:
+Colors accept hex, RGB/RGBA, and `color(display-p3 ...)` strings. The core's built-in presets are partial configs that also set series colors matched to their background (bright wide-gamut candles on dark, higher-contrast candles on light):
 
 ```ts
 import { CHART_THEMES } from '@bloxwap/chart';

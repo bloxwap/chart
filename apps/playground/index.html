@@ -108,7 +108,7 @@
       animation: { scheduler: frames, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240 },
       config: defineConfig({
         data: candles,
-        series: { type: 'candlestick', upColor: 'color(display-p3 0 1 0.55)', downColor: 'color(display-p3 1 0.2 0.35)' },
+        series: { type: 'candlestick' },
         theme: { fontFamily: "'Geist', system-ui, sans-serif", monoFamily: "'Geist Mono', ui-monospace, monospace", fontSize: 12 },
         watermark: { visible: true, text: 'BLOXWAP', opacity: 0.06, fontFamily: "'Geist'" },
         statusLine: { visible: true, symbol: feed === 'live' ? symbolFor(timeframe.label) : 'Random walk', volume: true },

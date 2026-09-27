@@ -361,7 +361,7 @@ export function createChartSettings(options: ChartSettingsOptions): ChartSetting
       const preset = CHART_THEMES[theme];
       defaults.theme = mergeDeep(initial.theme, preset.theme);
       defaults.grid = mergeDeep(initial.grid, preset.grid);
-      defaults.crosshair = mergeDeep(defaults.crosshair ?? {}, preset.crosshair);
+      defaults.crosshair = mergeDeep(defaults.crosshair!, preset.crosshair);
     }
     currentTheme = theme;
   };
