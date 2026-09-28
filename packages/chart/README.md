@@ -7,7 +7,7 @@ Zero-dependency, WASM+SIMD-accelerated candlestick/financial charting library in
 Read the [documentation and interactive playground](https://bloxwap.github.io/chart/)
 for guides, an API reference, and the complete chart controls.
 
-Install it with `npm install @bloxwap/chart`. `0.0.1` is an early developer
+Install it with `npm install @bloxwap/chart`. `0.1.0` is an early developer
 preview; expect breaking changes before `1.0`.
 
 The library lives in `packages/chart`, the Fumadocs app in `apps/docs`, and the
