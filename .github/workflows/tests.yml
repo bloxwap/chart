@@ -1,0 +1,45 @@
+name: Tests
+
+# Gates every pull request on the same checks contributors run locally. Runs on all PRs (no path
+# filter) so it can be made a required status check without blocking docs-only changes.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # Builds icons, WASM and TypeScript, compiles the tests, runs the suite, and fails if any
+      # file drops below 100% line/branch/function coverage.
+      - name: Tests and coverage gate
+        run: npm run coverage
+
+      # Tests import dist/ directly, so check the published entry points separately: every
+      # "exports" subpath must import by package name in plain Node.
+      - name: Package entry points
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const { name, exports } = JSON.parse(readFileSync('packages/chart/package.json', 'utf8'));
+            for (const key of Object.keys(exports)) await import(key === '.' ? name : name + key.slice(1));
+            console.log('imported', Object.keys(exports).length, 'entry points');
+          "
