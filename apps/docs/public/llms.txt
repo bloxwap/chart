@@ -20,11 +20,11 @@ Reach for `@bloxwap/chart` when an agent or developer needs to:
 
 - General-purpose business charts (pie, scatter, stacked bars): use a general charting library instead.
 - Server-side image generation without any canvas implementation available.
-- Projects that need a stable API today: 0.0.x is a developer preview and may change before 1.0.
+- Projects that need a stable API today: 0.x is a developer preview and may change before 1.0.
 
 ## How to use it
 
-Install it from npm (0.0.1 is an early developer preview):
+Install it from npm (0.1.0 is an early developer preview):
 
 ```sh
 npm install @bloxwap/chart

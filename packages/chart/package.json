@@ -1,6 +1,6 @@
 {
   "name": "@bloxwap/chart",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Zero-dependency, WASM-accelerated candlestick/financial charting library in TypeScript with injected DOM",
   "type": "module",
   "sideEffects": false,
