@@ -17,6 +17,11 @@
     #main { flex: 1; min-width: 0; display: flex; flex-direction: column; margin: 6px 6px 6px 0; border-radius: 12px; overflow: hidden; background: #171717; }
     body.light #main { background: #ffffff; }
     #header { flex: none; min-width: 0; }
+    /* Wide: the control rail carries the header's controls, so the plot starts at the top of the card. */
+    @media (min-width: 600px) { #header { display: none; } }
+    /* Rail text toggles (timeframe, Auto / % / Log) fit the 36px buttons; a pressed toggle takes the accent. */
+    #ctrl-rail .cts-btn-label { font-size: 11px; }
+    #ctrl-rail .rail-scale.cts-on { color: var(--cts-accent); background: var(--cts-accent-soft); }
     #stage { position: relative; flex: 1; min-height: 0; }
     #tools { flex: none; width: 52px; overflow: hidden; transition: width 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
     #tools.collapsed { width: 0; }
@@ -26,7 +31,7 @@
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
     /* bloxwap.pro chrome on dark for the rails, menus and dialogs: zero-stroke surfaces, #262626 hover fill, #00ff3f accent.
-       The header and the on-chart A / % / L strip take BLOXWAP_HEADER_THEME instead, which clears itself on light. */
+       The header takes BLOXWAP_HEADER_THEME instead, which clears itself on light. */
     body:not(.light) .cts-theme:not(.cts-light) {
       --cts-edge: transparent; --cts-panel-raised: #262626; --cts-accent: #00ff3f;
       --cts-accent-soft: #262626; --cts-on-accent: #0a0a0a;
@@ -70,12 +75,15 @@
   </div>
 
   <script type="module">
-    import { defineConfig, presetChartTheme } from '../dist/index.js';
-    import { createDatafeedChart, bucketStartMs } from '../dist/datafeed/index.js';
+    import {
+      defineConfig, presetChartTheme, createFootprintSeries, createDeltaIndicator, createCvdIndicator, attachRangeProfile, attachInlineBook,
+    } from '../dist/index.js';
+    import { createDatafeedChart, datafeedFootprintSource, bucketStartMs } from '../dist/datafeed/index.js';
     import {
       createDrawingToolbar, createChartSettings, createIndicatorsDialog, createThemeControl, createFrameScheduler,
-      createChartHeader, createScaleButtons, DEFAULT_TIMEFRAMES, attachScrollableRail, el, iconButton, setButtonIcon,
-      menuItem, menuLabel, menuSeparator, startCountdownTicker,
+      createChartHeader, DEFAULT_TIMEFRAMES, attachScrollableRail, el, iconButton, setButtonIcon,
+      menuItem, menuLabel, menuSeparator, startCountdownTicker, labelButton, setButtonLabel, ICONS,
+      DEFAULT_CHART_TYPES, CHART_TYPE_LABELS, SCALE_TOGGLES, toggleScale, scaleToggleState,
     } from '../dist/ui/index.js';
     import { BLOXWAP_HEADER_THEME } from '../dist/ui/index.js';
 
@@ -137,14 +145,146 @@
       return walkFor(symbol, intervalMs).filter((c) => c.time * 1000 >= fromMs && c.time * 1000 <= toMs);
     }
 
+    // ---------------- depth books: Hyperliquid for BTC, a synthetic book for the walks ----------------
+    // Hyperliquid pushes whole l2Book snapshots, so each one becomes a sequenced diff against the previous
+    // (size 0 removes a level). A snapshot read returns the latest pushed book, so the diffs line up with it.
+    // A subscription returns at most 20 levels a side, so the book stitches two precisions: fine levels sized to
+    // the timeframe (nSigFigs 4/3 ≈ $10/$100 at BTC prices) near the price, then coarse buckets (one step coarser)
+    // out to ±20 of those, for depth across the whole visible range.
+    let hlBook = null, hlSeq = 0, hlFigs = 4;
+    /** The latest raw book per precision, tagged with its nSigFigs. */
+    let hlFine = null, hlCoarse = null;
+    /** Hyperliquid's full-precision best bid/offer (the `bbo` feed): the true spread under aggregated levels. */
+    let hlBbo = null;
+    const hlFigsFor = (intervalMs) => (intervalMs <= 300_000 ? 4 : 3);
+    const hlSide = (levels) => levels.map((l) => [+l.px, +l.sz]);
+    /** Bucket size of `figs` significant figures at `price` (e.g. 3 → $100 at $83k). */
+    const hlStep = (price, figs) => 10 ** (Math.floor(Math.log10(price)) + 1 - figs);
+    function hlRaw(levels, figs, time) {
+      return { figs, bids: hlSide(levels[0]), asks: hlSide(levels[1]), time };
+    }
+    /**
+     * Fine levels, then each coarse bucket beyond them. Buckets round bids down ([px, px + step)) and asks up
+     * ((px - step, px]); the bucket straddling the fine edge keeps only the size the fine levels don't cover.
+     */
+    function hlStitch(fine, coarse) {
+      if (coarse === null || coarse.figs !== fine.figs - 1) return { figs: fine.figs, bids: fine.bids, asks: fine.asks, time: fine.time };
+      const price = fine.bids[0]?.[0] ?? fine.asks[0]?.[0];
+      const step = price > 0 ? hlStep(price, coarse.figs) : 0;
+      const side = (levels, buckets, bid) => {
+        if (levels.length === 0 || step === 0) return levels;
+        const edge = levels.at(-1)[0], out = levels.slice();
+        for (const [px, size] of buckets) {
+          if (bid ? px >= edge : px <= edge) continue; // wholly inside the fine range
+          const inside = levels.reduce((sum, [p, s]) => ((bid ? p >= px && p < px + step : p > px - step && p <= px) ? sum + s : sum), 0);
+          const rest = +(size - inside).toFixed(8);
+          if (rest > 0) out.push([px, rest]);
+        }
+        return out;
+      };
+      return { figs: fine.figs, bids: side(fine.bids, coarse.bids, true), asks: side(fine.asks, coarse.asks, false), time: Math.max(fine.time, coarse.time) };
+    }
+    async function fetchHyperliquidDepth({ signal }) {
+      const figs = hlFigs = hlFigsFor(datafeed.intervalMs ?? 900_000);
+      if (hlBook === null || hlBook.figs !== figs) {
+        const read = async (nSigFigs) => {
+          const res = await fetch('https://api.hyperliquid.xyz/info', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, signal,
+            body: JSON.stringify({ type: 'l2Book', coin: COIN, nSigFigs }),
+          });
+          if (!res.ok) throw new Error(`Hyperliquid l2Book failed: ${res.status}`);
+          const { levels, time } = await res.json();
+          return hlRaw(levels, nSigFigs, time);
+        };
+        const [fine, coarse] = await Promise.all([read(figs), read(figs - 1)]);
+        // A push at this precision during the read is newer: keep it.
+        if (hlBook === null || hlBook.figs !== figs) {
+          hlFine = fine;
+          hlCoarse = coarse;
+          hlBook = hlStitch(fine, coarse);
+        }
+      }
+      return { lastUpdateId: hlSeq, bids: hlBook.bids, asks: hlBook.asks, time: hlBook.time };
+    }
+    function hlDiff(prev, next) {
+      const keep = new Set(next.map(([p]) => p));
+      return next.concat(prev.filter(([p]) => !keep.has(p)).map(([p]) => [p, 0]));
+    }
+    /** Pushes arrive untagged: a book whose every price sits on the coarse step is the coarse subscription's. */
+    function onHyperliquidBook(data, figs) {
+      if (figs !== hlFigs) return; // a superseded precision's push
+      const levels = data.levels[0].concat(data.levels[1]);
+      if (levels.length === 0) return;
+      const coarseStep = hlStep(+levels[0].px, figs - 1);
+      const coarse = levels.every((l) => Math.abs(+l.px / coarseStep - Math.round(+l.px / coarseStep)) < 1e-9);
+      const raw = hlRaw(data.levels, coarse ? figs - 1 : figs, data.time);
+      if (coarse) hlCoarse = raw;
+      else hlFine = raw;
+      if (hlFine === null || hlFine.figs !== figs) return; // the coarse half alone is no book yet
+      const next = hlStitch(hlFine, hlCoarse);
+      const prev = hlBook !== null && hlBook.figs === figs ? hlBook : null;
+      // Without a same-precision base the diff is unknown: skip an id so the push gaps and the book resyncs.
+      if (prev === null) hlSeq += 1;
+      hlBook = next;
+      hlSeq += 1;
+      datafeed.pushDepth({ firstUpdateId: hlSeq, finalUpdateId: hlSeq, time: next.time,
+        bids: hlDiff(prev?.bids ?? [], next.bids), asks: hlDiff(prev?.asks ?? [], next.asks) }, COIN);
+    }
+    // A walk symbol's book: 50 levels per side around the last close, mutated by synthDepthDelta.
+    const synthBooks = new Map();
+    function synthBook(symbol) {
+      const existing = synthBooks.get(symbol);
+      if (existing) return existing;
+      const mid = chart.getData().at(-1)?.close ?? 100;
+      const tick = Math.max(0.01, +(mid * 0.0002).toPrecision(1));
+      const rand = seeded(hash(`${symbol}@depth`));
+      const side = (dir) => Array.from({ length: 50 }, (_, i) => [+(mid + dir * (i + 1) * tick).toFixed(6), +(rand() * 8 + 0.05).toFixed(3)]);
+      const depth = { seq: 0, mid, tick, rand, bids: side(-1), asks: side(1) };
+      synthBooks.set(symbol, depth);
+      return depth;
+    }
+    async function fetchSynthDepth(symbol) {
+      const depth = synthBook(symbol);
+      return { lastUpdateId: depth.seq, bids: depth.bids.slice(), asks: depth.asks.slice() };
+    }
+    // A few random levels per tick; a drift past 20 ticks recenters by forcing a sequence gap, so the
+    // depth manager resyncs from a fresh snapshot (its Binance-style gap repair, exercised locally).
+    function synthDepthDelta(symbol) {
+      const depth = synthBooks.get(symbol);
+      if (!depth || symbol === null) return;
+      const mid = chart.getData().at(-1)?.close ?? depth.mid;
+      if (Math.abs(mid - depth.mid) > 20 * depth.tick) {
+        const side = (dir) => Array.from({ length: 50 }, (_, i) => [+(mid + dir * (i + 1) * depth.tick).toFixed(6), +(depth.rand() * 8 + 0.05).toFixed(3)]);
+        depth.mid = mid;
+        depth.bids = side(-1);
+        depth.asks = side(1);
+        depth.seq += 2;
+        datafeed.pushDepth({ firstUpdateId: depth.seq, finalUpdateId: depth.seq, bids: [], asks: [] }, symbol);
+        return;
+      }
+      const bids = [], asks = [];
+      for (let k = 0; k < 4; k++) {
+        const side = depth.rand() < 0.5 ? 'bids' : 'asks';
+        const levels = depth[side];
+        const i = Math.floor(depth.rand() * levels.length);
+        levels[i] = [levels[i][0], depth.rand() < 0.12 ? 0 : +(depth.rand() * 8 + 0.05).toFixed(3)];
+        (side === 'bids' ? bids : asks).push(levels[i]);
+      }
+      depth.seq += 1;
+      datafeed.pushDepth({ firstUpdateId: depth.seq, finalUpdateId: depth.seq, bids, asks }, symbol);
+    }
+
     await Promise.all([document.fonts.load('12px "Geist"'), document.fonts.load('12px "Geist Mono"')]).catch(() => {});
 
     // ---------------- chart + paging datafeed ----------------
     const canvas = $('chart');
     const stage = $('stage');
     const frames = createFrameScheduler(window, (update) => chart.batch(update));
+    // WebGL2 draws the candles and heatmap as instanced quads (2D fallback when unavailable); ?renderer=canvas2d compares.
+    const requestedRenderer = new URLSearchParams(location.search).get('renderer') === 'canvas2d' ? 'canvas2d' : 'webgl2';
     const { chart, datafeed } = createDatafeedChart({
       container: canvas,
+      renderer: requestedRenderer,
       preset: 'bloxwapDark',
       animation: { scheduler: frames, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240 },
       config: defineConfig({
@@ -153,32 +293,141 @@
         // Like bloxwap.pro: the mark and last lines below replace the built-in last-price line (its axis label stays).
         priceAxis: { lines: { lastPrice: false } },
         formatters: { price: (value) => value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) },
+        // The heatmap paints the retained depth history behind the candles (same depth channel); off by default,
+        // Settings → Liquidity heatmap turns it on in the bloxwapDark palette.
+        heatmap: { enabled: false },
       }),
       fetchBars: (request) => (request.symbol === COIN ? fetchHyperliquid(request) : fetchSynthetic(request)),
+      fetchDepthSnapshot: (request) => (request.symbol === COIN ? fetchHyperliquidDepth(request) : fetchSynthDepth(request.symbol)),
       // Ticks fold as they arrive; their bars reach the chart once per frame, in the same batch as pointer work.
       scheduler: frames,
       onError: (error) => console.warn('chart data:', error),
     });
 
+    // ---------------- footprint: the trade tape → cells, delta and CVD sub-panes ----------------
+    // The source follows the datafeed's session (a symbol switch replaces the store), so the
+    // series and the indicators never hold a stale tape. Registered once; the settings toggle selects them.
+    const footprintSource = datafeedFootprintSource(datafeed);
+    chart.registerSeries('footprint', createFootprintSeries(footprintSource));
+    chart.indicators.register(createDeltaIndicator(footprintSource));
+    chart.indicators.register(createCvdIndicator(footprintSource));
+
+    let footprintOn = false, footprintIds = [], prevSeriesType = null;
+    // Binance futures aggTrade: p price, q qty, T trade time (ms), m = buyer is maker → the aggressor sold.
+    let tradeWs = null, tradeRetry = null, tradeDelay = 1000, tradeFrame = null;
+    function connectTrades() {
+      if (tradeWs) return;
+      const socket = tradeWs = new WebSocket('wss://fstream.binance.com/ws/btcusdt@aggTrade');
+      socket.onopen = () => { tradeDelay = 1000; };
+      socket.onmessage = (event) => {
+        const m = JSON.parse(event.data);
+        if (m.p === undefined) return;
+        datafeed.pushTrade({ time: m.T, price: +m.p, size: +m.q, side: m.m ? 'sell' : 'buy' }, COIN);
+        // pushTrade only fills the store; repaint at most once per frame, like the folded tick bars.
+        tradeFrame ??= frames.request(() => { tradeFrame = null; chart.render(); });
+      };
+      socket.onclose = () => {
+        if (tradeWs !== socket) return;
+        tradeWs = null;
+        tradeRetry = setTimeout(syncTradeFeed, tradeDelay = Math.min(tradeDelay * 2, 30_000));
+      };
+    }
+    function disconnectTrades() {
+      clearTimeout(tradeRetry);
+      if (tradeFrame !== null) { frames.cancel(tradeFrame); tradeFrame = null; }
+      const socket = tradeWs;
+      tradeWs = null;
+      socket?.close();
+    }
+    function syncTradeFeed() {
+      if (live && footprintOn && datafeed.symbol === COIN) connectTrades(); else disconnectTrades();
+    }
+    function setFootprint(on) {
+      if (on === footprintOn) return;
+      footprintOn = on;
+      if (on) {
+        prevSeriesType = chart.getConfig().series.type;
+        chart.updateConfig({ series: { type: 'footprint' } });
+        footprintIds = [chart.addIndicator({ name: 'delta' }), chart.addIndicator({ name: 'cvd' })];
+      } else {
+        chart.updateConfig({ series: { type: prevSeriesType ?? 'candlestick' } });
+        for (const id of footprintIds) chart.removeIndicator(id);
+        footprintIds = [];
+      }
+      footprintItem.classList.toggle('cts-active', on);
+      footprintItem.setAttribute('aria-checked', String(on));
+      syncTradeFeed();
+    }
+
     // ---------------- mark (live mid) and last (previous close) price lines, as bloxwap.pro draws them ----------------
     let markLine = null, lastLine = null;
     const lastLineColor = () => (document.body.classList.contains('light') ? 'rgba(19, 23, 34, 0.55)' : 'rgba(255, 255, 255, 0.6)');
+    // The mark (live mid) line is off by default (settings → Mark price line): its badge covered the chart's own
+    // current-price label, which now shows alone.
+    let markOn = false, markPrice = null;
     function setMarkLine(price) {
+      markPrice = price;
+      if (!markOn) return;
       if (markLine) markLine.applyOptions({ price });
-      else markLine = chart.series.createPriceLine({ price, color: '#35b5ff', lineWidth: 1, lineStyle: 'dashed', title: 'mark' });
+      else markLine = chart.series.createPriceLine({ price, color: '#35b5ff', lineWidth: 1, lineStyle: 'dashed' }); // untitled: just the price on the axis
     }
+    // The previous close ("last") is off by default (settings → Last close line): its badge sits under the mark's.
+    let lastOn = false, lastPrice = null;
     function setLastLine(price) {
+      lastPrice = price;
+      if (!lastOn) return;
       if (lastLine) lastLine.applyOptions({ price });
       else lastLine = chart.series.createPriceLine({ price, color: lastLineColor(), lineWidth: 1, lineStyle: 'dotted', title: 'last' });
     }
     function clearLines() {
       markLine?.remove(); lastLine?.remove();
-      markLine = lastLine = null;
+      markLine = lastLine = lastPrice = markPrice = null;
     }
+    // ---------------- visible-range volume profile: sell volume left, buy volume right, floating past the last bar ----------------
+    // Theme tokens by default: buy bars and sizes take the up color, sell bars and sizes the down color (bars as a
+    // dim tint behind the vivid numbers), the POC outline the theme text color, so the profile follows dark/light.
+    // Bars and shading tween on the frame scheduler.
+    const PROFILE = {
+      width: 200, inset: 48, scheduler: frames,
+      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180,
+    };
+    // ---------------- right-edge panel: the volume profile, the full order book, or neither (one at a time) ----------------
+    // The full live order book: a ladder growing out of the price axis over the plot's right edge, every level the
+    // depth channel below delivers. Its spread label reads Hyperliquid's full-precision best bid/offer, since the
+    // levels themselves are aggregated to the timeframe (walk symbols fall back to the gap between levels).
+    const BOOK = {
+      placement: 'overlay', layout: 'ladder', inset: 0, width: 160, maxLevels: 100,
+      spread: () => (datafeed.symbol === COIN && hlBbo !== null ? hlBbo.ask - hlBbo.bid : null),
+    };
+    let profile = attachRangeProfile(chart, PROFILE), book = null;
+    const sideMode = () => (profile !== null ? 'profile' : book !== null ? 'book' : 'none');
+    function setSideMode(mode) {
+      if (mode === 'profile' && profile === null) profile = attachRangeProfile(chart, PROFILE);
+      if (mode !== 'profile' && profile !== null) {
+        profile.remove();
+        profile = null;
+      }
+      if (mode === 'book' && book === null) book = attachInlineBook(chart, BOOK);
+      if (mode !== 'book' && book !== null) {
+        book.remove();
+        book = null;
+      }
+      clearSideSpace();
+      syncSideMode();
+    }
+    /** Leaves room past the latest bar so the panel floats in whitespace rather than over the newest candles. */
+    function clearSideSpace() {
+      if (chart.dataLength === 0) return;
+      const mode = sideMode();
+      const px = (mode === 'profile' ? PROFILE.width + PROFILE.inset : mode === 'book' ? BOOK.width : 0) + 24;
+      chart.scale.scrollTo(chart.dataLength - 1 + Math.ceil(px / chart.scale.barSpacing()));
+    }
+
     chart.subscribeDataLoad((e) => {
       const data = chart.getData();
       // A load shows the latest close; a bucket roll moves the line to the bar that just closed.
       if (e.reason === 'set') {
+        clearSideSpace();
         if (data.length > 0) setLastLine(data.at(-1).close);
         else clearLines();
         placeMarkers(data);
@@ -250,7 +499,61 @@
     }
     arrowsItem.setAttribute('role', 'checkbox');
     syncArrowsSetting();
-    settingsExtras.append(liveItem, arrowsItem, menuSeparator(document), menuLabel(document, 'Datasets'));
+    const heatmapItem = menuItem(document, { label: 'Liquidity heatmap', tick: true, onClick: () => {
+      chart.updateConfig({ heatmap: { enabled: !chart.getConfig().heatmap.enabled } });
+      syncHeatmapSetting();
+    } });
+    function syncHeatmapSetting() {
+      const enabled = chart.getConfig().heatmap.enabled;
+      heatmapItem.classList.toggle('cts-active', enabled);
+      heatmapItem.setAttribute('aria-checked', String(enabled));
+    }
+    heatmapItem.setAttribute('role', 'checkbox');
+    syncHeatmapSetting();
+    // The right-edge panel's settings items toggle their panel (switching the other off); the rail disclosure picks one.
+    const profileItem = menuItem(document, { label: 'Volume profile', tick: true,
+      onClick: () => setSideMode(sideMode() === 'profile' ? 'none' : 'profile') });
+    profileItem.setAttribute('role', 'checkbox');
+    const markItem = menuItem(document, { label: 'Mark price line', tick: true, onClick: () => {
+      markOn = !markOn;
+      if (markOn && markPrice !== null) setMarkLine(markPrice);
+      if (!markOn) { markLine?.remove(); markLine = null; }
+      markItem.classList.toggle('cts-active', markOn);
+      markItem.setAttribute('aria-checked', String(markOn));
+    } });
+    markItem.setAttribute('role', 'checkbox');
+    markItem.setAttribute('aria-checked', 'false');
+    const lastItem = menuItem(document, { label: 'Last close line', tick: true, onClick: () => {
+      lastOn = !lastOn;
+      if (lastOn && lastPrice !== null) setLastLine(lastPrice);
+      if (!lastOn) { lastLine?.remove(); lastLine = null; }
+      lastItem.classList.toggle('cts-active', lastOn);
+      lastItem.setAttribute('aria-checked', String(lastOn));
+    } });
+    lastItem.setAttribute('role', 'checkbox');
+    lastItem.setAttribute('aria-checked', 'false');
+    const bookItem = menuItem(document, { label: 'Order book', tick: true,
+      onClick: () => setSideMode(sideMode() === 'book' ? 'none' : 'book') });
+    bookItem.setAttribute('role', 'checkbox');
+    // The backend is fixed at creation, so switching reloads with the other ?renderer.
+    const glActive = chart.renderBackend === 'webgl2';
+    const glItem = menuItem(document, {
+      label: requestedRenderer === 'webgl2' && !glActive ? 'WebGL2 renderer (unavailable)' : 'WebGL2 renderer',
+      tick: true,
+      onClick: () => {
+        const url = new URL(location.href);
+        if (requestedRenderer === 'webgl2') url.searchParams.set('renderer', 'canvas2d');
+        else url.searchParams.delete('renderer');
+        location.replace(url);
+      },
+    });
+    glItem.setAttribute('role', 'checkbox');
+    glItem.classList.toggle('cts-active', glActive);
+    glItem.setAttribute('aria-checked', String(glActive));
+    const footprintItem = menuItem(document, { label: 'Footprint + delta/CVD', tick: true, onClick: () => setFootprint(!footprintOn) });
+    footprintItem.setAttribute('role', 'checkbox');
+    footprintItem.setAttribute('aria-checked', 'false');
+    settingsExtras.append(liveItem, arrowsItem, markItem, lastItem, profileItem, bookItem, heatmapItem, footprintItem, glItem, menuSeparator(document), menuLabel(document, 'Datasets'));
     const DATASETS = [
       { label: 'BTC perpetual · Hyperliquid', symbol: COIN, intervalMs: null }, // keeps the current timeframe
       { label: 'Random walk · 1m', symbol: WALK, intervalMs: 60_000 },
@@ -272,6 +575,7 @@
     chart.subscribeConfigChange(({ keys }) => {
       if (keys.includes('statusLine') || keys.includes('priceAxis')) syncCountdown();
       if (keys.includes('statusLine')) syncStatusSymbol();
+      if (keys.includes('heatmap')) syncHeatmapSetting();
     });
     const settings = createChartSettings({ chart, document, trigger: settingsBtn, extraContent: settingsExtras, chartTheme,
       onOpen: () => { toolbar.cancelNavigation(); flyouts.close(); indicators.close(); },
@@ -284,7 +588,104 @@
       onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
     });
 
-    // ---------------- header: symbol, timeframes → datafeed, chart type, indicators, scale toggles ----------------
+    // ---------------- rail: timeframe, chart type, indicators, price scale (the wide layout's header) ----------------
+    // Flyouts open to the right of the rail; every control follows the datafeed and config like the header does.
+    const railMenu = (label) => {
+      const menu = flyouts.create();
+      menu.append(menuLabel(document, label));
+      return menu;
+    };
+    const radio = (menu, options) => {
+      const item = menuItem(document, { tick: true, ...options, onClick: () => { flyouts.close(); options.onClick(); } });
+      item.setAttribute('role', 'menuitemradio');
+      menu.append(item);
+      return item;
+    };
+    const check = (item, on) => {
+      item.classList.toggle('cts-active', on);
+      item.setAttribute('aria-checked', String(on));
+    };
+
+    const tfBtn = labelButton(document, '15m', 'Timeframe');
+    const tfMenu = railMenu('Timeframe');
+    const tfItems = DEFAULT_TIMEFRAMES.map((tf) => radio(tfMenu, { label: tf.label,
+      onClick: () => { if (tf.intervalMs !== datafeed.intervalMs) void load(datafeed.symbol ?? COIN, tf.intervalMs); } }));
+    flyouts.attach(tfBtn, tfMenu);
+    function syncRailTimeframe() {
+      const intervalMs = datafeed.intervalMs;
+      const label = DEFAULT_TIMEFRAMES.find((tf) => tf.intervalMs === intervalMs)?.label ?? '';
+      setButtonLabel(tfBtn, label);
+      tfBtn.title = `Timeframe: ${label}`;
+      tfBtn.setAttribute('aria-label', tfBtn.title);
+      DEFAULT_TIMEFRAMES.forEach((tf, i) => check(tfItems[i], tf.intervalMs === intervalMs));
+    }
+    datafeed.subscribeState(syncRailTimeframe);
+
+    const typeBtn = iconButton(document, 'chart-candlestick', 'Chart type', 20);
+    const typeMenu = railMenu('Chart type');
+    const typeItems = DEFAULT_CHART_TYPES.map((type) => radio(typeMenu, { icon: `chart-${type}`, label: CHART_TYPE_LABELS[type],
+      onClick: () => chart.updateConfig({ series: { type } }) }));
+    flyouts.attach(typeBtn, typeMenu);
+    function syncRailType() {
+      const type = chart.getConfig().series.type;
+      // A custom series (the footprint) keeps the candlestick glyph.
+      setButtonIcon(typeBtn, ICONS[`chart-${type}`] !== undefined ? `chart-${type}` : 'chart-candlestick', 20);
+      typeBtn.title = `Chart type: ${CHART_TYPE_LABELS[type] ?? type}`;
+      typeBtn.setAttribute('aria-label', typeBtn.title);
+      DEFAULT_CHART_TYPES.forEach((t, i) => check(typeItems[i], t === type));
+    }
+
+    const indicatorsBtn = iconButton(document, 'function-square', 'Indicators', 20);
+    indicatorsBtn.setAttribute('aria-haspopup', 'dialog');
+    indicatorsBtn.addEventListener('click', () => indicators.openPicker());
+
+    // Right-edge panel disclosure: the volume profile (both ways from a center line), the order book (out of the
+    // right edge), or none. The button shows the chosen panel's glyph and takes the accent while one shows.
+    const SIDE_MODES = [
+      { mode: 'profile', icon: 'range-profile', label: 'Volume profile' },
+      { mode: 'book', icon: 'order-book', label: 'Order book' },
+      { mode: 'none', icon: 'eye-off', label: 'None' },
+    ];
+    const sideBtn = iconButton(document, 'range-profile', 'Right-edge panel', 20);
+    const sideMenu = railMenu('Right edge');
+    const sideItems = SIDE_MODES.map(({ mode, icon, label }) => radio(sideMenu, { icon, label, onClick: () => setSideMode(mode) }));
+    flyouts.attach(sideBtn, sideMenu);
+    function syncSideMode() {
+      const mode = sideMode();
+      const current = SIDE_MODES.find((m) => m.mode === mode);
+      setButtonIcon(sideBtn, mode === 'none' ? 'range-profile' : current.icon, 20);
+      sideBtn.classList.toggle('cts-on', mode !== 'none');
+      sideBtn.title = `Right edge: ${current.label}`;
+      sideBtn.setAttribute('aria-label', sideBtn.title);
+      SIDE_MODES.forEach((m, i) => check(sideItems[i], m.mode === mode));
+      check(profileItem, mode === 'profile');
+      check(bookItem, mode === 'book');
+    }
+    syncSideMode();
+
+    const scaleBtns = SCALE_TOGGLES.map(({ key, label, title }) => {
+      const b = labelButton(document, label, title);
+      b.classList.add('rail-scale');
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', () => toggleScale(chart, key));
+      return b;
+    });
+    function syncRailScale() {
+      const state = scaleToggleState(chart.getConfig().priceAxis);
+      SCALE_TOGGLES.forEach(({ key }, i) => {
+        scaleBtns[i].classList.toggle('cts-on', state[key]);
+        scaleBtns[i].setAttribute('aria-pressed', String(state[key]));
+      });
+    }
+    chart.subscribeConfigChange(({ keys }) => {
+      if (keys.includes('series')) syncRailType();
+      if (keys.includes('priceAxis')) syncRailScale();
+    });
+    syncRailTimeframe();
+    syncRailType();
+    syncRailScale();
+
+    // ---------------- header (narrow screens): symbol, timeframes → datafeed, chart type, indicators, scale toggles ----------------
     const shotBtn = iconButton(document, 'image', 'Download snapshot', 18);
     shotBtn.innerHTML = CAMERA;
     shotBtn.addEventListener('click', () => void downloadSnapshot());
@@ -302,7 +703,6 @@
       onIndicators: () => indicators.openPicker(),
       slots: { right: [headerControls] },
     });
-    const scaleButtons = createScaleButtons({ chart, document, overlay: stage, tokens: BLOXWAP_HEADER_THEME });
 
     // Embeds can pin a host theme with ?lockedTheme=dark (or light). Without a saved choice, start on dark (bloxwapDark).
     const themeKey = 'chart-ts:theme';
@@ -318,7 +718,6 @@
         toolbar.setTheme(theme);
         settings.setTheme(theme);
         header.setTheme(theme);
-        scaleButtons.setTheme(theme);
         lastLine?.applyOptions({ color: lastLineColor() });
         placeMarkers(chart.getData()); // in the theme's candle colors
         indicators.setTheme(theme); // after the toolbar, so candle-following colors in open settings match
@@ -341,16 +740,19 @@
       railToggle.title = show ? 'Hide drawing toolbar' : 'Show drawing toolbar';
     });
 
-    // Wide: a control rail. Narrow (< 600px): the rail hides and its buttons join the header, which compacts and wraps.
-    const divider = el(document, 'div', 'cts-rail-divider');
+    // Wide: the control rail replaces the header. Narrow (< 600px): the rail hides, the header shows, and the
+    // shared buttons join it, compacting and wrapping. The rail-only controls stay put in the hidden rail.
+    const divider = () => el(document, 'div', 'cts-rail-divider');
     const narrow = matchMedia('(max-width: 599px)');
+    $('ctrl-scroll').append(tfBtn, typeBtn, indicatorsBtn, sideBtn, divider(), ...scaleBtns, divider());
+    const themeDivider = divider();
     const placeControls = () => {
-      const rail = [undoBtn, redoBtn, ...(themeControl.element ? [divider, themeControl.element] : [])];
+      const theme = themeControl.element ? [themeControl.element] : [];
       flyouts.close();
-      if (narrow.matches) headerControls.append(...rail.filter((node) => node !== divider), settingsBtn, railToggle);
+      if (narrow.matches) headerControls.append(shotBtn, undoBtn, redoBtn, ...theme, settingsBtn, railToggle);
       else {
-        $('ctrl-scroll').append(...rail);
-        $('ctrl-bottom').append(settingsBtn, railToggle);
+        $('ctrl-scroll').append(undoBtn, redoBtn, ...(theme.length > 0 ? [themeDivider, ...theme] : []));
+        $('ctrl-bottom').append(shotBtn, settingsBtn, railToggle);
       }
     };
     placeControls();
@@ -454,6 +856,53 @@
       ws = null;
       socket?.close();
     }
+    // ---------------- live depth: Hyperliquid l2Book for BTC, synthetic deltas for the walks ----------------
+    let depthWs = null, depthRetry = null, depthDelay = 1000;
+    function connectDepth(figs) {
+      if (depthWs?.figs === figs) return;
+      // A new precision needs its own subscription; the old socket's pushes and close are ignored.
+      const stale = depthWs;
+      const socket = depthWs = new WebSocket('wss://api.hyperliquid.xyz/ws');
+      stale?.close();
+      socket.figs = figs;
+      socket.onopen = () => {
+        depthDelay = 1000;
+        socket.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'l2Book', coin: COIN, nSigFigs: figs } }));
+        socket.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'l2Book', coin: COIN, nSigFigs: figs - 1 } }));
+        socket.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'bbo', coin: COIN } }));
+      };
+      socket.onmessage = (event) => {
+        if (depthWs !== socket) return;
+        const message = JSON.parse(event.data);
+        if (message.channel === 'l2Book' && message.data?.coin === COIN) onHyperliquidBook(message.data, figs);
+        else if (message.channel === 'bbo' && message.data?.coin === COIN) {
+          const [bid, ask] = message.data.bbo;
+          hlBbo = bid && ask ? { bid: +bid.px, ask: +ask.px } : null;
+        }
+      };
+      socket.onclose = () => {
+        if (depthWs !== socket) return;
+        depthWs = null;
+        hlBook = hlFine = hlCoarse = hlBbo = null; // pushes are missed while disconnected: the next one resyncs the book
+        depthRetry = setTimeout(syncDepthFeed, depthDelay = Math.min(depthDelay * 2, 30_000));
+      };
+    }
+    function disconnectDepth() {
+      clearTimeout(depthRetry);
+      const socket = depthWs;
+      depthWs = null;
+      if (socket) hlBook = hlFine = hlCoarse = hlBbo = null;
+      socket?.close();
+    }
+    let depthTimer = null;
+    function syncDepthFeed() {
+      const symbol = datafeed.symbol;
+      if (live && symbol === COIN) connectDepth(hlFigsFor(datafeed.intervalMs ?? 900_000)); else disconnectDepth();
+      const synth = live && symbol !== null && symbol !== COIN;
+      if (synth && depthTimer === null) depthTimer = setInterval(() => synthDepthDelta(datafeed.symbol), 250);
+      if (!synth && depthTimer !== null) { clearInterval(depthTimer); depthTimer = null; }
+    }
+
     // The walk steps from its own last price: a hidden tab's bars reach the chart only once it shows again.
     let walkTimer = null, walkPrice = null;
     function syncFeed() {
@@ -467,8 +916,10 @@
         onMid(walkPrice, datafeed.symbol);
       }, 1000);
       if (!walking && walkTimer !== null) { clearInterval(walkTimer); walkTimer = null; }
+      syncDepthFeed(); // depth deltas for the loaded symbol; the datafeed ignores any other
+      syncTradeFeed(); // aggTrades while the footprint shows; ignored for any other symbol
     }
-    window.addEventListener('pagehide', disconnectFeed);
+    window.addEventListener('pagehide', () => { disconnectFeed(); disconnectDepth(); disconnectTrades(); });
 
     // ---------------- loading: Hyperliquid first, the random walk when it is unreachable ----------------
     async function load(symbol, intervalMs) {
@@ -497,7 +948,9 @@
         else if (step > 0) missingBuckets += Math.round(gap / step) - 1;
       }
       const { symbol, intervalMs, loading, exhausted, error } = datafeed.state;
+      const book = chart.depth;
       return { symbol, intervalMs, bars: data.length, duplicates, missingBuckets, exhausted, loading,
+        renderBackend: chart.renderBackend, bookLevels: book === null ? null : { bids: book.bids.length, asks: book.asks.length },
         error: error === null ? null : String(error), firstTime: data[0]?.time ?? null, lastTime: data.at(-1)?.time ?? null };
     };
 

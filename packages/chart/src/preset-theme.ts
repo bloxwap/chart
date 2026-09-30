@@ -19,14 +19,15 @@ import { withPreset, type ChartPresetName } from './presets.js';
 import { CHART_THEMES, type ThemeName } from './themes.js';
 
 /**
- * The colors a theme owns: chrome, grid, crosshair and series. Volume colors
- * are left out; they follow the series colors by default.
+ * The colors a theme owns: chrome, grid, crosshair, series and the heatmap
+ * ramp. Volume colors are left out; they follow the series colors by default.
  */
 const THEME_COLORS: Readonly<Record<string, readonly string[]>> = {
   theme: ['background', 'textColor', 'borderColor'],
   grid: ['color'],
   crosshair: ['color', 'labelBackground', 'labelColor'],
   series: ['upColor', 'downColor', 'wickUpColor', 'wickDownColor', 'borderUpColor', 'borderDownColor', 'lineColor', 'areaFillColor', 'histogramColor'],
+  heatmap: ['colorLow', 'colorHigh', 'stops'],
 };
 
 type Groups = Record<string, Record<string, unknown> | undefined>;

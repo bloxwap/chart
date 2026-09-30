@@ -7,6 +7,25 @@
  */
 
 export type { Candle } from '../core/data.js';
+export type { DepthBook, DepthLevel } from '../core/depth.js';
+export type { Trade, TradeSide } from '../core/trade.js';
+export { createTradeAggregation, MAX_FOOTPRINT_BARS } from './trade-aggregation.js';
+export type { FootprintBar, FootprintLevel, TradeAggregation, TradeAggregationOptions } from './trade-aggregation.js';
+export {
+  createDepthBookManager,
+  applyDepthLevels,
+  normalizeDepthSide,
+  MAX_BUFFERED_DELTAS,
+  DEPTH_RETRY_BACKOFF_MS,
+  DEPTH_MAX_RETRY_BACKOFF_MS,
+} from './depth-book.js';
+export type {
+  DepthBookManager,
+  DepthBookManagerOptions,
+  DepthDelta,
+  DepthSnapshot,
+  FetchDepthSnapshot,
+} from './depth-book.js';
 export { bucketStartMs, candleTimeMs, applyTick, normalizeCandles } from './candles.js';
 export {
   createLiveBarFolder,
@@ -24,6 +43,7 @@ export type { AbortControllerLike, AbortSignalLike, DatafeedSignal } from './abo
 export {
   attachDatafeed,
   createDatafeedChart,
+  datafeedFootprintSource,
   DEFAULT_INITIAL_BARS,
   DEFAULT_PAGE_BARS,
   MIN_LAZY_LOAD_THRESHOLD,
@@ -34,6 +54,8 @@ export type {
   Datafeed,
   DatafeedChart,
   DatafeedChartOptions,
+  DatafeedDepthRequest,
+  DatafeedFetchDepthSnapshot,
   DatafeedFetchGap,
   DatafeedGapRequest,
   DatafeedOptions,

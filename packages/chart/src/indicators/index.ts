@@ -34,3 +34,5 @@ export { donchianIndicator, donchianValues } from './donchian.js';
 export { stochIndicator, stochValues } from './stoch.js';
 export { stochRsiIndicator, stochRsiValues } from './stochrsi.js';
 export { psarIndicator, psarValues } from './psar.js';
+export { createDeltaIndicator } from './delta.js';
+export { createCvdIndicator, cvdValues } from './cvd.js';

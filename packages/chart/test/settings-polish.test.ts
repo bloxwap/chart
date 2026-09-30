@@ -406,7 +406,8 @@ describe('presetChartTheme', () => {
       grid: { color: 'rgba(255, 255, 255, 0.05)' },
       crosshair: { color: '#737373', labelBackground: '#262626', labelColor: '#fafafa' },
       series: { upColor: '#00ff3f', downColor: '#ff479c', wickUpColor: '#00ff3f', wickDownColor: '#ff479c', borderUpColor: '#00ff3f', borderDownColor: '#ff479c' },
-    }, 'no fonts, sizes, toggles or volume');
+      heatmap: { stops: bloxwapDark.heatmap!.stops },
+    }, 'no fonts, sizes, toggles, volume or heatmap curve');
   });
 
   it('gives the other theme its built-in colors, with the preset-only colors back at their defaults', () => {
@@ -416,6 +417,7 @@ describe('presetChartTheme', () => {
       grid: CHART_THEMES.light.grid,
       crosshair: { color: CHART_THEMES.light.crosshair!.color, labelBackground: DEFAULT_CONFIG.crosshair.labelBackground, labelColor: 'auto' },
       series: { upColor: '#089981', downColor: '#f23645', wickUpColor: '', wickDownColor: '', borderUpColor: '', borderDownColor: '' },
+      heatmap: { stops: [] },
     });
   });
 

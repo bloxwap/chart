@@ -24,7 +24,7 @@ export { createChartContextMenu } from './context-menu.js';
 export type {
   ChartContextMenu, ChartContextMenuHooks, ChartContextMenuOptions, ContextMenuAction, ContextMenuEntry, ContextMenuTarget,
 } from './context-menu.js';
-export { DrawingController, ZOOM_TOOL, GLYPH_TOOLS, DRAG_THRESHOLD_PX, MIN_ZOOM_BOX_PX, groupOf } from './controller.js';
+export { DrawingController, ZOOM_TOOL, GLYPH_TOOLS, DRAG_THRESHOLD_PX, VERTICAL_PAN_PX, MIN_ZOOM_BOX_PX, groupOf } from './controller.js';
 export type { ControllerEvents, CursorMode, Hint, ZoomBox, DrawingControllerOptions } from './controller.js';
 export { DrawingHistory, HISTORY_LIMIT } from './history.js';
 export {

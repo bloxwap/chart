@@ -7,7 +7,6 @@
  */
 
 import type { Candle } from '../core/data.js';
-import type { SeriesType } from '../config.js';
 import { drawCandlesticks } from './candlestick.js';
 import type { SeriesDrawFn } from './types.js';
 
@@ -81,7 +80,7 @@ export class HeikinAshiCache {
    * The main series' bars as displayed for `type`: HA bars for
    * `'heikin-ashi'`, otherwise `candles` itself (releasing any cached bars).
    */
-  display(candles: readonly Candle[], type: SeriesType): readonly Candle[] {
+  display(candles: readonly Candle[], type: string): readonly Candle[] {
     if (type === 'heikin-ashi') return this.get(candles);
     this.clear();
     return candles;

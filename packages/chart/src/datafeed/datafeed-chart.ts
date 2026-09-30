@@ -11,10 +11,15 @@
 
 import { createChart, type Chart, type CreateChartOptions } from '../core/chart.js';
 import type { Candle } from '../core/data.js';
+import type { DepthBook } from '../core/depth.js';
+import type { FootprintSource } from '../core/footprint.js';
 import { Emitter, type VisibleRangeChangeEvent } from '../core/events.js';
+import type { Trade } from '../core/trade.js';
 import type { FrameScheduler } from '../core/zoom.js';
 import { createAbortController, type AbortControllerLike, type DatafeedSignal } from './abort.js';
+import { createDepthBookManager, type DepthBookManager, type DepthDelta, type DepthSnapshot } from './depth-book.js';
 import { createLiveBarFolder, type FetchGap, type LiveBarFolder } from './live-bar-folder.js';
+import { createTradeAggregation, type FootprintBar, type TradeAggregation } from './trade-aggregation.js';
 import { barsInWindow, loadHistory, pageHistory, type FetchBars, type HistoryRead, type LoadHistoryOptions } from './pagination.js';
 
 /** Bars loaded by `setSymbol`: bloxwap.pro's `HISTORY_BARS`. */
@@ -49,6 +54,20 @@ export interface DatafeedGapRequest {
  */
 export type DatafeedFetchGap = (fromMs: number, toMs: number, request: DatafeedGapRequest) => Promise<readonly Candle[]>;
 
+/** Context handed to a {@link DatafeedFetchDepthSnapshot}. */
+export interface DatafeedDepthRequest {
+  readonly symbol: string;
+  /** Aborted when the symbol or interval changes, or the datafeed is destroyed. */
+  readonly signal: DatafeedSignal;
+}
+
+/**
+ * L2 book snapshot read for `request.symbol`: the initial load of the depth
+ * channel and every sequence-gap resync. The stream of diff-depth events goes
+ * to `Datafeed.pushDepth`.
+ */
+export type DatafeedFetchDepthSnapshot = (request: DatafeedDepthRequest) => Promise<DepthSnapshot>;
+
 /** Options for {@link attachDatafeed}. */
 export interface DatafeedOptions {
   /** Symbol to load right away (together with `intervalMs`). */
@@ -59,6 +78,16 @@ export interface DatafeedOptions {
   fetchBars: FetchBars;
   /** Gap repair for live folding. Default: `fetchBars` over the gap. */
   fetchGap?: DatafeedFetchGap;
+  /**
+   * L2 book snapshot source. Given, the datafeed maintains a depth book for
+   * the current symbol, stored outside the candle store: `pushDepth` folds
+   * Binance-style diff-depth events into it (snapshot load, then deltas, with
+   * sequence-gap resync and the same retry backoff as history reads), every
+   * book update re-renders through `chart.setDepth`, and `subscribeDepth`
+   * listeners receive it. Without it `pushDepth` is ignored and
+   * `subscribeDepth` never fires.
+   */
+  fetchDepthSnapshot?: DatafeedFetchDepthSnapshot;
   /** Bars loaded by `setSymbol` (a positive integer). Default {@link DEFAULT_INITIAL_BARS}. */
   initialBars?: number;
   /** Bars per lazy history page (a positive integer). Default {@link DEFAULT_PAGE_BARS}. */
@@ -156,6 +185,38 @@ export interface Datafeed extends DatafeedState {
    * batched `scheduler` frame, which that frame throws.
    */
   pushTick(price: number, symbol?: string): void;
+  /**
+   * Folds one diff-depth event into the current symbol's maintained L2 book.
+   * Ignored without `fetchDepthSnapshot`, and when `symbol` is given but is
+   * not the current one. Events arriving before the snapshot are buffered; a
+   * sequence gap resyncs from a fresh snapshot. Errors from publishing the
+   * book go to `onError`.
+   */
+  pushDepth(delta: DepthDelta, symbol?: string): void;
+  /**
+   * Calls `onBook` with each maintained L2 book of `symbol`: the snapshot
+   * first, then every applied delta. Books flow only while `symbol` is the
+   * current one. Returns an unsubscribe function.
+   */
+  subscribeDepth(symbol: string, onBook: (book: DepthBook) => void): () => void;
+  /**
+   * Folds one executed trade into the current session's footprint store and
+   * delivers it to `subscribeTrades` listeners. Ignored before the first
+   * `setSymbol`, and when `symbol` is given but is not the current one. The
+   * tape channel passes the trade through as received; the footprint store
+   * drops an invalid one (non-finite time, price or size, non-positive size).
+   * A trade listener's error goes to `onError`; `pushTrade` never throws.
+   */
+  pushTrade(trade: Trade, symbol?: string): void;
+  /**
+   * Calls `onTrade` with each trade pushed for `symbol`. Trades flow only
+   * while `symbol` is the current one. Returns an unsubscribe function.
+   */
+  subscribeTrades(symbol: string, onTrade: (trade: Trade) => void): () => void;
+  /** The current session's footprint bar whose bucket contains `timeMs`, or null. */
+  footprintBar(timeMs: number): FootprintBar | null;
+  /** The current session's footprint bars opening within `[fromMs, toMs]`, oldest first. */
+  footprintBars(fromMs: number, toMs: number): FootprintBar[];
   /** Calls `listener` with each new state. Returns an unsubscribe function. */
   subscribeState(listener: (state: DatafeedState) => void): () => void;
   /** Aborts every read, stops live folding and detaches from the chart (which stays alive). */
@@ -179,6 +240,10 @@ interface Session {
   readonly intervalMs: number;
   readonly controller: AbortControllerLike;
   folder: LiveBarFolder | null;
+  /** The symbol's maintained L2 book, or null without `fetchDepthSnapshot`. */
+  depth: DepthBookManager | null;
+  /** The symbol's (bar, price) trade aggregation, fed by `pushTrade`. */
+  tape: TradeAggregation;
   inflight: Promise<number> | null;
   /** The initial load has landed on the chart. */
   loaded: boolean;
@@ -201,7 +266,7 @@ interface Session {
  * `setSymbol`.
  */
 export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed {
-  const { fetchBars, fetchGap, pageSize, maxEmptyPages, lazyLoadThreshold, scheduler, onError } = options;
+  const { fetchBars, fetchGap, fetchDepthSnapshot, pageSize, maxEmptyPages, lazyLoadThreshold, scheduler, onError } = options;
   const newController = options.createAbortController ?? createAbortController;
   const initialBars = options.initialBars ?? DEFAULT_INITIAL_BARS;
   const pageBars = options.pageBars ?? DEFAULT_PAGE_BARS;
@@ -216,6 +281,10 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
   if (pageSize !== undefined) pageOptions.pageSize = pageSize;
   if (maxEmptyPages !== undefined) pageOptions.maxEmptyPages = maxEmptyPages;
   const states = new Emitter<DatafeedState>();
+  /** Depth listeners by symbol; only the current symbol's emitter ever fires. */
+  const depthListeners = new Map<string, Emitter<DepthBook>>();
+  /** Trade listeners by symbol; only the current symbol's emitter ever fires. */
+  const tradeListeners = new Map<string, Emitter<Trade>>();
   let session: Session | null = null;
   let destroyed = false;
   let lastRange: VisibleRangeChangeEvent | null = null;
@@ -255,10 +324,25 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
   function end(s: Session | null): void {
     s?.controller.abort();
     s?.folder?.dispose();
+    if (s?.depth != null) {
+      s.depth.dispose();
+      // A switch or destroy must not leave the previous symbol's book on screen.
+      chart.setDepth(null);
+    }
     queued.clear();
     if (!framePending) return;
     framePending = false;
     scheduler!.cancel(frame);
+  }
+
+  /**
+   * Publishes a session's book to the chart (which re-renders) and its
+   * symbol's depth listeners. Only the current session publishes: `end`
+   * disposes a superseded session's manager, which stops its publishing.
+   */
+  function publishBook(s: Session, book: DepthBook): void {
+    chart.setDepth(book);
+    depthListeners.get(s.symbol)?.emit(book);
   }
 
   /** Applies a live bar at once, or on the scheduler's next frame. */
@@ -407,10 +491,21 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
     if (destroyed) return Promise.resolve();
     end(session);
     const s: Session = {
-      symbol, intervalMs, controller: newController(), folder: null, inflight: null,
+      symbol, intervalMs, controller: newController(), folder: null, depth: null, inflight: null,
+      tape: createTradeAggregation({ intervalMs }),
       loaded: false, exhausted: false, error: null, failures: 0, retryAtMs: -Infinity,
     };
     session = s;
+    if (fetchDepthSnapshot !== undefined) {
+      const fetchSnapshot = fetchDepthSnapshot;
+      s.depth = createDepthBookManager({
+        fetchSnapshot: () => fetchSnapshot({ symbol: s.symbol, signal: s.controller.signal }),
+        onBook: (book) => publishBook(s, book),
+        now,
+        batch: (run) => chart.batch(run),
+        onError: report,
+      });
+    }
     return start(s, () => initialLoad(s)).then(() => undefined);
   }
 
@@ -452,6 +547,52 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
         report(error);
       }
     },
+    pushDepth(delta, symbol) {
+      if (symbol !== undefined && symbol !== session?.symbol) return;
+      try {
+        session?.depth?.pushDelta(delta);
+      } catch (error) {
+        // A depth-feed callback is no place for a chart listener's failure.
+        report(error);
+      }
+    },
+    subscribeDepth(symbol, onBook) {
+      const existing = depthListeners.get(symbol);
+      const emitter = existing ?? new Emitter<DepthBook>();
+      if (existing === undefined) depthListeners.set(symbol, emitter);
+      const off = emitter.subscribe(onBook);
+      return () => {
+        off();
+        if (emitter.size === 0) depthListeners.delete(symbol);
+      };
+    },
+    pushTrade(trade, symbol) {
+      const s = session;
+      if (s === null || (symbol !== undefined && symbol !== s.symbol)) return;
+      try {
+        s.tape.push(trade);
+        tradeListeners.get(s.symbol)?.emit(trade);
+      } catch (error) {
+        // A trade-feed callback is no place for a tape listener's failure.
+        report(error);
+      }
+    },
+    subscribeTrades(symbol, onTrade) {
+      const existing = tradeListeners.get(symbol);
+      const emitter = existing ?? new Emitter<Trade>();
+      if (existing === undefined) tradeListeners.set(symbol, emitter);
+      const off = emitter.subscribe(onTrade);
+      return () => {
+        off();
+        if (emitter.size === 0) tradeListeners.delete(symbol);
+      };
+    },
+    footprintBar(timeMs) {
+      return session?.tape.bar(timeMs) ?? null;
+    },
+    footprintBars(fromMs, toMs) {
+      return session?.tape.barsInRange(fromMs, toMs) ?? [];
+    },
     subscribeState: (listener) => states.subscribe(listener),
     destroy() {
       if (destroyed) return;
@@ -461,6 +602,10 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
       offRange();
       offData();
       states.clear();
+      for (const emitter of depthListeners.values()) emitter.clear();
+      depthListeners.clear();
+      for (const emitter of tradeListeners.values()) emitter.clear();
+      tradeListeners.clear();
     },
   };
 
@@ -476,6 +621,16 @@ export function attachDatafeed(chart: Chart, options: DatafeedOptions): Datafeed
     }
   }
   return datafeed;
+}
+
+/**
+ * A live {@link FootprintSource} over the datafeed's current session for the
+ * footprint series and the delta/CVD indicators. Unlike a captured
+ * `TradeAggregation` it follows `setSymbol`: each session replaces the store,
+ * and the lookup delegates to whichever session is current (null → no bar).
+ */
+export function datafeedFootprintSource(datafeed: Pick<Datafeed, 'footprintBar'>): FootprintSource {
+  return { bar: (timeMs) => datafeed.footprintBar(timeMs) };
 }
 
 /**

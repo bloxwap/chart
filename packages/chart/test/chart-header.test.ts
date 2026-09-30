@@ -274,6 +274,20 @@ describe('chart header: chart type menu', () => {
     m.chart.updateConfig({ series: { type: 'line' } });
     assert.equal(type.title, 'Chart type: Bars', 'destroyed headers stop following');
   });
+
+  it('falls back to the raw type string for a custom series without a label', () => {
+    const m = mount({ chartTypes: ['candlestick', 'line'] });
+    m.chart.registerSeries('stairs', () => undefined);
+    m.chart.updateConfig({ series: { type: 'stairs' } });
+    const type = m.q('.cts-header-type');
+    assert.equal(type.title, 'Chart type: stairs', 'no CHART_TYPE_LABELS entry, so the type itself shows');
+    assert.equal(type.getAttribute('aria-label'), 'Chart type: stairs');
+    assert.equal(m.qa('.cts-header-menu')[1]!.querySelectorAll('.cts-active').length, 0, 'no offered type matches');
+    assert.deepEqual([...m.qa('.cts-header-menu')[1]!.querySelectorAll('.cts-item')].map((n) => (n as HTMLElement).getAttribute('aria-checked')), ['false', 'false']);
+    m.header.setChartType('line');
+    assert.equal(type.title, 'Chart type: Line', 'labelled types still use CHART_TYPE_LABELS');
+    m.header.destroy();
+  });
 });
 
 describe('chart header: keyboard', () => {

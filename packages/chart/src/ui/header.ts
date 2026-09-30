@@ -346,14 +346,14 @@ export function createChartHeader(options: ChartHeaderOptions): ChartHeader {
   const typeBtn = button('cts-header-type', icon('chart-candlestick', 18), 'Chart type');
   const typeItems = chartTypes.map((type) => radioItem(typeMenu, typeBtn, CHART_TYPE_LABELS[type], `chart-${type}`, () => pickType(type)));
   dropdown(typeBtn, typeMenu, typeItems);
-  let shownType: SeriesType | null = null;
+  let shownType: string | null = null;
 
   function syncType(): void {
     const type = chart.getConfig().series.type;
     if (type === shownType) return;
     shownType = type;
     setButtonIcon(typeBtn, `chart-${type}`, 18);
-    typeBtn.title = `Chart type: ${CHART_TYPE_LABELS[type]}`;
+    typeBtn.title = `Chart type: ${CHART_TYPE_LABELS[type as SeriesType] ?? type}`;
     typeBtn.setAttribute('aria-label', typeBtn.title);
     chartTypes.forEach((t, i) => {
       typeItems[i].classList.toggle('cts-active', t === type);

@@ -9,11 +9,15 @@
 import type { Candle } from '../core/data.js';
 import type { PriceScale, TimeScale, VisibleRange } from '../core/scale.js';
 import type { PaneLayout } from '../core/pane.js';
-import type { ChartConfig } from '../config.js';
+import type { ChartConfig, SeriesType } from '../config.js';
 import type { IndicatorOutput } from '../indicators/types.js';
 import type { Canvas2DLike } from '../dom.js';
 import { contrastingTextColor } from '../color.js';
-import { SERIES_RENDERERS } from '../series/index.js';
+import { SERIES_RENDERERS, drawCandlesticks } from '../series/index.js';
+import type { SeriesDrawFn } from '../series/types.js';
+import type { PanePrimitives, PrimitiveDrawTarget } from './primitive.js';
+import { packCandleQuads } from './gl/candles.js';
+import type { GLFrame, GLQuadSink } from './gl/backend.js';
 import { drawWatermark } from '../watermark.js';
 import { drawTimeAxis, timeTickIndices } from './axis.js';
 import { drawDrawings, type ResolvedDrawing } from './drawings.js';
@@ -39,6 +43,21 @@ export interface PaneRenderInfo {
   readonly indicatorOpacities?: readonly number[];
   /** Sub-pane opacity, including its grid, separator and axis. Defaults to 1. */
   readonly opacity?: number;
+  /** Custom draw passes attached to the pane (`behind` runs under its series/indicators, `above` over them). */
+  readonly primitives?: PanePrimitives;
+}
+
+/** A host pane docked to a canvas edge (`Chart.addPane` with `placement: 'left' | 'right'`). */
+export interface DockedPaneRenderInfo {
+  readonly id: string;
+  readonly placement: 'left' | 'right';
+  /** Absolute canvas rectangle in CSS pixels. */
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly priceScale: PriceScale;
+  readonly primitives: PanePrimitives;
 }
 
 /** Everything {@link renderChart} needs for one frame. All sizes are CSS pixels. */
@@ -64,8 +83,15 @@ export interface RenderView {
   readonly displayCandles?: readonly Candle[];
   readonly range: VisibleRange;
   readonly timeScale: TimeScale;
-  /** First entry is the main pane; the rest are indicator sub-panes. */
+  /** First entry is the main pane; the rest are indicator sub-panes and stacked host panes. */
   readonly panes: readonly PaneRenderInfo[];
+  /** Host panes docked to the left/right canvas edge, painted above the base layers in order. */
+  readonly dockedPanes?: readonly DockedPaneRenderInfo[];
+  /**
+   * Draw pass for `config.series.type`; defaults to the {@link SERIES_RENDERERS}
+   * lookup. `Chart.registerSeries` resolves custom types through this.
+   */
+  readonly seriesDraw?: SeriesDrawFn;
   readonly config: ChartConfig;
   readonly drawings: readonly ResolvedDrawing[];
   readonly crosshair: { readonly active: boolean; readonly x: number; readonly y: number };
@@ -75,6 +101,12 @@ export interface RenderView {
   readonly markers?: readonly SeriesMarker[];
   /** Wall clock in ms for the bar-close countdown; without it the countdown is hidden. */
   readonly now?: () => number;
+  /**
+   * WebGL2 frame for the main pane's dense geometry (heatmap cells, candle
+   * bodies/wicks), composited where the series layer sits. Absent on the
+   * Canvas2D backend, which paints everything through `ctx`.
+   */
+  readonly gl?: GLFrame;
 }
 
 function drawIndicatorOutput(
@@ -126,6 +158,9 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): vo
   ctx.fillStyle = config.theme.background;
   ctx.fillRect(0, 0, view.canvasWidth, view.canvasHeight);
   const plotLeft = view.plotLeft ?? 0;
+  const canvasView = view;
+  ctx.save();
+  try {
   if (plotLeft > 0) {
     ctx.translate(plotLeft, 0);
     view = { ...view, crosshair: { ...view.crosshair, x: view.crosshair.x - plotLeft } };
@@ -169,25 +204,39 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): vo
     ctx.rect(0, 0, plotWidth, mainPane.layout.height);
     ctx.clip();
     drawVolumeOverlay(ctx, view, mainPane.layout.height);
-    SERIES_RENDERERS[config.series.type](
-      ctx,
-      view.displayCandles ?? view.candles,
-      drawRange,
-      view.timeScale,
-      mainPane.priceScale,
-      config.series,
-      view.liveCandle,
-    );
+    const target = primitiveTarget(view, plotWidth, mainPane.layout.height, mainPane.priceScale, drawRange, view.gl);
+    for (const primitive of mainPane.primitives?.behind ?? []) primitive.draw(ctx, target);
+    const drawSeries = view.seriesDraw ?? SERIES_RENDERERS[config.series.type as SeriesType];
+    const gl = view.gl;
+    if (gl !== undefined && drawSeries === drawCandlesticks && !config.series.borderVisible &&
+        packCandleQuads(gl, view.displayCandles ?? view.candles, drawRange, view.timeScale, mainPane.priceScale, config.series, view.liveCandle)) {
+      // Candles joined the heatmap's quads; the GL image composites at the series layer.
+      gl.composite(ctx);
+    } else {
+      // A 2D series still paints over the GL-composited heatmap, if any.
+      gl?.composite(ctx);
+      drawSeries?.(
+        ctx,
+        view.displayCandles ?? view.candles,
+        drawRange,
+        view.timeScale,
+        mainPane.priceScale,
+        config.series,
+        view.liveCandle,
+      );
+    }
     drawMarkers(ctx, view, mainPane.priceScale);
     // Layer 4a: main-pane indicators overlay the series.
     for (const [index, output] of mainPane.indicators.entries()) {
       ctx.globalAlpha = mainPane.indicatorOpacities?.[index] ?? 1;
       drawIndicatorOutput(ctx, output, drawRange, view.timeScale, mainPane.priceScale, view.candles.length);
     }
+    ctx.globalAlpha = 1;
+    for (const primitive of mainPane.primitives?.above ?? []) primitive.draw(ctx, target);
     ctx.restore();
   }
 
-  // Layer 4b: sub-pane indicators.
+  // Layer 4b: sub-pane indicators and stacked host panes.
   for (const pane of view.panes.slice(1)) {
     ctx.save();
     ctx.globalAlpha = pane.opacity ?? 1;
@@ -195,9 +244,12 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): vo
     ctx.beginPath();
     ctx.rect(0, 0, plotWidth, pane.layout.height);
     ctx.clip();
+    const target = primitiveTarget(view, plotWidth, pane.layout.height, pane.priceScale, drawRange);
+    for (const primitive of pane.primitives?.behind ?? []) primitive.draw(ctx, target);
     for (const output of pane.indicators) {
       drawIndicatorOutput(ctx, output, drawRange, view.timeScale, pane.priceScale, view.candles.length);
     }
+    for (const primitive of pane.primitives?.above ?? []) primitive.draw(ctx, target);
     ctx.restore();
   }
 
@@ -271,6 +323,46 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): vo
   drawPriceReferences(ctx, view);
   drawPriceLines(ctx, view);
   if (overlay) renderOverlayLayers(ctx, view);
+  } finally {
+    ctx.restore();
+  }
+
+  // Layer 9: host panes docked to the canvas edges, in absolute coordinates.
+  drawDockedPanes(ctx, canvasView);
+}
+
+function primitiveTarget(
+  view: RenderView,
+  width: number,
+  height: number,
+  priceScale: PriceScale,
+  range: VisibleRange,
+  gl?: GLQuadSink,
+): PrimitiveDrawTarget {
+  return {
+    width,
+    height,
+    priceScale,
+    timeScale: view.timeScale,
+    range,
+    candles: view.candles,
+    pixelRatio: view.pixelRatio,
+    ...(gl !== undefined ? { gl } : {}),
+  };
+}
+
+function drawDockedPanes(ctx: Canvas2DLike, view: RenderView): void {
+  for (const dock of view.dockedPanes ?? []) {
+    ctx.save();
+    ctx.translate(dock.x, dock.y);
+    ctx.beginPath();
+    ctx.rect(0, 0, dock.width, dock.height);
+    ctx.clip();
+    const target = primitiveTarget(view, dock.width, dock.height, dock.priceScale, view.range);
+    for (const primitive of dock.primitives.behind) primitive.draw(ctx, target);
+    for (const primitive of dock.primitives.above) primitive.draw(ctx, target);
+    ctx.restore();
+  }
 }
 
 /** Repaints hover-dependent status text and crosshair above a cached base. */

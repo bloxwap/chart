@@ -7,6 +7,7 @@
  */
 
 import type { DrawingPoint } from '../config.js';
+import { valueArea, volumeProfileRows } from '../core/profile.js';
 import { defineDrawing } from './define.js';
 import type { DrawingDef, DrawPrimitive } from './types.js';
 import {
@@ -270,23 +271,8 @@ export function volumeProfile(
   to: number,
   rows: number,
 ): { lo: number; hi: number; up: number[]; down: number[] } {
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (let i = from; i <= to; i++) {
-    lo = Math.min(lo, v.candles[i]!.low);
-    hi = Math.max(hi, v.candles[i]!.high);
-  }
-  const step = (hi - lo) / rows || 1;
-  const up = new Array<number>(rows).fill(0);
-  const down = new Array<number>(rows).fill(0);
-  for (let i = from; i <= to; i++) {
-    const c = v.candles[i]!;
-    const r0 = Math.min(rows - 1, Math.floor((c.low - lo) / step));
-    const r1 = Math.min(rows - 1, Math.floor((c.high - lo) / step));
-    const share = (c.volume ?? 0) / (r1 - r0 + 1);
-    for (let r = r0; r <= r1; r++) (c.close >= c.open ? up : down)[r]! += share;
-  }
-  return { lo, hi, up, down };
+  const prof = volumeProfileRows(v.candles, from, to, rows);
+  return prof ?? { lo: 0, hi: 0, up: new Array<number>(rows).fill(0), down: new Array<number>(rows).fill(0) };
 }
 
 /** Fixed range volume profile (2 points): volume by price over bars a..b, with POC and value area. */
@@ -303,18 +289,9 @@ export const volumeProfileDrawing = defineDrawing({
     const prof = volumeProfile(v, from, to, VOLUME_PROFILE_ROWS);
     const totals = prof.up.map((u, i) => u + prof.down[i]!);
     const max = Math.max(...totals) || 1;
-    const poc = totals.indexOf(Math.max(...totals));
     // Value area: grow from the POC until 70% of volume is covered.
-    const sum = totals.reduce((s, x) => s + x, 0);
-    let lo = poc;
-    let hi = poc;
-    let acc = totals[poc]!;
-    while (acc < sum * 0.7 && (lo > 0 || hi < totals.length - 1)) {
-      const below = lo > 0 ? totals[lo - 1]! : -1;
-      const above = hi < totals.length - 1 ? totals[hi + 1]! : -1;
-      if (above >= below) acc += totals[++hi]!;
-      else acc += totals[--lo]!;
-    }
+    const va = valueArea(totals);
+    const poc = va.poc;
     const rowH = (prof.hi - prof.lo) / VOLUME_PROFILE_ROWS;
     const width = (right - left) * 0.7;
     const top = v.priceToY(prof.hi);
@@ -323,7 +300,7 @@ export const volumeProfileDrawing = defineDrawing({
     totals.forEach((total, r) => {
       const y0 = v.priceToY(prof.lo + rowH * (r + 1));
       const h = Math.max(1, v.priceToY(prof.lo + rowH * r) - y0 - 1);
-      const inVa = r >= lo && r <= hi;
+      const inVa = r >= va.low && r <= va.high;
       const uw = (prof.up[r]! / max) * width;
       const dw = (prof.down[r]! / max) * width;
       const alpha = inVa ? 0.55 : 0.25;
