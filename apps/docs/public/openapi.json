@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bloxwap Chart SDK — Documentation Site API",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "summary": "Machine-readable endpoints published by the @bloxwap/chart documentation site.",
     "description": "The Bloxwap Chart SDK (`@bloxwap/chart`) is a client-side TypeScript library for interactive financial charts on HTML canvas. It has no hosted HTTP API: charts are rendered by JavaScript running in your own page, worker, or test. This specification documents every machine-readable HTTP resource the documentation site itself publishes — the llms.txt agent index, the sitemap, the full-text search index, and this specification — so agents can discover and consume them automatically. The library's JavaScript API (createChart, indicators, drawings, the React component) is documented at https://bloxwap.github.io/chart/docs/api/chart/ and indexed in https://bloxwap.github.io/chart/llms.txt.",
     "contact": {

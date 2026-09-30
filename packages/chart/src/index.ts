@@ -11,7 +11,7 @@
  */
 
 /** Library version. */
-export const version = '0.2.0';
+export const version = '0.3.0';
 
 export { createChart, Chart } from './core/chart.js';
 export { DEFAULT_DRAWING_COLOR, LINE_STYLE_DASH, WEAK_MAGNET_PX, DEFAULT_DOCK_WIDTH } from './core/chart.js';

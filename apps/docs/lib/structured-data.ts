@@ -39,7 +39,7 @@ export function homeStructuredData(): Record<string, unknown> {
         applicationSubCategory: 'Charting library',
         operatingSystem: 'Web browser, Node.js',
         programmingLanguage: 'TypeScript',
-        softwareVersion: '0.2.0',
+        softwareVersion: '0.3.0',
         license: 'https://opensource.org/licenses/MIT',
         codeRepository: repository,
         isAccessibleForFree: true,

@@ -14,7 +14,7 @@ export default function Home() {
     <main className="home">
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow"><span className="status-dot" /> DEVELOPER PREVIEW · v0.2.0</p>
+          <p className="eyebrow"><span className="status-dot" /> DEVELOPER PREVIEW · v0.3.0</p>
           <h1>Financial charts.<br /><span>Your interface.</span></h1>
           <p className="hero-description">Your next trading interface starts here. Candles, live order books, and volume profiles, drawn with WebGL2. Try the full chart below: draw a trend line, add indicators, change timeframes, and make it your own.</p>
           <div className="hero-actions"><a href="#playground" className="btn">Play with the chart <ArrowDown aria-hidden="true" /></a><Link href="/docs/getting-started" className="btn btn--secondary">Start building <ArrowRight aria-hidden="true" /></Link></div>
