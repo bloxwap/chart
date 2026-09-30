@@ -2,7 +2,7 @@
 
 > A zero-dependency TypeScript library for interactive financial charts, drawn on an HTML canvas with WebAssembly-accelerated math and a JavaScript fallback. Open source (MIT) by Bloxwap, Inc.
 
-`@bloxwap/chart` renders candlestick, hollow candle, Heikin Ashi, OHLC bar, line, area, and histogram series with 20 built-in indicators (SMA, EMA, Bollinger Bands, VWAP, MA ribbon, Supertrend, Ichimoku, Donchian, Parabolic SAR, MACD, RSI, KDJ, volume, ADX, CCI, MFI, OBV, ATR, Stochastic, Stochastic RSI) and 89 drawing tools grouped the way trading terminals present them (trend lines, channels, pitchforks, Fibonacci, Gann, harmonic patterns, Elliott waves, long/short positions, measurers, shapes, annotations). An optional UI layer, `@bloxwap/chart/ui`, adds a drawing toolbar, header bar, settings card, indicator dialog, context menus, touch gestures, and on-chart editing. An optional datafeed, `@bloxwap/chart/datafeed`, pages history from a server and folds live ticks into bars, replacing a TradingView UDF datafeed; it also maintains a live L2 order book from a snapshot plus diff-depth stream. Order-flow views draw that data on the chart: an inline order book, a visible-range volume profile, a session volume profile/TPO pane, a liquidity heatmap, footprint candles, and delta/CVD indicators. Rendering can run on WebGL2 (`renderer: 'webgl2'`) with an automatic Canvas2D fallback, and host code can add custom series, panes, and pane primitives.
+`@bloxwap/chart` renders candlestick, hollow candle, Heikin Ashi, OHLC bar, line, area, and histogram series with 20 built-in indicators (SMA, EMA, Bollinger Bands, VWAP, MA ribbon, Supertrend, Ichimoku, Donchian, Parabolic SAR, MACD, RSI, KDJ, volume, ADX, CCI, MFI, OBV, ATR, Stochastic, Stochastic RSI) and 89 drawing tools grouped the way trading terminals present them (trend lines, channels, pitchforks, Fibonacci, Gann, harmonic patterns, Elliott waves, long/short positions, measurers, shapes, annotations). An optional UI layer, `@bloxwap/chart/ui`, adds a drawing toolbar, a header bar or vertical control rail, a settings card, indicator dialog, context menus, touch gestures, and on-chart editing. An optional datafeed, `@bloxwap/chart/datafeed`, pages history from a server and folds live ticks into bars, replacing a TradingView UDF datafeed; it also maintains a live L2 order book from a snapshot plus diff-depth stream. Order-flow views draw that data on the chart: an inline order book, a visible-range volume profile, a session volume profile/TPO pane, a liquidity heatmap, footprint candles, and delta/CVD indicators. Rendering can run on WebGL2 (`renderer: 'webgl2'`) with an automatic Canvas2D fallback, and host code can add custom series, panes, and pane primitives.
 
 ## When to use this
 
@@ -25,7 +25,7 @@ Reach for `@bloxwap/chart` when an agent or developer needs to:
 
 ## How to use it
 
-Install it from npm (0.2.0 is an early developer preview):
+Install it from npm (0.3.0 is an early developer preview):
 
 ```sh
 npm install @bloxwap/chart
