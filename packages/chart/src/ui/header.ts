@@ -25,7 +25,8 @@ import type { SeriesType } from '../config.js';
 import type { ThemeName } from '../themes.js';
 import type { UIDocument, UIElement, UIEvent } from './host.js';
 import { icon } from './icons.js';
-import { Flyouts, addCaret, el, menuItem, requireWindow, setButtonIcon } from './menu.js';
+import { Flyouts, el, requireWindow, setButtonIcon } from './menu.js';
+import { menuControls } from './menu-controls.js';
 import { headerTokensFor, injectHeaderStyles, swapTokens, type HeaderTokens, type ThemedHeaderTokens } from './header-styles.js';
 import { createScaleToggleGroup } from './scale-buttons.js';
 
@@ -169,13 +170,10 @@ const UNITS: readonly (readonly [number, string])[] = [
 ];
 
 /** Short label for an interval outside the timeframe list, e.g. `2h`. */
-function intervalLabel(ms: number): string {
+export function intervalLabel(ms: number): string {
   for (const [size, unit] of UNITS) if (ms >= size && ms % size === 0) return `${ms / size}${unit}`;
   return `${ms}ms`;
 }
-
-/** No-op `menuItem` handler; the header wires clicks itself so destroy can remove them. */
-const ignore = (): void => undefined;
 
 /** Builds the header bar into `options.container`. */
 export function createChartHeader(options: ChartHeaderOptions): ChartHeader {
@@ -210,63 +208,7 @@ export function createChartHeader(options: ChartHeaderOptions): ChartHeader {
     b.setAttribute('type', 'button');
     return b;
   };
-  /** Click toggles `menu` below `btn`; arrows, Home/End, Escape and Tab drive it from the keyboard. */
-  const dropdown = (btn: UIElement, menu: UIElement, items: readonly UIElement[]): void => {
-    btn.classList.add('cts-flyout-btn');
-    btn.setAttribute('aria-haspopup', 'menu');
-    flyouts.trackExpanded(btn);
-    addCaret(doc, btn);
-    listen(btn, 'click', (e) => {
-      e.stopPropagation();
-      flyouts.toggle(menu, btn);
-      // Keyboard activation (detail 0) moves focus into the menu, onto the checked entry.
-      if (flyouts.open === menu && e.detail === 0) (items.find((item) => item.classList.contains('cts-active')) ?? items[0]).focus();
-    });
-    const keys = (e: UIEvent): void => {
-      if (flyouts.open !== menu) return;
-      if (e.key === 'Tab') {
-        // Close, and let Tab carry on from the button rather than from the detached menu.
-        flyouts.close();
-        if (menu.contains(e.target)) btn.focus();
-        return;
-      }
-      if (e.key === 'Escape') {
-        flyouts.close();
-        btn.focus();
-      } else {
-        const at = items.indexOf(e.target as UIElement);
-        const next = e.key === 'ArrowDown' ? at + 1 : e.key === 'ArrowUp' ? (at < 0 ? items.length : at) - 1
-          : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : null;
-        if (next === null) return;
-        items[(next + items.length) % items.length].focus();
-      }
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    listen(btn, 'keydown', keys);
-    listen(menu, 'keydown', keys);
-    // Escape anywhere closes it too: a menu opened by a pointer may hold no focus (Safari never focuses a clicked button).
-    const escape = (e: UIEvent): void => {
-      if (e.key !== 'Escape' || flyouts.open !== menu) return;
-      flyouts.close();
-      btn.focus();
-    };
-    doc.addEventListener('keydown', escape);
-    cleanups.push(() => doc.removeEventListener('keydown', escape));
-  };
-  /** A checkable entry; picking it closes `menu` and, when focus was inside, returns it to `owner`. */
-  const radioItem = (menu: UIElement, owner: UIElement, label: string, iconName: string | undefined, onPick: () => void): UIElement => {
-    const item = menuItem(doc, { label, tick: true, onClick: ignore, ...(iconName !== undefined ? { icon: iconName } : {}) });
-    item.setAttribute('role', 'menuitemradio');
-    listen(item, 'click', () => {
-      const refocus = menu.contains(doc.activeElement);
-      flyouts.close();
-      onPick();
-      if (refocus) owner.focus();
-    });
-    menu.append(item);
-    return item;
-  };
+  const { dropdown, radioItem } = menuControls(doc, flyouts, cleanups);
 
   // ------------------------------------------------------------ symbol
 

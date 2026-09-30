@@ -1,6 +1,6 @@
 ---
-title: Header and scale buttons
-description: Add a TradingView-style top bar with timeframes, chart types, indicators, and price-scale toggles.
+title: Header, control rail and scale buttons
+description: Add a TradingView-style top bar or a vertical control rail with timeframes, chart types, indicators, and price-scale toggles.
 ---
 
 The chart header is an optional top bar from `@bloxwap/chart/ui`. It holds the symbol, a timeframe switcher that drives your datafeed, a chart-type menu, an Indicators button, Auto / % / Log price-scale toggles, and slots for your own controls. It is a normal-flow element: put its container above the chart. Nothing else depends on it, so skip it if you keep your own header.
@@ -88,6 +88,44 @@ Picking a timeframe does not touch `timeAxis.intervalMs` or `timeScale.intervalM
 The chart-type button and scale toggles follow `series` and `priceAxis` changes as soon as they render, through [`subscribeConfigChange`](/docs/guides/events#config-changes): the toolbar's Alt+P and Alt+L, the settings card, the context menu, and your own `updateConfig` calls all show at once.
 
 Every control is its own tab stop, and dropdowns work from the keyboard: arrows, Home, and End move through entries, Escape closes the menu (from anywhere on the page, so a menu opened with a click or tap closes too) and returns focus to its button, and Tab closes it and continues from its button. Menus stack above the settings card and the indicators dialog.
+
+## Control rail
+
+`createControlRail` puts the same controls in a vertical rail beside the drawing toolbar, so the plot starts at the top of the card. This is the layout bloxwap.pro and the playground use on wide screens. It holds a timeframe menu, the chart-type menu, the Indicators button, and the Auto / % / Log toggles, then your own controls.
+
+```html
+<div style="display: flex; height: 480px">
+  <div id="controls" style="display: flex"></div>
+  <div id="tools" style="width: 52px"></div>
+  <div id="stage" style="position: relative; flex: 1"><canvas id="chart"></canvas></div>
+</div>
+```
+
+```ts
+import { createControlRail } from '@bloxwap/chart/ui';
+
+const rail = createControlRail({
+  chart,
+  document,
+  container: document.querySelector<HTMLElement>('#controls')!,
+  datafeed,                                    // picking 1h reloads the loaded symbol at 3_600_000
+  flyouts: toolbar.flyouts,                    // one menu open at a time with the drawing rail
+  onIndicators: () => indicators.openPicker(),
+  slots: { top: [undoButton, redoButton], bottom: [settingsButton] },
+});
+
+rail.slots.bottom.append(snapshotButton);     // slots are live containers
+rail.setTheme('light');
+rail.destroy();
+```
+
+The layout, top to bottom, is `[timeframe] [chart type] [Indicators] — [Auto % Log] — [top slot] … [bottom slot]`. Dividers only appear between groups that are shown. The top slot scrolls with the built-in controls, and the rail adds paging arrows when they overflow. The bottom slot stays pinned at the foot.
+
+It takes the header's `symbol`, `timeframes`, `intervalMs`, `datafeed`, `onTimeframeChange`, `chartTypes`, `onChartTypeChange`, `onIndicators`, `scaleButtons`, `flyouts`, and `theme` options, with the same defaults and the same [datafeed rules](#working-with-a-datafeed). `slots` is `{ top?, bottom? }`. The handle has `element`, `slots` (the `top` and `bottom` containers), `symbol`, `intervalMs`, `setSymbol`, `setInterval`, `setChartType`, `setTheme`, `refresh`, and `destroy`, which behave like the header's.
+
+Menus open to the right of their button, on click or mouse hover like the drawing rail's, and work from the keyboard like the header's dropdowns. The rail uses the shared toolbar tokens (`--cts-accent`, `--cts-accent-soft`, and so on) rather than `--cts-header-*`: set them on `.cts-theme` to restyle it along with the drawing rail. A pressed scale toggle takes the accent color on the soft accent fill.
+
+To switch layouts by width, as the playground does, create both. Hide the rail's container below a breakpoint and the header's above it, then move your own buttons between `rail.slots` and the header's `slots.right` container. Both follow the datafeed, so they stay in step.
 
 ## Scale buttons on the chart
 

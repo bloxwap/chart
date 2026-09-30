@@ -19,9 +19,7 @@
     #header { flex: none; min-width: 0; }
     /* Wide: the control rail carries the header's controls, so the plot starts at the top of the card. */
     @media (min-width: 600px) { #header { display: none; } }
-    /* Rail text toggles (timeframe, Auto / % / Log) fit the 36px buttons; a pressed toggle takes the accent. */
-    #ctrl-rail .cts-btn-label { font-size: 11px; }
-    #ctrl-rail .rail-scale.cts-on { color: var(--cts-accent); background: var(--cts-accent-soft); }
+    #ctrl-rail { flex: none; display: flex; }
     #stage { position: relative; flex: 1; min-height: 0; }
     #tools { flex: none; width: 52px; overflow: hidden; transition: width 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
     #tools.collapsed { width: 0; }
@@ -63,10 +61,7 @@
 </head>
 <body>
   <div id="app">
-    <nav id="ctrl-rail" class="cts-theme cts-rail" aria-label="Chart controls">
-      <div class="cts-rail-scroll" id="ctrl-scroll"></div>
-      <div id="ctrl-bottom" class="cts-rail-footer" style="display: flex; flex-direction: column; gap: 4px;"></div>
-    </nav>
+    <div id="ctrl-rail"></div>
     <div id="tools"></div>
     <main id="main">
       <div id="header"></div>
@@ -81,9 +76,8 @@
     import { createDatafeedChart, datafeedFootprintSource, bucketStartMs } from '../dist/datafeed/index.js';
     import {
       createDrawingToolbar, createChartSettings, createIndicatorsDialog, createThemeControl, createFrameScheduler,
-      createChartHeader, DEFAULT_TIMEFRAMES, attachScrollableRail, el, iconButton, setButtonIcon,
-      menuItem, menuLabel, menuSeparator, startCountdownTicker, labelButton, setButtonLabel, ICONS,
-      DEFAULT_CHART_TYPES, CHART_TYPE_LABELS, SCALE_TOGGLES, toggleScale, scaleToggleState,
+      createChartHeader, createControlRail, DEFAULT_TIMEFRAMES, el, iconButton, setButtonIcon,
+      menuItem, menuLabel, menuSeparator, startCountdownTicker,
     } from '../dist/ui/index.js';
     import { BLOXWAP_HEADER_THEME } from '../dist/ui/index.js';
 
@@ -588,8 +582,8 @@
       onChange: () => { toolbar.cancelNavigation(); toolbar.refreshViewport(); },
     });
 
-    // ---------------- rail: timeframe, chart type, indicators, price scale (the wide layout's header) ----------------
-    // Flyouts open to the right of the rail; every control follows the datafeed and config like the header does.
+    // ---------------- rail: the right-edge panel disclosure (createControlRail below holds the header's controls) ----------------
+    // Flyouts open to the right of the rail.
     const railMenu = (label) => {
       const menu = flyouts.create();
       menu.append(menuLabel(document, label));
@@ -605,39 +599,6 @@
       item.classList.toggle('cts-active', on);
       item.setAttribute('aria-checked', String(on));
     };
-
-    const tfBtn = labelButton(document, '15m', 'Timeframe');
-    const tfMenu = railMenu('Timeframe');
-    const tfItems = DEFAULT_TIMEFRAMES.map((tf) => radio(tfMenu, { label: tf.label,
-      onClick: () => { if (tf.intervalMs !== datafeed.intervalMs) void load(datafeed.symbol ?? COIN, tf.intervalMs); } }));
-    flyouts.attach(tfBtn, tfMenu);
-    function syncRailTimeframe() {
-      const intervalMs = datafeed.intervalMs;
-      const label = DEFAULT_TIMEFRAMES.find((tf) => tf.intervalMs === intervalMs)?.label ?? '';
-      setButtonLabel(tfBtn, label);
-      tfBtn.title = `Timeframe: ${label}`;
-      tfBtn.setAttribute('aria-label', tfBtn.title);
-      DEFAULT_TIMEFRAMES.forEach((tf, i) => check(tfItems[i], tf.intervalMs === intervalMs));
-    }
-    datafeed.subscribeState(syncRailTimeframe);
-
-    const typeBtn = iconButton(document, 'chart-candlestick', 'Chart type', 20);
-    const typeMenu = railMenu('Chart type');
-    const typeItems = DEFAULT_CHART_TYPES.map((type) => radio(typeMenu, { icon: `chart-${type}`, label: CHART_TYPE_LABELS[type],
-      onClick: () => chart.updateConfig({ series: { type } }) }));
-    flyouts.attach(typeBtn, typeMenu);
-    function syncRailType() {
-      const type = chart.getConfig().series.type;
-      // A custom series (the footprint) keeps the candlestick glyph.
-      setButtonIcon(typeBtn, ICONS[`chart-${type}`] !== undefined ? `chart-${type}` : 'chart-candlestick', 20);
-      typeBtn.title = `Chart type: ${CHART_TYPE_LABELS[type] ?? type}`;
-      typeBtn.setAttribute('aria-label', typeBtn.title);
-      DEFAULT_CHART_TYPES.forEach((t, i) => check(typeItems[i], t === type));
-    }
-
-    const indicatorsBtn = iconButton(document, 'function-square', 'Indicators', 20);
-    indicatorsBtn.setAttribute('aria-haspopup', 'dialog');
-    indicatorsBtn.addEventListener('click', () => indicators.openPicker());
 
     // Right-edge panel disclosure: the volume profile (both ways from a center line), the order book (out of the
     // right edge), or none. The button shows the chosen panel's glyph and takes the accent while one shows.
@@ -663,28 +624,6 @@
     }
     syncSideMode();
 
-    const scaleBtns = SCALE_TOGGLES.map(({ key, label, title }) => {
-      const b = labelButton(document, label, title);
-      b.classList.add('rail-scale');
-      b.setAttribute('aria-label', title);
-      b.addEventListener('click', () => toggleScale(chart, key));
-      return b;
-    });
-    function syncRailScale() {
-      const state = scaleToggleState(chart.getConfig().priceAxis);
-      SCALE_TOGGLES.forEach(({ key }, i) => {
-        scaleBtns[i].classList.toggle('cts-on', state[key]);
-        scaleBtns[i].setAttribute('aria-pressed', String(state[key]));
-      });
-    }
-    chart.subscribeConfigChange(({ keys }) => {
-      if (keys.includes('series')) syncRailType();
-      if (keys.includes('priceAxis')) syncRailScale();
-    });
-    syncRailTimeframe();
-    syncRailType();
-    syncRailScale();
-
     // ---------------- header (narrow screens): symbol, timeframes → datafeed, chart type, indicators, scale toggles ----------------
     const shotBtn = iconButton(document, 'image', 'Download snapshot', 18);
     shotBtn.innerHTML = CAMERA;
@@ -703,6 +642,11 @@
       onIndicators: () => indicators.openPicker(),
       slots: { right: [headerControls] },
     });
+    // Wide: the control rail replaces the header, driving the same source. Host controls join its slots below.
+    const controlRail = createControlRail({ chart, document, container: $('ctrl-rail'), datafeed: source, flyouts,
+      onIndicators: () => indicators.openPicker(),
+      slots: { top: [sideBtn, el(document, 'div', 'cts-rail-divider')] },
+    });
 
     // Embeds can pin a host theme with ?lockedTheme=dark (or light). Without a saved choice, start on dark (bloxwapDark).
     const themeKey = 'chart-ts:theme';
@@ -714,7 +658,7 @@
       onSelect: mode => safeSet(themeKey, mode),
       onChange: theme => {
         document.body.classList.toggle('light', theme === 'light');
-        $('ctrl-rail').classList.toggle('cts-light', theme === 'light');
+        controlRail.setTheme(theme);
         toolbar.setTheme(theme);
         settings.setTheme(theme);
         header.setTheme(theme);
@@ -742,21 +686,18 @@
 
     // Wide: the control rail replaces the header. Narrow (< 600px): the rail hides, the header shows, and the
     // shared buttons join it, compacting and wrapping. The rail-only controls stay put in the hidden rail.
-    const divider = () => el(document, 'div', 'cts-rail-divider');
     const narrow = matchMedia('(max-width: 599px)');
-    $('ctrl-scroll').append(tfBtn, typeBtn, indicatorsBtn, sideBtn, divider(), ...scaleBtns, divider());
-    const themeDivider = divider();
+    const themeDivider = el(document, 'div', 'cts-rail-divider');
     const placeControls = () => {
       const theme = themeControl.element ? [themeControl.element] : [];
       flyouts.close();
       if (narrow.matches) headerControls.append(shotBtn, undoBtn, redoBtn, ...theme, settingsBtn, railToggle);
       else {
-        $('ctrl-scroll').append(undoBtn, redoBtn, ...(theme.length > 0 ? [themeDivider, ...theme] : []));
-        $('ctrl-bottom').append(shotBtn, settingsBtn, railToggle);
+        controlRail.slots.top.append(undoBtn, redoBtn, ...(theme.length > 0 ? [themeDivider, ...theme] : []));
+        controlRail.slots.bottom.append(shotBtn, settingsBtn, railToggle);
       }
     };
     placeControls();
-    attachScrollableRail(document, $('ctrl-scroll'));
     narrow.addEventListener('change', placeControls);
     // Keep the chart usable in a narrow embed; drawing tools are one click away.
     if (narrow.matches) railToggle.click();
@@ -968,7 +909,7 @@
         chart.addDrawing({ name: 'long-position', points: [{ index: n - 30, price: data[n - 30].close }, { index: n + 10, price: data[n - 30].close * 1.012 }] });
       }
     }
-    Object.assign(window, { chart, datafeed, toolbar, header, indicators, settings });
+    Object.assign(window, { chart, datafeed, toolbar, header, controlRail, indicators, settings });
   </script>
 </body>
 </html>

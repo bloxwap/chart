@@ -14,7 +14,7 @@ The package ships ESM and TypeScript declarations. There is no CommonJS export. 
 | `@bloxwap/chart/indicators` | Indicator registry, built-ins, and calculation helpers |
 | `@bloxwap/chart/drawings` | Drawing registry, catalog, built-ins, and geometry types |
 | `@bloxwap/chart/wasm` | WASM initialization and kernel interface |
-| `@bloxwap/chart/ui` | Drawing toolbar, settings, header, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker, controller, history, UI primitives, and frame scheduler |
+| `@bloxwap/chart/ui` | Drawing toolbar, settings, header, control rail, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker, controller, history, UI primitives, and frame scheduler |
 | `@bloxwap/chart/icons` | `ICONS` and `icon(name, size?)` |
 | `@bloxwap/chart/react` | `<Chart>` React component (`'use client'`), `ChartProps`, `ChartInstance` |
 | `@bloxwap/chart/datafeed` | `createDatafeedChart`, `attachDatafeed`, `loadHistory`, `createLiveBarFolder`, paging and bucket helpers |
@@ -40,6 +40,7 @@ Beyond `createChart`, the root entry exports:
 | Area | Exports |
 | --- | --- |
 | Header | `createChartHeader`, `DEFAULT_TIMEFRAMES`, `DEFAULT_HEADER_INTERVAL_MS`, `DEFAULT_CHART_TYPES`, `CHART_TYPE_LABELS`, `HEADER_CSS`, `HEADER_STYLE_MARKER`, `injectHeaderStyles`, `BLOXWAP_HEADER_TOKENS`, `BLOXWAP_HEADER_THEME`; types `HeaderTokens`, `ThemedHeaderTokens` |
+| Control rail | `createControlRail`; types `ControlRail`, `ControlRailOptions` |
 | Scale buttons | `createScaleButtons`, `toggleScale`, `scaleToggleState`, `syncScaleToggles`, `SCALE_TOGGLES` |
 | Indicator dialog | `createIndicatorsDialog`, `indicatorInputs`, `indicatorStyleGroups`, `INDICATORS_DIALOG_CSS`, `INDICATORS_DIALOG_STYLE_MARKER` |
 | Context menu | `createChartContextMenu`; types `ChartContextMenuHooks`, `ContextMenuTarget`, `ContextMenuAction`, `ContextMenuEntry` |

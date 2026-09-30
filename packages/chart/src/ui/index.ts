@@ -69,6 +69,8 @@ export type { GestureHandlers, GestureRecognizerOptions, TouchGestures, TouchGes
 export type { ThemeName } from '../themes.js';
 export { createChartHeader, DEFAULT_TIMEFRAMES, DEFAULT_HEADER_INTERVAL_MS, DEFAULT_CHART_TYPES, CHART_TYPE_LABELS } from './header.js';
 export type { ChartHeader, ChartHeaderOptions, HeaderTimeframe, HeaderDatafeed } from './header.js';
+export { createControlRail } from './control-rail.js';
+export type { ControlRail, ControlRailOptions } from './control-rail.js';
 export { createScaleButtons, toggleScale, scaleToggleState, syncScaleToggles, SCALE_TOGGLES } from './scale-buttons.js';
 export type { ScaleButtons, ScaleButtonsOptions, ScaleToggle, ScaleToggleState } from './scale-buttons.js';
 export { HEADER_CSS, HEADER_STYLE_MARKER, BLOXWAP_HEADER_TOKENS, BLOXWAP_HEADER_THEME, injectHeaderStyles } from './header-styles.js';
