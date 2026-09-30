@@ -1,5 +1,51 @@
 # Performance measurements
 
+## Order-flow backend audit — September 29, 2026
+
+The WebGL2 backend now uses an instanced glyph atlas for dense footprint
+bid×ask labels, alongside its candle/heatmap quads. The atlas caches the 15
+characters needed by the compact numeric formatter, rasterizes once per pixel
+ratio, and releases its texture/canvas on destroy. Missing atlas canvases,
+failed texture allocation, unsupported text and unsupported colors keep the
+Canvas2D label path. Axes and other text continue to use Canvas2D. Separate RGB
+and alpha blend factors preserve opacity when the GL buffer is composited.
+
+Measured in headless Chrome 154 on an Apple M3 Max with 128 GiB RAM, at
+1,264 × 900 CSS pixels and 1× backing ratio. Each workload has ten warmup
+operations and 90 animation-frame samples. There are 1,440 stored one-minute
+candles; depth history has 50 levels per side, one snapshot per minute. The
+144,000-point case retains and displays a complete 24-hour session. The harness
+asserts that the requested backend and all retained snapshots are present.
+
+CPU milliseconds: median (p95). Animation FPS is computed from rAF intervals;
+it is not compositor FPS, GPU raster time or a guarantee on other hardware or
+at finer depth-history resolution. The old mock backend benchmark remains a
+CPU-only measurement.
+
+| Retained depth points | Workload | Canvas2D CPU ms | WebGL2 CPU ms | Canvas2D animation FPS | WebGL2 animation FPS |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1,000 | pan | 0.5 (0.6) | 0.3 (0.4) | 60.0 | 60.0 |
+| 1,000 | zoom | 0.5 (0.6) | 0.3 (0.4) | 60.0 | 60.0 |
+| 50,000 | pan | 15.4 (17.5) | 4.4 (4.7) | 57.4 | 60.0 |
+| 50,000 | zoom | 15.1 (17.4) | 4.4 (4.5) | 58.0 | 60.0 |
+| 144,000 | pan | 39.3 (42.3) | 11.9 (12.2) | 24.1 | 60.0 |
+| 144,000 | zoom | 38.9 (42.1) | 12.2 (12.8) | 24.3 | 60.0 |
+
+The full-session WebGL2 runs had zero intervals above 25 ms; Canvas2D had 89
+in each run. Raw measurements, browser version and timestamp are saved in
+[the backend results](bench/results/2026-09-29-backends.json).
+
+Reproduce with Chrome installed (or set `CHART_BENCH_BROWSER`):
+
+```sh
+npm run bench:browser --workspace @bloxwap/chart -- --backends=true --frames=90 --output=/tmp/chart-backends.json
+node packages/chart/bench/run-browser.mjs --glyphs=true
+```
+
+The glyph browser check compares painted bounds, RGB and alpha with Canvas2D
+at 1×/2× and repeats the frame to check atlas reuse and GL errors. The library
+suite passes 1,855 tests with 100% line, branch and function coverage.
+
 ## Rendering and interaction audit — September 26, 2026
 
 Compared commit `9acee8d` with this working tree on the same Apple M3 Max

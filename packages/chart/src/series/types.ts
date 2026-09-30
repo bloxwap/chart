@@ -4,6 +4,7 @@
  * @module
  */
 
+import type { GLFrame } from '../render/gl/backend.js';
 import type { Candle } from '../core/data.js';
 import type { PriceScale, TimeScale, VisibleRange } from '../core/scale.js';
 import type { SeriesConfig } from '../config.js';
@@ -19,4 +20,6 @@ export type SeriesDrawFn = (
   config: SeriesConfig,
   /** Interpolated prices for the last candle only; the array stays authoritative. */
   liveCandle?: Candle,
+  /** Optional main-pane GPU frame; custom renderers may submit geometry or footprint labels. */
+  gl?: GLFrame,
 ) => void;

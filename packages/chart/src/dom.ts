@@ -91,10 +91,25 @@ export interface WebGL2Like {
   readonly DYNAMIC_DRAW: number;
   readonly FLOAT: number;
   readonly BLEND: number;
+  readonly ONE: number;
   readonly SRC_ALPHA: number;
   readonly ONE_MINUS_SRC_ALPHA: number;
   readonly SCISSOR_TEST: number;
   readonly COLOR_BUFFER_BIT: number;
+  readonly TEXTURE_2D: number;
+  readonly TEXTURE_MIN_FILTER: number;
+  readonly TEXTURE_MAG_FILTER: number;
+  readonly TEXTURE_WRAP_S: number;
+  readonly TEXTURE_WRAP_T: number;
+  readonly LINEAR: number;
+  readonly CLAMP_TO_EDGE: number;
+  readonly RGBA: number;
+  readonly UNSIGNED_BYTE: number;
+  createTexture(): unknown;
+  bindTexture(target: number, texture: unknown): void;
+  texParameteri(target: number, pname: number, param: number): void;
+  texImage2D(target: number, level: number, internalformat: number, format: number, type: number, source: unknown): void;
+  deleteTexture(texture: unknown): void;
   createShader(type: number): unknown;
   shaderSource(shader: unknown, source: string): void;
   compileShader(shader: unknown): void;
@@ -125,6 +140,7 @@ export interface WebGL2Like {
   enable(cap: number): void;
   disable(cap: number): void;
   blendFunc(sfactor: number, dfactor: number): void;
+  blendFuncSeparate(srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number): void;
   clearColor(red: number, green: number, blue: number, alpha: number): void;
   clear(mask: number): void;
   drawArraysInstanced(mode: number, first: number, count: number, instanceCount: number): void;
@@ -365,10 +381,27 @@ export class MockContextWebGL2 implements WebGL2Like {
   readonly DYNAMIC_DRAW = 0x88e8;
   readonly FLOAT = 0x1406;
   readonly BLEND = 0x0be2;
+  readonly ONE = 1;
   readonly SRC_ALPHA = 0x0302;
   readonly ONE_MINUS_SRC_ALPHA = 0x0303;
   readonly SCISSOR_TEST = 0x0c11;
   readonly COLOR_BUFFER_BIT = 0x4000;
+  readonly TEXTURE_2D = 0x0de1;
+  readonly TEXTURE_MIN_FILTER = 0x2801;
+  readonly TEXTURE_MAG_FILTER = 0x2800;
+  readonly TEXTURE_WRAP_S = 0x2802;
+  readonly TEXTURE_WRAP_T = 0x2803;
+  readonly LINEAR = 0x2601;
+  readonly CLAMP_TO_EDGE = 0x812f;
+  readonly RGBA = 0x1908;
+  readonly UNSIGNED_BYTE = 0x1401;
+  createTexture(): unknown { this.record('createTexture', []); return this.handle(); }
+  bindTexture(target: number, texture: unknown): void { this.record('bindTexture', [target, texture]); }
+  texParameteri(target: number, pname: number, param: number): void { this.record('texParameteri', [target, pname, param]); }
+  texImage2D(target: number, level: number, internalformat: number, format: number, type: number, source: unknown): void {
+    this.record('texImage2D', [target, level, internalformat, format, type, source]);
+  }
+  deleteTexture(texture: unknown): void { this.record('deleteTexture', [texture]); }
 
   /** Returned by `getShaderParameter(COMPILE_STATUS)`; clear to simulate a compile failure. */
   compileStatus = true;
@@ -497,6 +530,9 @@ export class MockContextWebGL2 implements WebGL2Like {
   }
   blendFunc(sfactor: number, dfactor: number): void {
     this.record('blendFunc', [sfactor, dfactor]);
+  }
+  blendFuncSeparate(srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number): void {
+    this.record('blendFuncSeparate', [srcRGB, dstRGB, srcAlpha, dstAlpha]);
   }
   clearColor(red: number, green: number, blue: number, alpha: number): void {
     this.record('clearColor', [red, green, blue, alpha]);

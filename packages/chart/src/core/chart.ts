@@ -79,8 +79,9 @@ export interface CreateChartOptions {
   /**
    * Render backend preference. `'webgl2'` paints the main pane's dense
    * geometry (heatmap cells, candle bodies and wicks) as instanced quads on an
-   * offscreen WebGL2 canvas composited at the series layer; text, axes and
-   * overlays stay on Canvas2D. When the host cannot provide a WebGL2 context
+   * offscreen WebGL2 canvas composited at the series layer. Footprint labels
+   * use a GPU glyph atlas; axes and other text/overlays stay on Canvas2D.
+   * When the host cannot provide a WebGL2 context
    * (workers, SSR, tests) or pipeline setup fails, the chart silently uses
    * `'canvas2d'` — see {@link Chart.renderBackend}. Default `'canvas2d'`.
    */
@@ -1278,7 +1279,8 @@ export class Chart {
     const glCanvas = ownerDocument?.createElement !== undefined
       ? ownerDocument.createElement('canvas')
       : this.snapshotDocument?.createCanvas(this.canvas.width, this.canvas.height);
-    const backend = glCanvas !== undefined ? GLBackend.create(glCanvas) : null;
+    const backend = glCanvas !== undefined ? GLBackend.create(glCanvas, () => ownerDocument?.createElement !== undefined
+      ? ownerDocument.createElement('canvas') : this.snapshotDocument!.createCanvas(1, 1)) : null;
     if (backend === null) {
       this.glFailed = true;
       return null;

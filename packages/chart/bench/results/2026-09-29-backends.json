@@ -1,0 +1,266 @@
+{
+  "measuredAt": "2026-09-30T02:30:40.091Z",
+  "headless": true,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "frames": 90,
+  "pixelRatio": 1,
+  "measurement": "CPU submission and animation-frame cadence; not compositor FPS or GPU raster time",
+  "results": [
+    {
+      "renderer": "canvas2d",
+      "workload": "pan",
+      "retainedDepthPoints": 1000,
+      "buckets": 10,
+      "bucketMs": 60000,
+      "sessionHours": 0.16666666666666666,
+      "visibleBars": 11,
+      "cpuMs": {
+        "p50": 0.5,
+        "p95": 0.6000000238418579,
+        "max": 0.7000000476837158
+      },
+      "frameIntervalMs": {
+        "p50": 16.699999999999932,
+        "p95": 16.799999999999955,
+        "max": 16.80000000000001
+      },
+      "animationFps": 60.00539374325782,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "canvas2d",
+      "workload": "zoom",
+      "retainedDepthPoints": 1000,
+      "buckets": 10,
+      "bucketMs": 60000,
+      "sessionHours": 0.16666666666666666,
+      "visibleBars": 12,
+      "cpuMs": {
+        "p50": 0.5,
+        "p95": 0.6000000238418579,
+        "max": 1
+      },
+      "frameIntervalMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999955,
+        "max": 16.800000000000182
+      },
+      "animationFps": 60.00539374325783,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "pan",
+      "retainedDepthPoints": 1000,
+      "buckets": 10,
+      "bucketMs": 60000,
+      "sessionHours": 0.16666666666666666,
+      "visibleBars": 11,
+      "cpuMs": {
+        "p50": 0.30000007152557373,
+        "p95": 0.40000009536743164,
+        "max": 0.6000000238418579
+      },
+      "frameIntervalMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "animationFps": 60.001348344906624,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "zoom",
+      "retainedDepthPoints": 1000,
+      "buckets": 10,
+      "bucketMs": 60000,
+      "sessionHours": 0.16666666666666666,
+      "visibleBars": 12,
+      "cpuMs": {
+        "p50": 0.30000007152557373,
+        "p95": 0.3999999761581421,
+        "max": 0.40000009536743164
+      },
+      "frameIntervalMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "animationFps": 59.997303491977874,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "canvas2d",
+      "workload": "pan",
+      "retainedDepthPoints": 50000,
+      "buckets": 500,
+      "bucketMs": 60000,
+      "sessionHours": 8.333333333333334,
+      "visibleBars": 501,
+      "cpuMs": {
+        "p50": 15.399999976158142,
+        "p95": 17.5,
+        "max": 20.100000023841858
+      },
+      "frameIntervalMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "max": 33.399999999999636
+      },
+      "animationFps": 57.4230595522292,
+      "framesOver25Ms": 4
+    },
+    {
+      "renderer": "canvas2d",
+      "workload": "zoom",
+      "retainedDepthPoints": 50000,
+      "buckets": 500,
+      "bucketMs": 60000,
+      "sessionHours": 8.333333333333334,
+      "visibleBars": 501,
+      "cpuMs": {
+        "p50": 15.100000023841858,
+        "p95": 17.399999976158142,
+        "max": 19.09999990463257
+      },
+      "frameIntervalMs": {
+        "p50": 16.69999999999891,
+        "p95": 16.799999999999272,
+        "max": 33.399999999999636
+      },
+      "animationFps": 58.04474010304575,
+      "framesOver25Ms": 3
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "pan",
+      "retainedDepthPoints": 50000,
+      "buckets": 500,
+      "bucketMs": 60000,
+      "sessionHours": 8.333333333333334,
+      "visibleBars": 501,
+      "cpuMs": {
+        "p50": 4.400000095367432,
+        "p95": 4.700000047683716,
+        "max": 4.899999976158142
+      },
+      "frameIntervalMs": {
+        "p50": 16.69999999999891,
+        "p95": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "animationFps": 60.00539374325787,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "zoom",
+      "retainedDepthPoints": 50000,
+      "buckets": 500,
+      "bucketMs": 60000,
+      "sessionHours": 8.333333333333334,
+      "visibleBars": 501,
+      "cpuMs": {
+        "p50": 4.399999976158142,
+        "p95": 4.5,
+        "max": 4.699999928474426
+      },
+      "frameIntervalMs": {
+        "p50": 16.69999999999891,
+        "p95": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "animationFps": 60.00134834490666,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "canvas2d",
+      "workload": "pan",
+      "retainedDepthPoints": 144000,
+      "buckets": 1440,
+      "bucketMs": 60000,
+      "sessionHours": 24,
+      "visibleBars": 1440,
+      "cpuMs": {
+        "p50": 39.299999952316284,
+        "p95": 42.299999952316284,
+        "max": 42.799999952316284
+      },
+      "frameIntervalMs": {
+        "p50": 33.400000000001455,
+        "p95": 50,
+        "max": 50.10000000000218
+      },
+      "animationFps": 24.05535434347802,
+      "framesOver25Ms": 89
+    },
+    {
+      "renderer": "canvas2d",
+      "workload": "zoom",
+      "retainedDepthPoints": 144000,
+      "buckets": 1440,
+      "bucketMs": 60000,
+      "sessionHours": 24,
+      "visibleBars": 1440,
+      "cpuMs": {
+        "p50": 38.90000009536743,
+        "p95": 42.10000002384186,
+        "max": 42.60000002384186
+      },
+      "frameIntervalMs": {
+        "p50": 33.400000000001455,
+        "p95": 50.10000000000218,
+        "max": 50.10000000000218
+      },
+      "animationFps": 24.27383062866494,
+      "framesOver25Ms": 89
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "pan",
+      "retainedDepthPoints": 144000,
+      "buckets": 1440,
+      "bucketMs": 60000,
+      "sessionHours": 24,
+      "visibleBars": 1440,
+      "cpuMs": {
+        "p50": 11.899999976158142,
+        "p95": 12.200000047683716,
+        "max": 12.5
+      },
+      "frameIntervalMs": {
+        "p50": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "animationFps": 60.00134834490666,
+      "framesOver25Ms": 0
+    },
+    {
+      "renderer": "webgl2",
+      "workload": "zoom",
+      "retainedDepthPoints": 144000,
+      "buckets": 1440,
+      "bucketMs": 60000,
+      "sessionHours": 24,
+      "visibleBars": 1440,
+      "cpuMs": {
+        "p50": 12.200000047683716,
+        "p95": 12.800000071525574,
+        "max": 13.099999904632568
+      },
+      "frameIntervalMs": {
+        "p50": 16.700000000000728,
+        "p95": 16.799999999999272,
+        "max": 16.80000000000291
+      },
+      "animationFps": 60.00134834490666,
+      "framesOver25Ms": 0
+    }
+  ],
+  "hardware": {
+    "cpu": "Apple M3 Max",
+    "memoryGiB": 128
+  }
+}
