@@ -10,6 +10,9 @@ self-hosted, so documentation builds and visitors do not need Google Fonts reque
   `monorepo/packages/og/assets/` for Open Graph rendering (weights 700 and 900).
   They share the adjacent `Nunito-OFL.txt` license; the image renderer needs TTF
   rather than the site's WOFF2 font.
+- **Nunito Regular**: a static weight-400 TTF instanced from `Nunito-Latin.woff2`
+  with fontTools (`instancer.instantiateVariableFont(font, {"wght": 400})`) for the
+  Open Graph descriptions. Same Latin subset and `Nunito-OFL.txt` license.
 - **Space Grotesk Bold**: copied with its OFL license from
   `monorepo/workers/www/public/fonts/`.
 - **Maple Mono**: variable subset, weights 100–800, copied with its OFL license from
