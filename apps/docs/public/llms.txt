@@ -68,7 +68,7 @@ Add the toolbar with `createDrawingToolbar({ chart, document, canvas, rail, over
 - [Indicators](https://bloxwap.github.io/chart/docs/guides/indicators/): 20 built-in studies, per-plot styling, the indicator dialog, and custom calculations.
 - [Drawings](https://bloxwap.github.io/chart/docs/guides/drawings/): Place, edit, and manage annotations in data coordinates.
 - [Toolbar and settings](https://bloxwap.github.io/chart/docs/guides/toolbar-settings/): Drawing rail, navigation, the settings card, and context menus.
-- [Header and scale buttons](https://bloxwap.github.io/chart/docs/guides/header/): Top bar with timeframes, chart types, indicators, and Auto / % / Log toggles.
+- [Header, control rail and scale buttons](https://bloxwap.github.io/chart/docs/guides/header/): Top bar or vertical control rail with timeframes, chart types, indicators, and Auto / % / Log toggles.
 - [Touch gestures](https://bloxwap.github.io/chart/docs/guides/touch/): Pan, pinch, fling, and long-press crosshair.
 - [Time scale](https://bloxwap.github.io/chart/docs/guides/time-scale/): Bar-indexed or time-continuous axis, and what stays bar-indexed.
 - [Chart events](https://bloxwap.github.io/chart/docs/guides/events/): Visible range, crosshair, data load, and layout events and their delivery rules.

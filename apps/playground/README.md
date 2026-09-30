@@ -44,6 +44,11 @@ bloxwap.pro uses the chart:
   section of the settings card switches between BTC, the random walk (1m or 1d)
   and **Gaps (1h)**. Gaps (1h) turns on `timeScale.continuous`, so missing
   buckets show as gaps.
+- **Control rail:** on wide screens, `createControlRail` stacks the timeframe
+  menu, chart-type menu, **Indicators** button and Auto / % / Log toggles in a
+  rail left of the drawing toolbar. The page adds the right-edge panel picker,
+  undo/redo and the theme control to its top slot, and the snapshot, settings
+  and drawing-rail toggle buttons to its bottom slot.
 - **Header:** `createChartHeader` shows the symbol and the 1m–1M timeframes.
   Picking a timeframe calls `datafeed.setSymbol`. The header also has the
   chart-type menu (including Heikin Ashi and hollow candles), an **Indicators**
@@ -71,8 +76,8 @@ bloxwap.pro uses the chart:
   `#00ff3f` accent. The header and the on-chart scale toggles get it from
   `BLOXWAP_HEADER_THEME`, which their `setTheme` clears on light. With no saved
   choice, the page starts on dark.
-- **Narrow screens (under 600px):** the control rail hides and its buttons move
-  into the header. When the header is too wide, it collapses the timeframes into
+- **Narrow screens (under 600px):** the control rail hides, the header shows,
+  and the page's own buttons move from the rail's slots into the header. When the header is too wide, it collapses the timeframes into
   a dropdown and wraps onto a second row. The drawing rail starts collapsed. The
   status line wraps onto more rows instead of running under the price axis. On
   touch devices, a one-finger drag pans even across the demo drawings: tap one

@@ -131,6 +131,14 @@ export const TOOLBAR_CSS = `
 @media (hover: none) { .cts-rail-scroll-button { opacity: 1; pointer-events: auto; } }
 
 .cts-rail-divider { width: 24px; height: 1px; flex: none; background: var(--cts-edge); margin: 4px 0; }
+.cts-rail-footer { flex: none; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* Control rail: the header's controls stacked; text toggles fit the 36px buttons, a pressed toggle takes the accent. */
+.cts-control-rail-group { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cts-control-rail-slot { display: contents; }
+.cts-control-rail-group > .cts-btn, .cts-control-rail-slot > .cts-btn { left: -4px; }
+.cts-control-rail .cts-btn-label, .cts-control-rail .cts-rail-scale { font: 500 11px/1 var(--cts-mono); }
+.cts-rail-scale.cts-on { color: var(--cts-accent); background: var(--cts-accent-soft); }
 
 /* ---- buttons ---- */
 .cts-btn {

@@ -31,7 +31,7 @@ to open the playground at http://localhost:8641/demo/ (requires Bun).
 - **Events** — visible range, crosshair, data load and layout subscriptions with re-entrancy-safe delivery
 - **Time-continuous axis** — `timeScale.continuous` shows weekends and outages as gaps (bar-indexed by default)
 - **Snapshots and countdown** — `takeScreenshot`/`toBlob`/`toDataURL`, and a bar-close countdown in the status line and on the price label
-- **TradingView-style UI** — header bar with timeframes, chart types and Auto/%/Log toggles, indicator picker and settings dialog, right-click context menus, and touch gestures (pan, pinch, fling, long-press crosshair)
+- **TradingView-style UI** — header bar or vertical control rail with timeframes, chart types and Auto/%/Log toggles, indicator picker and settings dialog, right-click context menus, and touch gestures (pan, pinch, fling, long-press crosshair)
 - **89 drawing tools** in TradingView's toolbar groups — lines, channels, pitchforks, Fibonacci, Gann, harmonic/chart patterns, Elliott waves, cycles, long/short positions, forecasting, anchored VWAP, fixed range volume profile, measurers, brushes, shapes, arrows, text/notes/callouts/tables, images, emoji — plus a registry for custom models
 - **Interactive editing API** — live draft preview, hit-testing, selection handles, point dragging, translation, magnet snapping (weak/strong), hide/clear, per-drawing color/width/line style/text/lock
 - **Cursor modes** — cross, dot, arrow and presenter halo (`crosshair.mode`)
@@ -49,7 +49,7 @@ to open the playground at http://localhost:8641/demo/ (requires Bun).
 | `@bloxwap/chart/indicators` | Indicator registry, built-ins and calculation helpers |
 | `@bloxwap/chart/drawings` | Drawing registry, catalog and built-ins |
 | `@bloxwap/chart/wasm` | WASM initialization |
-| `@bloxwap/chart/ui` | Drawing toolbar, settings card, header, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker |
+| `@bloxwap/chart/ui` | Drawing toolbar, settings card, header, control rail, scale buttons, indicator dialog, context menu, touch gestures, countdown ticker |
 | `@bloxwap/chart/icons` | `ICONS`, `icon(name, size?)` |
 | `@bloxwap/chart/react` | `<Chart>` component |
 | `@bloxwap/chart/datafeed` | `createDatafeedChart`, `attachDatafeed`, `loadHistory`, `createLiveBarFolder` and paging helpers |
@@ -156,6 +156,8 @@ const header = createChartHeader({
   flyouts: toolbar.flyouts, tokens: BLOXWAP_HEADER_THEME, // bloxwap.pro look on dark; setTheme swaps it
   onIndicators: () => indicators.openPicker(),
 });
+// Or stack the same controls in a rail beside the drawing toolbar:
+// createControlRail({ chart, document, container: controlsEl, datafeed, flyouts: toolbar.flyouts, onIndicators: … });
 ```
 
 Custom indicators and drawings:
