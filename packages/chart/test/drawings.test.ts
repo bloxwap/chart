@@ -12,8 +12,9 @@ import {
   hlineDrawing,
   rectDrawing,
   trendlineDrawing,
+  volumeProfile,
 } from '../dist/drawings/index.js';
-import type { DrawingDef, DrawingView, DrawPrimitive } from '../dist/drawings/index.js';
+import type { DrawingDef, DrawingView, DrawPrimitive, FullView } from '../dist/drawings/index.js';
 import type { Candle } from '../dist/core/data.js';
 
 // Identity pixel view: index → x * 10, price → y = 100 - price.
@@ -275,6 +276,18 @@ describe('forecasting', () => {
     const def = BUILTIN_DRAWINGS.find((d) => d.name === 'anchored-vwap')!;
     const prims = def.geometry([{ index: 55, price: 1 }], { ...fullView, candles: sampleCandles.map((c) => ({ ...c, volume: 0 })) });
     assert.ok(prims.some((p) => p.type === 'text' && p.text.startsWith('VWAP ')));
+  });
+  it('anchored VWAP weights bars without a volume field as 1', () => {
+    const def = BUILTIN_DRAWINGS.find((d) => d.name === 'anchored-vwap')!;
+    const prims = def.geometry([{ index: 55, price: 1 }], {
+      ...fullView,
+      candles: sampleCandles.map(({ volume: _v, ...c }) => c),
+    });
+    assertFinite(prims, 'volume-less vwap');
+    assert.ok(prims.some((p) => p.type === 'text' && p.text.startsWith('VWAP ')));
+  });
+  it('volumeProfile falls back to a zero grid for a degenerate row count', () => {
+    assert.deepEqual(volumeProfile(fullView as FullView, 0, 10, 0), { lo: 0, hi: 0, up: [], down: [] });
   });
   it('projection shows a dash for a flat first leg', () => {
     const def = BUILTIN_DRAWINGS.find((d) => d.name === 'projection')!;

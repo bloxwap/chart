@@ -372,6 +372,26 @@ describe('DrawingController eraser, zoom and navigation', () => {
     c.pointerLeave();
     c.pointerUp(1, 1); // stray up with no drag
   });
+  it('keeps autoscale fitting the bars on every drag while it is on', () => {
+    const { c, chart } = setup();
+    c.pointerDown(400, 200);
+    c.pointerMove(400, 300); // straight down
+    c.pointerUp(400, 300);
+    assert.equal(chart.getConfig().priceAxis.autoScale, true);
+  });
+  it('with autoscale off, pans the price range only once a drag is clearly vertical', () => {
+    const { c, chart } = setup();
+    chart.updateConfig({ priceAxis: { autoScale: false } });
+    c.pointerDown(400, 200);
+    c.pointerMove(460, 225); // 25px down but mostly sideways: a time pan
+    const price = chart.scale.yToPrice(200);
+    assert.ok(Math.abs(chart.scale.priceToY(price) - 200) < 1e-6, 'prices hold');
+    c.pointerMove(420, 260);
+    c.pointerUp(420, 260);
+    // The content followed the pointer: the price under it now sits 60px lower.
+    assert.ok(Math.abs(chart.scale.priceToY(price) - 260) < 1e-6);
+    assert.equal(chart.getConfig().priceAxis.autoScale, false);
+  });
   it('navigation off leaves the viewport alone', () => {
     const { c, chart } = setup({ navigation: false });
     const before = chart.scale.visibleRange();

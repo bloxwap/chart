@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createChart, MockDocument, type Chart, type FrameScheduler, type IndicatorHit } from '../dist/index.js';
+import { createChart, MockCanvas, MockDocument, type Chart, type FrameScheduler, type IndicatorHit } from '../dist/index.js';
 import type { Candle } from '../dist/core/data.js';
 import type { ChartConfig, DeepPartial } from '../dist/config.js';
 import type { IndicatorDef, IndicatorLine, IndicatorOutput } from '../dist/indicators/index.js';
@@ -43,6 +43,32 @@ class TestFrames implements FrameScheduler {
   request = () => 1;
   cancel = () => {};
 }
+
+describe('chart.scale.scrollPrice', () => {
+  it('pans the range in scale units, turning autoscale off once, and ignores no-ops', () => {
+    const chart = make({ width: 640, height: 400 });
+    const price = chart.scale.yToPrice(200);
+    chart.scale.scrollPrice(0);
+    assert.equal(chart.getConfig().priceAxis.autoScale, true, 'a zero pan changes nothing');
+    chart.scale.scrollPrice(40);
+    assert.equal(chart.getConfig().priceAxis.autoScale, false);
+    assert.ok(Math.abs(chart.scale.priceToY(price) - 240) < 1e-6);
+    chart.scale.scrollPrice(-40); // autoscale already off: a plain re-render
+    assert.ok(Math.abs(chart.scale.priceToY(price) - 200) < 1e-6);
+    chart.updateConfig({ priceAxis: { mode: 'logarithmic', inverted: true } });
+    const logPrice = chart.scale.yToPrice(100);
+    chart.scale.scrollPrice(30);
+    assert.ok(Math.abs(chart.scale.priceToY(logPrice) - 130) < 1e-6, 'log and inverted axes follow the pointer too');
+    chart.destroy();
+  });
+
+  it('is a no-op before the main pane is laid out', () => {
+    const chart = createChart({ container: new MockCanvas(0, 0), config: { wasm: false } });
+    chart.scale.scrollPrice(10);
+    assert.equal(chart.getConfig().priceAxis.autoScale, true);
+    chart.destroy();
+  });
+});
 
 describe('chart.resetScale', () => {
   it('restores the initial bar spacing and scrolls back to the latest bar', () => {

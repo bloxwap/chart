@@ -9,6 +9,23 @@
  */
 
 import type { Candle } from './core/data.js';
+import {
+  DEFAULT_HEATMAP_BUCKET_MS,
+  DEFAULT_HEATMAP_COLOR_HIGH,
+  DEFAULT_HEATMAP_COLOR_LOW,
+  DEFAULT_HEATMAP_GAMMA,
+  DEFAULT_HEATMAP_MAX_BUCKETS,
+  DEFAULT_HEATMAP_MAX_LEVELS,
+  DEFAULT_HEATMAP_MIN_OPACITY,
+  DEFAULT_HEATMAP_OPACITY,
+  type HeatmapStop,
+} from './core/heatmap.js';
+import {
+  DEFAULT_INLINE_BOOK_ASK_COLOR,
+  DEFAULT_INLINE_BOOK_BID_COLOR,
+  DEFAULT_INLINE_BOOK_MAX_LEVELS,
+  DEFAULT_INLINE_BOOK_WIDTH,
+} from './core/inline-book.js';
 import type { CanvasImageSourceLike } from './dom.js';
 
 /** Built-in main-series renderers. */
@@ -16,7 +33,8 @@ export type SeriesType = 'candlestick' | 'line' | 'area' | 'bar' | 'histogram' |
 
 /** Main series appearance. Colors accept hex, rgb(a), and `color(display-p3 ...)`. */
 export interface SeriesConfig {
-  type: SeriesType;
+  /** A built-in {@link SeriesType}, or a type registered via {@link import('./core/chart.js').Chart.registerSeries}. */
+  type: SeriesType | (string & {});
   colorByPreviousClose: boolean;
   bodyVisible: boolean;
   borderVisible: boolean;
@@ -229,6 +247,76 @@ export interface VolumeConfig {
   height: number;
 }
 
+/**
+ * Inline order book: a live bid/ask depth ladder docked beside the price
+ * axis, fed by `Chart.setDepth` (the datafeed's depth channel). The chart
+ * attaches the pane while `enabled` holds and drops it when it clears.
+ */
+export interface InlineBookConfig {
+  /** Dock the inline book pane, sharing the main price scale. */
+  enabled: boolean;
+  /** Levels shown per side. */
+  maxLevels: number;
+  /** Bid bar color. */
+  bidColor: string;
+  /** Ask bar color. */
+  askColor: string;
+  /** Shade cumulative depth behind the level bars. */
+  cumulative: boolean;
+  /** Size label per row when the row is tall enough. */
+  showLabels: boolean;
+  /**
+   * `'dock'` gives the book its own strip beside the price axis, shrinking the
+   * plot; `'overlay'` paints it behind the series along the plot's right edge,
+   * so the plot keeps the full width.
+   */
+  placement: 'dock' | 'overlay';
+  /**
+   * `'ladder'` grows every level from the price-axis side; `'mirrored'` grows
+   * bids left and asks right from a central column of size labels.
+   */
+  layout: 'ladder' | 'mirrored';
+  /** Book width in CSS pixels: the dock strip, or the overlay band. */
+  width: number;
+  /** Overlay only: gap in CSS pixels between the band and the price axis. */
+  inset: number;
+}
+
+/**
+ * Liquidity heatmap (Bookmap-style): resting order-book size over time as a
+ * color field behind the main series, fed by `Chart.setDepth` (the datafeed's
+ * depth channel). While `enabled` holds, the chart retains a bounded window
+ * of time-bucketed book snapshots (`maxBuckets` × 2 × `maxLevels` level
+ * pairs) and drops it when `enabled` clears.
+ */
+export interface HeatmapConfig {
+  /** Paint the heatmap behind the candles. */
+  enabled: boolean;
+  /** Wall-clock bucket width in ms; at most one retained snapshot per bucket. */
+  bucketMs: number;
+  /** Retained buckets (the history window's capacity). */
+  maxBuckets: number;
+  /** Levels kept per side per snapshot. */
+  maxLevels: number;
+  /** Ramp color at zero intensity (used when `stops` is empty). */
+  colorLow: string;
+  /** Ramp color at full intensity (used when `stops` is empty). */
+  colorHigh: string;
+  /**
+   * A custom gradient from zero to full intensity, replacing `colorLow` →
+   * `colorHigh` when it has at least one usable color. Bare colors spread
+   * evenly; `{ color, at }` pins a stop to an intensity (0-1). A stop's own
+   * alpha scales the ramp alpha there. Empty (the default) keeps the two-color ramp.
+   */
+  stops: HeatmapStop[];
+  /** 0-1; peak cell alpha at full intensity. */
+  opacity: number;
+  /** 0-1; cell alpha at zero intensity, so thin liquidity can stay visible. Default 0. */
+  minOpacity: number;
+  /** Intensity curve exponent; below 1 lifts small sizes. */
+  gamma: number;
+}
+
 /** Label formatting hooks. */
 export interface FormattersConfig {
   price: (value: number) => string;
@@ -259,6 +347,10 @@ export interface ChartConfig {
   theme: ThemeConfig;
   watermark: WatermarkConfig;
   volume: VolumeConfig;
+  /** Inline order book docked beside the price axis. */
+  inlineBook: InlineBookConfig;
+  /** Liquidity heatmap behind the main series. */
+  heatmap: HeatmapConfig;
   formatters: FormattersConfig;
   /** Relative height of each indicator sub-pane (main pane weighs 3). */
   indicatorPaneWeight: number;
@@ -345,6 +437,30 @@ export const DEFAULT_CONFIG: ChartConfig = {
     fontFamily: '',
   },
   volume: { overlay: false, upColor: 'up', downColor: 'down', opacity: 0.5, height: 0.2 },
+  inlineBook: {
+    enabled: false,
+    maxLevels: DEFAULT_INLINE_BOOK_MAX_LEVELS,
+    bidColor: DEFAULT_INLINE_BOOK_BID_COLOR,
+    askColor: DEFAULT_INLINE_BOOK_ASK_COLOR,
+    cumulative: true,
+    showLabels: true,
+    placement: 'dock',
+    layout: 'ladder',
+    width: DEFAULT_INLINE_BOOK_WIDTH,
+    inset: 0,
+  },
+  heatmap: {
+    enabled: false,
+    bucketMs: DEFAULT_HEATMAP_BUCKET_MS,
+    maxBuckets: DEFAULT_HEATMAP_MAX_BUCKETS,
+    maxLevels: DEFAULT_HEATMAP_MAX_LEVELS,
+    colorLow: DEFAULT_HEATMAP_COLOR_LOW,
+    colorHigh: DEFAULT_HEATMAP_COLOR_HIGH,
+    stops: [],
+    opacity: DEFAULT_HEATMAP_OPACITY,
+    minOpacity: DEFAULT_HEATMAP_MIN_OPACITY,
+    gamma: DEFAULT_HEATMAP_GAMMA,
+  },
   formatters: { price: defaultPriceFormatter, time: defaultTimeFormatter },
   indicatorPaneWeight: 1,
 };

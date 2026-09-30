@@ -6,10 +6,10 @@
  */
 
 import type { Candle } from '../core/data.js';
-import type { SeriesConfig, SeriesType } from '../config.js';
+import type { SeriesConfig } from '../config.js';
 
 /** Series types whose renderers honour `colorByPreviousClose`. */
-const PREVIOUS_CLOSE_OPTIONAL: ReadonlySet<SeriesType> = new Set<SeriesType>(['candlestick', 'bar', 'histogram']);
+const PREVIOUS_CLOSE_OPTIONAL: ReadonlySet<string> = new Set(['candlestick', 'bar', 'histogram']);
 
 /**
  * Whether bar `index` of `candles` draws in the up color. Hollow candles (and

@@ -33,7 +33,9 @@ const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
  * The bloxwap.pro dark look: #171717 pane, faint grid, 11px system-ui scales
  * in #a1a1a1, borderless #00ff3f / #ff479c candles over a 50% volume overlay,
  * direction-colored last-price line and badge, a background-free system-ui
- * status line, invisible pane separators and a neutral crosshair.
+ * status line, invisible pane separators and a neutral crosshair. When the
+ * liquidity heatmap is turned on it ramps neutral greys (thin liquidity) into
+ * brand gold and yellow (walls), keeping clear of the candle colors.
  */
 export const bloxwapDark: DeepPartial<ChartConfig> = {
   theme: {
@@ -62,6 +64,17 @@ export const bloxwapDark: DeepPartial<ChartConfig> = {
   statusLine: { visible: true, volume: false },
   priceAxis: { labels: { lastPrice: true }, lines: { lastPrice: true } },
   volume: { overlay: true, upColor: UP_COLOR, downColor: DOWN_COLOR, opacity: 0.5 },
+  // Colors only; the heatmap stays off until a host or the user enables it. A linear
+  // intensity curve keeps mid-sized levels grey so the gold walls stand out.
+  heatmap: {
+    stops: [
+      { color: '#404040', at: 0 },
+      { color: '#737373', at: 0.4 },
+      { color: '#ffc83d', at: 0.85 },
+      { color: '#fffb38', at: 1 },
+    ],
+    gamma: 1,
+  },
 };
 
 /** Built-in presets by name; pass a name as `createChart({ preset })` or merge one with `updateConfig`. */

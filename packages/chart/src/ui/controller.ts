@@ -31,6 +31,14 @@ export const GLYPH_TOOLS: readonly string[] = ['emoji', 'sticker', 'icon'];
 /** Pixels of pointer travel before a press becomes a drag. */
 export const DRAG_THRESHOLD_PX = 4;
 
+/**
+ * Vertical travel before a navigation drag pans the price range. Only with
+ * autoscale off: while it is on, drags scroll time and the price range keeps
+ * fitting the bars. The drag must also be at least twice as vertical as it is
+ * horizontal, so a sideways pan never shifts prices.
+ */
+export const VERTICAL_PAN_PX = 12;
+
 /** Minimum box-zoom width in pixels. */
 export const MIN_ZOOM_BOX_PX = 6;
 
@@ -72,7 +80,7 @@ export interface ZoomBox {
 }
 
 type Drag =
-  | { kind: 'pan'; lastX: number }
+  | { kind: 'pan'; lastX: number; lastY: number; x0: number; y0: number; vertical: boolean }
   | { kind: 'handle'; id: string; index: number; checkpointed: boolean }
   | { kind: 'move'; id: string; lastX: number; lastY: number; checkpointed: boolean }
   | { kind: 'zoom'; x0: number; x1: number }
@@ -500,7 +508,7 @@ export class DrawingController {
       return;
     }
     this.select(null);
-    this.drag = this.navigation ? { kind: 'pan', lastX: x } : null;
+    this.drag = this.navigation ? { kind: 'pan', lastX: x, lastY: y, x0: x, y0: y, vertical: false } : null;
   }
 
   pointerMove(x: number, y: number): void {
@@ -514,7 +522,15 @@ export class DrawingController {
       case 'pan': {
         const spacing = Math.max(0.5, this.chart.scale.barSpacing());
         this.chart.scale.scrollBy((x - d.lastX) / spacing);
+        // With autoscale off, a clearly vertical drag pans the price range; autoscale on keeps the bars in frame.
+        const dy = Math.abs(y - d.y0);
+        if (!d.vertical && dy > VERTICAL_PAN_PX && dy >= 2 * Math.abs(x - d.x0) && !this.chart.getConfig().priceAxis.autoScale) {
+          d.vertical = true;
+          d.lastY = d.y0;
+        }
+        if (d.vertical) this.chart.scale.scrollPrice(y - d.lastY);
         d.lastX = x;
+        d.lastY = y;
         this.emit('viewport', undefined);
         break;
       }

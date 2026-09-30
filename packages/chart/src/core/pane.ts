@@ -7,7 +7,8 @@
 /** A pane before pixel layout. */
 export interface PaneSpec {
   readonly id: string;
-  readonly kind: 'main' | 'indicator';
+  /** `main` is the price pane, `indicator` a study sub-pane, `custom` a host pane from `Chart.addPane`. */
+  readonly kind: 'main' | 'indicator' | 'custom';
   readonly weight: number;
 }
 

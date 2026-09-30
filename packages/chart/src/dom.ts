@@ -68,15 +68,85 @@ export interface Canvas2DLike {
   scale(x: number, y: number): void;
 }
 
+/** Context attributes accepted when asking a canvas for a WebGL2 context. */
+export interface WebGLContextOptionsLike {
+  alpha?: boolean;
+  antialias?: boolean;
+  preserveDrawingBuffer?: boolean;
+}
+
+/**
+ * Minimal subset of `WebGL2RenderingContext` used by the WebGL2 backend
+ * (instanced axis-aligned quads). A real `WebGL2RenderingContext` is
+ * structurally assignable to this type; handles (`WebGLProgram`, buffers,
+ * vertex arrays, uniform locations) are opaque `unknown`s.
+ */
+export interface WebGL2Like {
+  readonly TRIANGLES: number;
+  readonly VERTEX_SHADER: number;
+  readonly FRAGMENT_SHADER: number;
+  readonly COMPILE_STATUS: number;
+  readonly LINK_STATUS: number;
+  readonly ARRAY_BUFFER: number;
+  readonly DYNAMIC_DRAW: number;
+  readonly FLOAT: number;
+  readonly BLEND: number;
+  readonly SRC_ALPHA: number;
+  readonly ONE_MINUS_SRC_ALPHA: number;
+  readonly SCISSOR_TEST: number;
+  readonly COLOR_BUFFER_BIT: number;
+  createShader(type: number): unknown;
+  shaderSource(shader: unknown, source: string): void;
+  compileShader(shader: unknown): void;
+  getShaderParameter(shader: unknown, pname: number): unknown;
+  getShaderInfoLog(shader: unknown): string | null;
+  deleteShader(shader: unknown): void;
+  createProgram(): unknown;
+  attachShader(program: unknown, shader: unknown): void;
+  linkProgram(program: unknown): void;
+  getProgramParameter(program: unknown, pname: number): unknown;
+  getProgramInfoLog(program: unknown): string | null;
+  useProgram(program: unknown): void;
+  deleteProgram(program: unknown): void;
+  getUniformLocation(program: unknown, name: string): unknown;
+  uniform2f(location: unknown, x: number, y: number): void;
+  createBuffer(): unknown;
+  bindBuffer(target: number, buffer: unknown): void;
+  bufferData(target: number, data: ArrayBufferView, usage: number): void;
+  deleteBuffer(buffer: unknown): void;
+  createVertexArray(): unknown;
+  bindVertexArray(vao: unknown): void;
+  deleteVertexArray(vao: unknown): void;
+  enableVertexAttribArray(index: number): void;
+  vertexAttribPointer(index: number, size: number, type: number, normalized: boolean, stride: number, offset: number): void;
+  vertexAttribDivisor(index: number, divisor: number): void;
+  viewport(x: number, y: number, width: number, height: number): void;
+  scissor(x: number, y: number, width: number, height: number): void;
+  enable(cap: number): void;
+  disable(cap: number): void;
+  blendFunc(sfactor: number, dfactor: number): void;
+  clearColor(red: number, green: number, blue: number, alpha: number): void;
+  clear(mask: number): void;
+  drawArraysInstanced(mode: number, first: number, count: number, instanceCount: number): void;
+  isContextLost?(): boolean;
+}
+
 /**
  * A canvas the renderer can draw into. `HTMLCanvasElement` satisfies this
  * interface because its `getContext('2d')` returns a superset of
- * {@link Canvas2DLike}.
+ * {@link Canvas2DLike} and its `getContext('webgl2')` a superset of
+ * {@link WebGL2Like}.
  */
 export interface ChartCanvas {
   width: number;
   height: number;
   getContext(contextId: '2d', options?: { colorSpace?: 'srgb' | 'display-p3' }): Canvas2DLike | null;
+  /**
+   * WebGL2 access for the GL backend. Returns `unknown` because host mocks
+   * often implement only the `'2d'` signature; the backend narrows the result
+   * and treats anything unusable as unavailable (Canvas2D fallback).
+   */
+  getContext(contextId: 'webgl2', options?: WebGLContextOptionsLike): unknown;
   addEventListener?(type: 'contextrestored', listener: () => void): void;
   removeEventListener?(type: 'contextrestored', listener: () => void): void;
   /** Optional browser document used to lazily allocate the crosshair's raster cache. */
@@ -251,7 +321,9 @@ export class MockCanvas implements ChartCanvas {
     this.height = height;
   }
 
-  getContext(contextId: '2d'): Canvas2DLike | null {
+  getContext(contextId: '2d'): Canvas2DLike | null;
+  getContext(contextId: 'webgl2'): WebGL2Like | null;
+  getContext(contextId: string): unknown {
     return contextId === '2d' ? this.context : null;
   }
 
@@ -273,6 +345,206 @@ export class MockDocument implements ChartDocument {
 
   createCanvas(width: number, height: number): ChartCanvas {
     const canvas = new MockCanvas(width, height);
+    this.created.push(canvas);
+    return canvas;
+  }
+}
+
+/**
+ * A recording stand-in for {@link WebGL2Like}. Constants carry their real GL
+ * values; shaders compile and programs link unless {@link compileStatus} /
+ * {@link linkStatus} are cleared; handles are sequential plain objects.
+ */
+export class MockContextWebGL2 implements WebGL2Like {
+  readonly TRIANGLES = 0x0004;
+  readonly VERTEX_SHADER = 0x8b31;
+  readonly FRAGMENT_SHADER = 0x8b30;
+  readonly COMPILE_STATUS = 0x8b81;
+  readonly LINK_STATUS = 0x8b82;
+  readonly ARRAY_BUFFER = 0x8892;
+  readonly DYNAMIC_DRAW = 0x88e8;
+  readonly FLOAT = 0x1406;
+  readonly BLEND = 0x0be2;
+  readonly SRC_ALPHA = 0x0302;
+  readonly ONE_MINUS_SRC_ALPHA = 0x0303;
+  readonly SCISSOR_TEST = 0x0c11;
+  readonly COLOR_BUFFER_BIT = 0x4000;
+
+  /** Returned by `getShaderParameter(COMPILE_STATUS)`; clear to simulate a compile failure. */
+  compileStatus = true;
+  /** Returned by `getProgramParameter(LINK_STATUS)`; clear to simulate a link failure. */
+  linkStatus = true;
+
+  /** Every method call in order. */
+  readonly calls: RecordedCall[] = [];
+
+  private handleSeq = 0;
+
+  private record(name: string, args: unknown[]): void {
+    this.calls.push([name, ...args]);
+  }
+
+  /** Counts how many times a method was called. */
+  countCalls(name: string): number {
+    return this.calls.filter((c) => c[0] === name).length;
+  }
+
+  /** Returns all calls to one method. */
+  callsNamed(name: string): RecordedCall[] {
+    return this.calls.filter((c) => c[0] === name);
+  }
+
+  private handle(): { id: number } {
+    return { id: ++this.handleSeq };
+  }
+
+  createShader(type: number): unknown {
+    this.record('createShader', [type]);
+    return this.handle();
+  }
+  shaderSource(shader: unknown, source: string): void {
+    this.record('shaderSource', [shader, source]);
+  }
+  compileShader(shader: unknown): void {
+    this.record('compileShader', [shader]);
+  }
+  getShaderParameter(shader: unknown, pname: number): unknown {
+    this.record('getShaderParameter', [shader, pname]);
+    return this.compileStatus;
+  }
+  getShaderInfoLog(shader: unknown): string | null {
+    this.record('getShaderInfoLog', [shader]);
+    return this.compileStatus ? null : 'mock compile error';
+  }
+  deleteShader(shader: unknown): void {
+    this.record('deleteShader', [shader]);
+  }
+  createProgram(): unknown {
+    this.record('createProgram', []);
+    return this.handle();
+  }
+  attachShader(program: unknown, shader: unknown): void {
+    this.record('attachShader', [program, shader]);
+  }
+  linkProgram(program: unknown): void {
+    this.record('linkProgram', [program]);
+  }
+  getProgramParameter(program: unknown, pname: number): unknown {
+    this.record('getProgramParameter', [program, pname]);
+    return this.linkStatus;
+  }
+  getProgramInfoLog(program: unknown): string | null {
+    this.record('getProgramInfoLog', [program]);
+    return this.linkStatus ? null : 'mock link error';
+  }
+  useProgram(program: unknown): void {
+    this.record('useProgram', [program]);
+  }
+  deleteProgram(program: unknown): void {
+    this.record('deleteProgram', [program]);
+  }
+  getUniformLocation(program: unknown, name: string): unknown {
+    this.record('getUniformLocation', [program, name]);
+    return this.handle();
+  }
+  uniform2f(location: unknown, x: number, y: number): void {
+    this.record('uniform2f', [location, x, y]);
+  }
+  createBuffer(): unknown {
+    this.record('createBuffer', []);
+    return this.handle();
+  }
+  bindBuffer(target: number, buffer: unknown): void {
+    this.record('bindBuffer', [target, buffer]);
+  }
+  /** `data` is recorded as its byte length to keep the call log small. */
+  bufferData(target: number, data: ArrayBufferView, usage: number): void {
+    this.record('bufferData', [target, data.byteLength, usage]);
+  }
+  deleteBuffer(buffer: unknown): void {
+    this.record('deleteBuffer', [buffer]);
+  }
+  createVertexArray(): unknown {
+    this.record('createVertexArray', []);
+    return this.handle();
+  }
+  bindVertexArray(vao: unknown): void {
+    this.record('bindVertexArray', [vao]);
+  }
+  deleteVertexArray(vao: unknown): void {
+    this.record('deleteVertexArray', [vao]);
+  }
+  enableVertexAttribArray(index: number): void {
+    this.record('enableVertexAttribArray', [index]);
+  }
+  vertexAttribPointer(index: number, size: number, type: number, normalized: boolean, stride: number, offset: number): void {
+    this.record('vertexAttribPointer', [index, size, type, normalized, stride, offset]);
+  }
+  vertexAttribDivisor(index: number, divisor: number): void {
+    this.record('vertexAttribDivisor', [index, divisor]);
+  }
+  viewport(x: number, y: number, width: number, height: number): void {
+    this.record('viewport', [x, y, width, height]);
+  }
+  scissor(x: number, y: number, width: number, height: number): void {
+    this.record('scissor', [x, y, width, height]);
+  }
+  enable(cap: number): void {
+    this.record('enable', [cap]);
+  }
+  disable(cap: number): void {
+    this.record('disable', [cap]);
+  }
+  blendFunc(sfactor: number, dfactor: number): void {
+    this.record('blendFunc', [sfactor, dfactor]);
+  }
+  clearColor(red: number, green: number, blue: number, alpha: number): void {
+    this.record('clearColor', [red, green, blue, alpha]);
+  }
+  clear(mask: number): void {
+    this.record('clear', [mask]);
+  }
+  drawArraysInstanced(mode: number, first: number, count: number, instanceCount: number): void {
+    this.record('drawArraysInstanced', [mode, first, count, instanceCount]);
+  }
+}
+
+/** Options for {@link MockGLDocument}: per-context compile/link outcomes. */
+export interface MockGLDocumentOptions {
+  /** Initial {@link MockContextWebGL2.compileStatus} of created contexts. Default true. */
+  compile?: boolean;
+  /** Initial {@link MockContextWebGL2.linkStatus} of created contexts. Default true. */
+  link?: boolean;
+}
+
+/** A {@link MockCanvas} whose `'webgl2'` context is a {@link MockContextWebGL2}. */
+export class MockGLCanvas extends MockCanvas {
+  readonly gl: MockContextWebGL2;
+
+  constructor(width = 0, height = 0, options: MockGLDocumentOptions = {}) {
+    super(width, height);
+    this.gl = new MockContextWebGL2();
+    this.gl.compileStatus = options.compile !== false;
+    this.gl.linkStatus = options.link !== false;
+  }
+
+  override getContext(contextId: '2d'): Canvas2DLike | null;
+  override getContext(contextId: 'webgl2'): WebGL2Like | null;
+  override getContext(contextId: string): unknown {
+    if (contextId === 'webgl2') return this.gl;
+    return contextId === '2d' ? this.context : null;
+  }
+}
+
+/** A {@link ChartDocument} that creates {@link MockGLCanvas} instances. */
+export class MockGLDocument implements ChartDocument {
+  /** All canvases created through this document. */
+  readonly created: MockGLCanvas[] = [];
+
+  constructor(private readonly options: MockGLDocumentOptions = {}) {}
+
+  createCanvas(width: number, height: number): ChartCanvas {
+    const canvas = new MockGLCanvas(width, height, this.options);
     this.created.push(canvas);
     return canvas;
   }
