@@ -45,7 +45,7 @@ for guides, an API reference, and the complete chart controls.
 npm install @bloxwap/chart
 ```
 
-`0.1.0` is an early developer preview; expect breaking changes before `1.0`.
+`0.2.0` is an early developer preview; expect breaking changes before `1.0`.
 
 ## Quick Example
 
