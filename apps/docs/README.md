@@ -47,9 +47,14 @@ monorepo checkout.
 ## Social cards
 
 The homepage and every documentation page have a 1200×630 PNG for Open Graph
-and Twitter/X large-image previews. The design follows `monorepo/packages/og`:
-black surfaces, a colored edge, the supplied Bloxwap wordmark, Nunito headlines,
-and Space Grotesk labels. Fonts and artwork are local assets.
+and Twitter/X large-image previews. They are laid out like GitHub's repository
+cards, in the site's dark theme and matching the bloxwap/sfx cards: a Bloxwap
+black (`#0a0a0a`) canvas, Nunito Bold and Black text in the `--foreground` and
+`--muted-foreground` grays, and the green Bloxwap mark. The home card shows a
+stats row (built-in indicator and drawing-tool counts from the library, plus the
+dependency count and version from `packages/chart/package.json`); page cards
+show the section instead. A weighted brand-color bar runs along the bottom.
+Fonts are local assets.
 
 `lib/og-card.tsx` renders the cards with Next's `ImageResponse`. The static route
 in `app/og/[...slug]/route.tsx` generates `/og/home.png` and
