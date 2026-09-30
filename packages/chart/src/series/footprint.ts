@@ -15,6 +15,7 @@
  * @module
  */
 
+import type { GLFrame } from '../render/gl/backend.js';
 import type { SeriesConfig } from '../config.js';
 import {
   barDelta,
@@ -147,7 +148,7 @@ function drawLevelBars(ctx: Canvas2DLike, rows: readonly CellRow[], x: number, w
 }
 
 /** Zoomed in: a `sell × buy` label per level over a faint delta-signed tint. */
-function drawTextCells(ctx: Canvas2DLike, rows: readonly CellRow[], x: number, w: number, o: ResolvedFootprintOptions): void {
+function drawTextCells(ctx: Canvas2DLike, rows: readonly CellRow[], x: number, w: number, o: ResolvedFootprintOptions, gl?: GLFrame): void {
   const alpha = ctx.globalAlpha;
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
@@ -160,7 +161,9 @@ function drawTextCells(ctx: Canvas2DLike, rows: readonly CellRow[], x: number, w
     ctx.fillRect(x, y0, w, h);
     ctx.globalAlpha = alpha;
     ctx.fillStyle = o.textColor ?? (up ? o.upColor : o.downColor);
-    ctx.fillText(`${formatFootprintSize(level.sellSize)}×${formatFootprintSize(level.buySize)}`, x + w / 2, (y0 + y1) / 2);
+    const label = `${formatFootprintSize(level.sellSize)}×${formatFootprintSize(level.buySize)}`;
+    const labelX = x + w / 2, labelY = (y0 + y1) / 2;
+    if (!gl?.text?.(label, labelX, labelY, ctx.fillStyle as string, alpha)) ctx.fillText(label, labelX, labelY);
   }
 }
 
@@ -172,7 +175,7 @@ function drawTextCells(ctx: Canvas2DLike, rows: readonly CellRow[], x: number, w
  */
 export function createFootprintSeries(source: FootprintSeriesSource, options: FootprintSeriesOptions = {}): SeriesDrawFn {
   const resolve = typeof source === 'function' ? source : () => source;
-  return (ctx, candles, range, timeScale, priceScale, config) => {
+  return (ctx, candles, range, timeScale, priceScale, config, _liveCandle, gl) => {
     const store = resolve();
     if (store === null) return;
     const o = resolveFootprintOptions(options, config);
@@ -183,7 +186,7 @@ export function createFootprintSeries(source: FootprintSeriesSource, options: Fo
       const { rows, cellPx } = cellRows(bar, priceScale);
       const x = Math.round(timeScale.indexToX(i, candles.length) - w / 2);
       const lod = footprintLod(timeScale.barSpacing, cellPx, o.display, o.thresholds);
-      if (lod === 'text') drawTextCells(ctx, rows, x, w, o);
+      if (lod === 'text') drawTextCells(ctx, rows, x, w, o, gl);
       else if (lod === 'bars') drawLevelBars(ctx, rows, x, w, o);
       else drawDeltaColumn(ctx, bar, rows, x, w, o);
     }

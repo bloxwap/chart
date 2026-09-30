@@ -223,7 +223,9 @@ function renderLayers(ctx: Canvas2DLike, view: RenderView, overlay: boolean): vo
         mainPane.priceScale,
         config.series,
         view.liveCandle,
+        gl,
       );
+      gl?.composite(ctx);
     }
     drawMarkers(ctx, view, mainPane.priceScale);
     // Layer 4a: main-pane indicators overlay the series.

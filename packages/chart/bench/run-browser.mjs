@@ -30,21 +30,28 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  if (options.verify === 'true') {
+  if (options.glyphs === 'true') {
+    console.log(await page.evaluate(async () => (await import('/bench/verify-glyphs.mjs')).verifyGlyphs()));
+    if (errors.length) throw new Error(errors.join('\n'));
+  } else if (options.verify === 'true') {
     const result = await page.evaluate(async () => (await import('/bench/verify-browser.mjs')).verifyBrowser());
     console.log(result);
     await verifyPlayground(page, `http://127.0.0.1:${server.address().port}`);
     if (errors.length) throw new Error(errors.join('\n'));
   } else {
     const result = await page.evaluate(async options => {
+      if (options.backends === 'true') {
+        const { runBackends } = await import('/bench/backends.bench.mjs');
+        return runBackends({ frames: Number(options.frames ?? 90) });
+      }
       const { runInteractions } = await import('/bench/interactions.bench.mjs');
       return runInteractions({ base: options.baseline ? '/baseline/' : '/dist/', frames: Number(options.frames ?? 90) });
     }, options);
     if (errors.length) throw new Error(errors.join('\n'));
     const report = { measuredAt: new Date().toISOString(), headless: options.headed !== 'true', ...result };
     if (options.output) await writeFile(options.output, JSON.stringify(report, null, 2) + '\n');
-    console.table(result.results.map(({ pixelRatio, visible, workload, cpuMs, frameIntervalMs, framesOver25Ms }) => ({
-      pixelRatio, visible, workload, cpuP50: cpuMs.p50.toFixed(2), cpuP95: cpuMs.p95.toFixed(2),
+    console.table(result.results.map(({ renderer, retainedDepthPoints, animationFps, pixelRatio, visible, workload, cpuMs, frameIntervalMs, framesOver25Ms }) => ({
+      ...(renderer ? { renderer, retainedDepthPoints, animationFps: animationFps.toFixed(1) } : { pixelRatio, visible }), workload, cpuP50: cpuMs.p50.toFixed(2), cpuP95: cpuMs.p95.toFixed(2),
       intervalP95: frameIntervalMs.p95.toFixed(2), framesOver25Ms,
     })));
   }

@@ -1,10 +1,10 @@
 /**
  * WebGL2 geometry backend. The dense layers (candle bodies/wicks, heatmap
  * cells) are packed into instanced axis-aligned quads — one base quad per
- * instance, corners derived from `gl_VertexID`, so a frame is one buffer
+ * instance, corners derived from `gl_VertexID`, so each dense pass is one buffer
  * upload and one instanced draw — then composited into the host canvas with
  * `drawImage`, letting the Canvas2D pass paint text, axes and overlays on top
- * (hybrid compositing: GL never rasterizes glyphs).
+ * and the footprint glyph atlas paints dense bid×ask labels in GL.
  *
  * The GL canvas is allocated by the caller through the injected DOM (the host
  * canvas's `ownerDocument` or the injected `ChartDocument`) and is never
@@ -13,6 +13,8 @@
  * @module
  */
 
+import { GlyphAtlas } from './glyph-atlas.js';
+import { parseColor } from '../../color.js';
 import type { Canvas2DLike, ChartCanvas, WebGL2Like } from '../../dom.js';
 
 /** Render backend identifiers; see `CreateChartOptions.renderer`. */
@@ -32,16 +34,20 @@ export interface GLQuadSink {
 export interface GLFrame extends GLQuadSink {
   /** Flushes pending quads and composites the GL canvas; a no-op when no quads were submitted. */
   composite(ctx: Canvas2DLike): void;
+  /** Centered 10px footprint label via the glyph atlas; false keeps the Canvas2D fallback. */
+  text?(text: string, x: number, y: number, color: string, alpha: number): boolean;
 }
 
-const FLOATS_PER_QUAD = 8;
+const FLOATS_PER_QUAD = 12;
 const QUAD_STRIDE_BYTES = FLOATS_PER_QUAD * 4;
 
 const VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec4 aRect;
 layout(location = 1) in vec4 aColor;
+layout(location = 2) in vec4 aUv;
 uniform vec2 uResolution;
 out vec4 vColor;
+out vec2 vUv;
 void main() {
   vec2 corner = vec2(
     float(gl_VertexID == 1 || gl_VertexID == 4 || gl_VertexID == 5),
@@ -50,14 +56,17 @@ void main() {
   vec2 clip = position / uResolution * 2.0 - 1.0;
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   vColor = aColor;
+  vUv = aUv.xy + corner * aUv.zw;
 }`;
 
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec4 vColor;
+in vec2 vUv;
+uniform sampler2D uAtlas;
 out vec4 fragColor;
 void main() {
-  fragColor = vColor;
+  fragColor = vec4(vColor.rgb, vColor.a * (vUv.x < 0.0 ? 1.0 : texture(uAtlas, vUv).a));
 }`;
 
 function compileShader(gl: WebGL2Like, type: number, source: string): unknown {
@@ -106,6 +115,10 @@ export class GLBackend implements GLQuadSink {
   private staging = new Float32Array(FLOATS_PER_QUAD * 1024);
   private count = 0;
   private pixelRatio = 1;
+  private atlas: GlyphAtlas | null = null;
+  private texture: unknown = null;
+  private atlasAttempted = false;
+  private makeAtlasCanvas: (() => ChartCanvas | undefined) | undefined;
 
   private constructor(canvas: ChartCanvas, gl: WebGL2Like, program: unknown, buffer: unknown, vao: unknown, resolution: unknown) {
     this.canvas = canvas;
@@ -117,7 +130,7 @@ export class GLBackend implements GLQuadSink {
   }
 
   /** Acquires a WebGL2 context on `canvas` and builds the quad pipeline; `null` on any failure. */
-  static create(canvas: ChartCanvas): GLBackend | null {
+  static create(canvas: ChartCanvas, makeAtlasCanvas?: () => ChartCanvas | undefined): GLBackend | null {
     const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, preserveDrawingBuffer: false }) as WebGL2Like | null;
     if (gl === null || gl === undefined || typeof gl.createShader !== 'function') return null;
     try {
@@ -133,10 +146,16 @@ export class GLBackend implements GLQuadSink {
       gl.enableVertexAttribArray(1);
       gl.vertexAttribPointer(1, 4, gl.FLOAT, false, QUAD_STRIDE_BYTES, 16);
       gl.vertexAttribDivisor(1, 1);
+      gl.enableVertexAttribArray(2);
+      gl.vertexAttribPointer(2, 4, gl.FLOAT, false, QUAD_STRIDE_BYTES, 32);
+      gl.vertexAttribDivisor(2, 1);
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      // Keep alpha linear when the premultiplied drawing buffer is composited into 2D.
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.useProgram(program);
-      return new GLBackend(canvas, gl, program, buffer, vao, gl.getUniformLocation(program, 'uResolution'));
+      const backend = new GLBackend(canvas, gl, program, buffer, vao, gl.getUniformLocation(program, 'uResolution'));
+      backend.makeAtlasCanvas = makeAtlasCanvas;
+      return backend;
     } catch {
       return null;
     }
@@ -173,6 +192,7 @@ export class GLBackend implements GLQuadSink {
     return {
       quad: (x, y, w, h, r, g, b, a) => this.quad(x, y, w, h, r, g, b, a),
       composite: (ctx) => this.composite(ctx),
+      text: (text, x, y, color, alpha) => this.text(text, x, y, color, alpha),
     };
   }
 
@@ -193,7 +213,49 @@ export class GLBackend implements GLQuadSink {
     this.staging[o + 5] = g;
     this.staging[o + 6] = b;
     this.staging[o + 7] = a;
+    this.staging[o + 8] = -1;
+    this.staging[o + 9] = -1;
+    this.staging[o + 10] = 0;
+    this.staging[o + 11] = 0;
     this.count++;
+  }
+
+  private text(text: string, x: number, y: number, color: string, alpha: number): boolean {
+    const parsed = parseColor(color);
+    if (parsed === null) return false;
+    if (!this.atlasAttempted) {
+      this.atlasAttempted = true;
+      const canvas = this.makeAtlasCanvas?.();
+      this.atlas = canvas === undefined ? null : GlyphAtlas.create(canvas);
+      if (this.atlas !== null) {
+        const gl = this.gl;
+        this.texture = gl.createTexture();
+        if (this.texture === null) {
+          this.atlas.dispose();
+          this.atlas = null;
+          return false;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+    }
+    if (this.atlas === null) return false;
+    if (this.atlas.prepare(this.pixelRatio)) {
+      const gl = this.gl;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.atlas.canvas);
+    }
+    const d = parsed.space === 'srgb' ? 255 : 1;
+    return this.atlas.draw(text, x, y, (left, top, width, height, u, du) => {
+      this.quad(left, top, width, height, parsed.r / d, parsed.g / d, parsed.b / d, parsed.a * alpha);
+      const offset = (this.count - 1) * FLOATS_PER_QUAD;
+      this.staging[offset + 8] = u;
+      this.staging[offset + 9] = 0;
+      this.staging[offset + 10] = du;
+      this.staging[offset + 11] = 1;
+    });
   }
 
   /** Uploads and draws the staged quads; returns whether anything was drawn. */
@@ -217,6 +279,8 @@ export class GLBackend implements GLQuadSink {
   /** Releases GL resources and drops the canvas bitmap. */
   dispose(): void {
     const gl = this.gl;
+    if (this.texture !== null) gl.deleteTexture(this.texture);
+    this.atlas?.dispose();
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
