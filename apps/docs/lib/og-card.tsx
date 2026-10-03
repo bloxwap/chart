@@ -12,8 +12,8 @@ const ink = '#fafafa'; // --foreground
 const muted = '#a1a1a1'; // --muted-foreground
 const bar: [color: string, share: number][] = [['#00ff3f', 62], ['#35b5ff', 14], ['#b300ff', 10], ['#ff479c', 8], ['#fffb38', 6]];
 const assets = Promise.all([
-  readFile(join(process.cwd(), 'fonts/Nunito-Bold.ttf')),
-  readFile(join(process.cwd(), 'fonts/Nunito-Black.ttf')),
+  readFile(join(process.cwd(), 'fonts/BloxwapSans-Bold.ttf')),
+  readFile(join(process.cwd(), 'fonts/BloxwapSans-Black.ttf')),
   readFile(join(process.cwd(), '../../packages/chart/package.json'), 'utf8'),
 ]);
 
@@ -65,7 +65,7 @@ export async function renderSocialCard(options: {
   const fontSize = options.home || title.length <= 20 ? 84 : title.length <= 34 ? 72 : 60;
 
   return new ImageResponse(
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: '#0a0a0a', color: ink, fontFamily: 'Nunito' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: '#0a0a0a', color: ink, fontFamily: 'Bloxwap Sans' }}>
       <div style={{ display: 'flex', flex: 1, padding: '76px 80px 0' }}>
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingRight: 64 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', fontSize, lineHeight: 1.12, letterSpacing: -1 }}>
@@ -99,8 +99,8 @@ export async function renderSocialCard(options: {
     {
       ...socialImageSize,
       fonts: [
-        { name: 'Nunito', data: bold, weight: 700, style: 'normal' },
-        { name: 'Nunito', data: black, weight: 900, style: 'normal' },
+        { name: 'Bloxwap Sans', data: bold, weight: 700, style: 'normal' },
+        { name: 'Bloxwap Sans', data: black, weight: 900, style: 'normal' },
       ],
     },
   );

@@ -4,8 +4,8 @@
 @import '../styles/tokens.generated.css';
 
 @theme inline {
-  --font-sans: var(--font-docs-sans), ui-rounded, system-ui, sans-serif;
-  --font-mono: var(--font-docs-mono), ui-monospace, monospace;
+  --font-sans: var(--font-bloxwap-sans), ui-rounded, system-ui, sans-serif;
+  --font-mono: var(--font-bloxwap-mono), ui-monospace, monospace;
 }
 
 /* Keep Fumadocs surfaces and states on the shared Bloxwap palette. */

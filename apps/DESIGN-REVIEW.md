@@ -2,7 +2,7 @@
 
 Reviewed on 2026-09-26 against the zandesign catalog. The reference is the Bloxwap monorepo, not an outside site:
 
-- **Tokens:** `monorepo/packages/tokens` (radius, type scale, 4 px spacing, motion, icon sizes, Maple Mono) and the
+- **Tokens:** `monorepo/packages/tokens` (radius, type scale, 4 px spacing, motion, icon sizes, Bloxwap Mono) and the
   plain-UI variable layer generated from it (`packages/plain-ui/scripts/gen-tokens-css.mjs`): `--radius-*`, `--text-*`,
   `--space-*`, `--duration-*`, `--ease-spring`, `--icon-*`.
 - **Controls:** `packages/plain-ui/styles/buttons.css` (the web `Button`: a pill, 48 px, 16 px semibold, active

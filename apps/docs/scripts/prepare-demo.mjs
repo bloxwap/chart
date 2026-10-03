@@ -1,4 +1,4 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 
 const repository = new URL('../../../', import.meta.url);
 const output = new URL('../public/chart-demo/', import.meta.url);
@@ -13,3 +13,19 @@ await Promise.all([
   cp(new URL('packages/chart/assets/fonts/', repository), new URL('assets/fonts/', output), { recursive: true }),
 ]);
 console.log('Prepared the complete chart demo for the documentation site.');
+
+// The embedded documentation example explicitly overrides the canvas preset's
+// family; an iframe cannot inherit the parent's Next.js font variables.
+const fontPackage = new URL('../../../node_modules/@bloxwap/font/', import.meta.url);
+await cp(new URL('fonts/', fontPackage), new URL('assets/bloxwap-font/fonts/', output), { recursive: true });
+await cp(new URL('bloxwap-font.css', fontPackage), new URL('assets/bloxwap-font/bloxwap-font.css', output));
+await cp(new URL('LICENSE', fontPackage), new URL('assets/bloxwap-font/LICENSE', output));
+const demo = new URL('demo/index.html', output);
+const html = (await readFile(demo, 'utf8'))
+  .replace('<style>', '<link rel="stylesheet" href="../assets/bloxwap-font/bloxwap-font.css" /><style>')
+  .replace(/@font-face \{[^}]+\}/g, '')
+  .replaceAll("'Geist'", "'Bloxwap Sans'")
+  .replaceAll('12px "Geist"', '12px "Bloxwap Sans"')
+  .replaceAll('12px "Geist Mono"', '12px "Bloxwap Mono"')
+  .replace('config: defineConfig({', `config: defineConfig({ theme: { fontFamily: '"Bloxwap Sans", "Bloxwap Sans Scripts", system-ui, sans-serif' },`);
+await writeFile(demo, html);

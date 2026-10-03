@@ -28,7 +28,7 @@ checks local HTML links and assets, and emits a browser-searchable index at
 `search.json`. Fonts are local repository assets, so builds do not fetch Google Fonts.
 
 The design follows `bloxwap/src/monorepo/workers/docs`: dark surfaces, green
-accents, Nunito body copy, Space Grotesk headings, and Maple Mono code. The theme
+accents, Bloxwap Sans body copy, Space Grotesk headings, and Bloxwap Mono code. The theme
 is intentionally dark, matching the main Bloxwap docs.
 
 - `styles/tokens.generated.css` is a vendored copy of the monorepo's
@@ -49,7 +49,7 @@ monorepo checkout.
 The homepage and every documentation page have a 1200×630 PNG for Open Graph
 and Twitter/X large-image previews. They are laid out like GitHub's repository
 cards, in the site's dark theme and matching the bloxwap/sfx cards: a Bloxwap
-black (`#0a0a0a`) canvas, Nunito Bold and Black text in the `--foreground` and
+black (`#0a0a0a`) canvas, Bloxwap Sans Bold and Black text in the `--foreground` and
 `--muted-foreground` grays, and the green Bloxwap mark. The home card shows a
 stats row (built-in indicator and drawing-tool counts from the library, plus the
 dependency count and version from `packages/chart/package.json`); page cards
@@ -86,3 +86,9 @@ the deployment job uses GitHub's Pages permissions and OIDC.
 The chart package has not been published to npm yet. The quick-start guide
 documents building and installing its local tarball; update that note and the
 homepage's release badge after the first public release.
+
+The exact `@bloxwap/font@0.1.1` dependency supplies self-hosted Sans/Mono Next.js
+loaders. The embedded playground copies the package stylesheet and fonts and
+explicitly sets `theme.fontFamily` to Bloxwap Sans before drawing its canvas;
+the standalone playground and SDK presets retain their existing font defaults.
+Static social-image font provenance is recorded in `fonts/README.md`.
