@@ -70,8 +70,8 @@ For a `/chart` build, preview the homepage image at
 
 The `predev` and `prebuild` scripts compile the library and run
 `scripts/prepare-demo.mjs`. It copies `apps/playground/index.html`,
-`packages/chart/dist/`, and `packages/chart/assets/fonts/` from the repository
-into the ignored `public/chart-demo/` directory. Both the homepage and the
+`packages/chart/dist/`, and the Latin Bloxwap Sans/Mono faces from
+`@bloxwap/font` into the ignored `public/chart-demo/` directory. Both the homepage and the
 playground guide embed this same demo; edit the original instead of making a
 separate docs implementation. Restart `docs:dev` after changing the demo or
 library to refresh the copied assets. The export checker validates the iframe
@@ -88,7 +88,10 @@ documents building and installing its local tarball; update that note and the
 homepage's release badge after the first public release.
 
 The exact `@bloxwap/font@0.1.1` dependency supplies self-hosted Sans/Mono Next.js
-loaders. The embedded playground copies the package stylesheet and fonts and
-explicitly sets `theme.fontFamily` to Bloxwap Sans before drawing its canvas;
-the standalone playground and SDK presets retain their existing font defaults.
+loaders. The embedded playground copies a stylesheet trimmed to the Latin Sans
+and Mono faces, replaces the playground's Geist faces with them, points the SDK
+chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
+`theme.fontFamily` to Bloxwap Sans and `monoFamily`/`scaleFontFamily` (status
+line, drawing labels and scales) to Bloxwap Mono. The standalone playground and
+SDK presets retain their existing font defaults.
 Static social-image font provenance is recorded in `fonts/README.md`.
