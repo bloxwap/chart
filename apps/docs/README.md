@@ -87,7 +87,7 @@ The chart package has not been published to npm yet. The quick-start guide
 documents building and installing its local tarball; update that note and the
 homepage's release badge after the first public release.
 
-The exact `@bloxwap/font@0.1.1` dependency supplies self-hosted Sans/Mono Next.js
+The exact `@bloxwap/font@0.1.2` dependency supplies self-hosted Sans/Mono Next.js
 loaders. The embedded playground copies a stylesheet trimmed to the Latin Sans
 and Mono faces, replaces the playground's Geist faces with them, points the SDK
 chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
