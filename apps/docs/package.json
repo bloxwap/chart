@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@bloxwap/chart": "0.3.0",
-    "@bloxwap/font": "0.1.1",
+    "@bloxwap/font": "0.1.2",
     "fumadocs-core": "16.15.14",
     "fumadocs-mdx": "15.4.5",
     "fumadocs-ui": "16.15.14",
