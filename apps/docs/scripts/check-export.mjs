@@ -15,7 +15,7 @@ async function walk(path) {
 for (const required of [
   'index.html', '404.html', 'docs/index.html', 'developers/index.html', 'search.json', 'icon.svg',
   'llms.txt', 'robots.txt', 'openapi.json', '404.md',
-  'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js', 'chart-demo/dist/datafeed/index.js',
+  'chart-demo/assets/hig-tokens.css', 'chart-demo/demo/index.html', 'chart-demo/dist/index.js', 'chart-demo/dist/ui/index.js', 'chart-demo/dist/datafeed/index.js',
   'chart-demo/assets/bloxwap-font/fonts/BloxwapSans/BloxwapSans-Variable.woff2', 'chart-demo/assets/bloxwap-font/fonts/BloxwapMono/BloxwapMono-Variable.woff2', 'chart-demo/assets/bloxwap-font/bloxwap-font.css',
 ]) {
   if (!await exists(join(root, required))) failures.push(`Missing ${required}`);

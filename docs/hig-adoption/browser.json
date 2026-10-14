@@ -1,0 +1,35 @@
+{
+  "browser": "154.0.8037.97",
+  "checks": [
+    "Install tabs: arrows/Home/End, selected state and focus",
+    "Copy: pending suppresses repeat activation, success status, visible denial and recovery",
+    "Pinned HIG palette, Bloxwap typography and reduced motion",
+    "Distinctive demo: canvas/worker assets, offline synthetic bars, HIG chrome, locked dark theme, settings/Escape, pointer/wheel",
+    "Static search index, results and keyboard dismissal",
+    "Representative docs: RTL and 200% root text without page overflow",
+    "Touch emulation: 48px copy target, narrow layout and mobile navigation"
+  ],
+  "demo": {
+    "stats": {
+      "symbol": "Random walk",
+      "intervalMs": 900000,
+      "bars": 500,
+      "duplicates": 0,
+      "missingBuckets": 0,
+      "exhausted": false,
+      "loading": false,
+      "renderBackend": "webgl2",
+      "bookLevels": {
+        "bids": 50,
+        "asks": 50
+      },
+      "error": null,
+      "firstTime": 1791494100,
+      "lastTime": 1791943200
+    },
+    "light": false,
+    "font": "\"Bloxwap Sans\", system-ui, sans-serif",
+    "panel": "#171717",
+    "themeButtons": 0
+  }
+}

@@ -1,0 +1,130 @@
+import { chromium } from 'playwright-core';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { manifest, colors } from './hig-tokens.mjs';
+const server = spawn(process.execPath, ['apps/docs/scripts/preview.mjs'], { env: { ...process.env, PORT: '0' }, stdio: 'pipe' });
+const origin = await new Promise((resolve, reject) => { server.stdout.once('data', chunk => resolve(`http://127.0.0.1:${chunk.toString().match(/localhost:(\d+)/)[1]}`)); server.once('error', reject); server.once('exit', code => reject(new Error(`Preview exited: ${code}`))); });
+let browser;
+const evidence = process.env.HIG_EVIDENCE_DIR;
+const checks = [];
+function record(check) { checks.push(check); console.log(check); }
+try {
+  browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  page.setDefaultTimeout(30000);
+  page.setDefaultNavigationTimeout(60000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  // Verify offline recovery without relying on an external exchange or emitting audio/haptics.
+  let demoAllowed = false;
+  await context.route('**/*', route => route.request().url().startsWith(origin) && (demoAllowed || !route.request().url().includes('/chart-demo/demo/')) ? route.continue() : route.abort());
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  assert.match(page.url(), /\/chart\/$/);
+  await page.getByRole('tab', { name: 'bun', exact: true }).waitFor();
+  await page.getByRole('tab', { name: 'bun', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  const npmTab = page.getByRole('tab', { name: 'npm', exact: true });
+  assert.equal(await npmTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await npmTab.evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('End');
+  assert.equal(await page.getByRole('tab', { name: 'yarn', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.keyboard.press('Home');
+  assert.equal(await page.getByRole('tab', { name: 'bun', exact: true }).getAttribute('aria-selected'), 'true');
+  record('Install tabs: arrows/Home/End, selected state and focus');
+  await page.evaluate(() => {
+    window.copyStatusLog = [];
+    const observe = () => {
+      for (const el of document.querySelectorAll('[role="status"]')) {
+        if (el.textContent) window.copyStatusLog.push({ text: el.textContent, visibleError: el.classList.contains('copy-feedback') && el.getBoundingClientRect().height > 1 });
+      }
+    };
+    new MutationObserver(observe).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
+    window.copyCalls = 0;
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText(text) {
+      window.copyCalls++; window.copiedText = text;
+      return new Promise(resolve => { window.finishCopy = resolve; });
+    } } });
+  });
+  const copy = page.getByRole('button', { name: 'Copy install command', exact: true });
+  await copy.click();
+  assert.equal(await copy.isDisabled(), true);
+  assert.equal(await copy.getAttribute('aria-busy'), 'true');
+  await copy.evaluate(el => el.click());
+  assert.equal(await page.evaluate(() => window.copyCalls), 1);
+  await page.evaluate(() => window.finishCopy());
+  await page.waitForFunction(() => window.copyStatusLog.some(entry => entry.text.includes('Code copied to clipboard.')));
+  assert.equal(await page.evaluate(() => window.copiedText), 'bun add @bloxwap/chart');
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } }));
+  await copy.click();
+  await page.waitForFunction(() => window.copyStatusLog.some(entry => entry.text.includes('Could not copy.') && entry.visibleError));
+  assert.equal(await copy.isDisabled(), false);
+  record('Copy: pending suppresses repeat activation, success status, visible denial and recovery');
+  const presentation = await page.evaluate(() => {
+    const css = getComputedStyle(document.documentElement);
+    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, motion: css.getPropertyValue('--duration-fast').trim(), transform: getComputedStyle(document.querySelector('.btn')).transform };
+  });
+  assert.equal(presentation.surface, colors.surface);
+  assert.match(presentation.font, /BloxwapSans|Bloxwap Sans|bloxwap/i);
+  assert.match(presentation.motion, /^0(m?s)$/);
+  assert.equal(presentation.transform, 'none');
+  record('Pinned HIG palette, Bloxwap typography and reduced motion');
+  await page.getByRole('tab', { name: 'npm', exact: true }).click();
+  await page.getByRole('tab', { name: 'bun', exact: true }).click();
+  if (evidence) { await mkdir(evidence, { recursive: true }); await page.screenshot({ path: `${evidence}/after-home.png`, fullPage: true }); }
+  demoAllowed = true;
+  await page.goto(`${origin}/chart/docs/playground/`, { waitUntil: 'domcontentloaded' });
+  const frame = page.frameLocator('iframe[title="Interactive Bloxwap chart playground"]');
+  await frame.locator('button[title="Settings"]').waitFor();
+  await page.waitForFunction(() => document.querySelector('iframe').contentWindow.__chartStats?.().bars > 0);
+  const demo = await page.locator('iframe').evaluate(el => {
+    const doc = el.contentDocument;
+    return { stats: el.contentWindow.__chartStats(), light: doc.body.classList.contains('light'), font: getComputedStyle(doc.querySelector('.cts-theme')).getPropertyValue('--cts-font'), panel: getComputedStyle(doc.querySelector('.cts-theme')).getPropertyValue('--cts-panel').trim(), themeButtons: doc.querySelectorAll('button[title^="Theme:"]').length };
+  });
+  assert.equal(demo.stats.symbol, 'Random walk');
+  assert.ok(demo.stats.bars > 0);
+  assert.equal(demo.stats.duplicates, 0);
+  assert.equal(demo.light, false);
+  assert.equal(demo.themeButtons, 0);
+  assert.match(demo.font, /Bloxwap Sans/);
+  assert.equal(demo.panel, colors.surface);
+  await frame.locator('button[title="Settings"]').click();
+  await frame.getByRole('dialog', { name: 'Chart settings' }).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await frame.getByRole('dialog', { name: 'Chart settings' }).isVisible(), false);
+  await frame.locator('#chart').hover({ position: { x: 180, y: 160 } });
+  await page.mouse.wheel(0, -120);
+  record('Distinctive demo: canvas/worker assets, offline synthetic bars, HIG chrome, locked dark theme, settings/Escape, pointer/wheel');
+  if (evidence) await page.screenshot({ path: `${evidence}/after-playground.png`, fullPage: true });
+  await page.getByRole('button', { name: /search/i }).first().click();
+  const search = page.getByRole('combobox', { name: 'Search' });
+  await search.fill('datafeed');
+  await page.getByRole('dialog').getByRole('option').first().waitFor();
+  await page.keyboard.press('Escape');
+  record('Static search index, results and keyboard dismissal');
+  await page.evaluate(() => { document.documentElement.dir = 'rtl'; document.documentElement.style.fontSize = '200%'; });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  record('Representative docs: RTL and 200% root text without page overflow');
+  await context.close();
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await mobile.route('**/*', route => route.request().url().startsWith(origin) && !route.request().url().includes('/chart-demo/demo/') ? route.continue() : route.abort());
+  const phone = await mobile.newPage();
+  phone.setDefaultTimeout(30000);
+  phone.setDefaultNavigationTimeout(60000);
+  await phone.goto(`${origin}/chart/`, { waitUntil: 'domcontentloaded' });
+  const target = await phone.getByRole('button', { name: 'Copy install command' }).boundingBox();
+  assert.ok(target.height >= manifest.density.comfortable.target && target.width >= manifest.density.comfortable.target);
+  assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await phone.goto(`${origin}/chart/docs/getting-started/`, { waitUntil: 'domcontentloaded' });
+  const menu = phone.getByRole('button', { name: 'Open Sidebar', exact: true });
+  await menu.click();
+  await phone.getByRole('link', { name: 'Interactive playground', exact: true }).waitFor({ state: 'visible' });
+  await phone.getByRole('link', { name: 'Interactive playground', exact: true }).click();
+  await phone.waitForURL(/\/chart\/docs\/playground\/?$/);
+  record('Touch emulation: 48px copy target, narrow layout and mobile navigation');
+  if (evidence) await phone.screenshot({ path: `${evidence}/after-mobile.png`, fullPage: true });
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ browser: await browser.version(), checks, demo, limitations: ['Linux Chromium emulation only; no physical touch/haptics, iOS, VoiceOver or TalkBack certification'] }, null, 2));
+  if (evidence) await writeFile(`${evidence}/browser.json`, JSON.stringify({ browser: await browser.version(), checks, demo }, null, 2) + '\n');
+} finally { await browser?.close(); server.kill(); }

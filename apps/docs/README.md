@@ -95,3 +95,6 @@ chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
 line, drawing labels and scales) to Bloxwap Mono. The standalone playground and
 SDK presets retain their existing font defaults.
 Static social-image font provenance is recorded in `fonts/README.md`.
+
+HIG presentation, pinned candidate provenance, validation, exceptions and upgrade/rollback
+instructions are recorded in [the adoption report](../../docs/hig-adoption/README.md).

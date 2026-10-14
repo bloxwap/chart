@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
-@import '../styles/tokens.generated.css';
+@import '../vendor/hig/tokens.css';
+@import '../styles/hig.generated.css';
 
 @theme inline {
   --font-sans: var(--font-bloxwap-sans), ui-rounded, system-ui, sans-serif;
@@ -62,31 +63,31 @@ html > body[data-scroll-locked] {
 }
 
 #nd-page h1 {
-  font-family: var(--font-docs-display), var(--font-sans);
+  font-family: var(--font-sans);
   font-size: clamp(1.875rem, 3vw, 2.5rem);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.2;
 }
 
 #nd-page > p {
-  font-size: 1.125rem;
-  line-height: 1.6;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
 }
 
 .prose {
-  line-height: 1.75;
+  line-height: 1.5;
 }
 
 .prose h2 {
-  font-family: var(--font-docs-display), var(--font-sans);
+  font-family: var(--font-sans);
   font-size: 1.375rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .prose h3 {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .prose a:not([data-card]):not(.not-prose a) {
@@ -109,7 +110,7 @@ html > body[data-scroll-locked] {
 
 .prose [data-card='true'] h3 {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 #nd-sidebar {
@@ -140,60 +141,12 @@ html > body[data-scroll-locked] {
   border-radius: var(--radius-full);
   transition: background-color var(--duration-fast) var(--ease-spring), color var(--duration-fast) var(--ease-spring);
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .docs-app-link:hover {
   background: var(--card);
   color: var(--bloxwap-green);
-}
-
-/*
- * Scale layer from the monorepo's plain-UI system (packages/plain-ui/scripts/gen-tokens-css.mjs,
- * values from @workspace/tokens). The palette and radius steps come from tokens.generated.css;
- * the shared --text-* names repeat Tailwind's identical rem values.
- */
-:root {
-  --radius-2xl: 1rem;
-  --radius-full: 9999px;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-  --text-4xl: 2.25rem;
-  --text-5xl: 3rem;
-  --text-6xl: 3.75rem;
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 0.75rem;
-  --space-lg: 1rem;
-  --space-xl: 1.25rem;
-  --space-2xl: 1.5rem;
-  --space-3xl: 2rem;
-  --space-4xl: 2.5rem;
-  --space-5xl: 3rem;
-  --space-6xl: 4rem;
-  --duration-fast: 180ms;
-  --duration-base: 260ms;
-  --duration-slow: 320ms;
-  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-standard: ease-out;
-  --icon-md: 16px;
-  --control-h: 3rem;
-  --control-h-sm: 2.25rem;
-  --control-h-md: 2.75rem;
-  --control-min-w: 6rem;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-fast: 0ms;
-    --duration-base: 0ms;
-    --duration-slow: 0ms;
-  }
 }
 
 /*
@@ -205,7 +158,7 @@ html > body[data-scroll-locked] {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  height: var(--control-h);
+  min-height: var(--control-h);
   min-width: var(--control-min-w);
   padding: 0 var(--space-xl);
   border: 1px solid transparent;
@@ -213,7 +166,8 @@ html > body[data-scroll-locked] {
   background: var(--bloxwap-green);
   color: var(--bloxwap-black);
   font: 600 var(--text-base) / 1 var(--font-sans);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
   text-decoration: none;
   touch-action: manipulation;
@@ -240,7 +194,7 @@ html > body[data-scroll-locked] {
 .brand img { flex: none; width: 28px; height: 28px; }
 .brand-product { border-left: 1px solid var(--border); padding-left: var(--space-md); color: var(--muted-foreground); font-size: var(--text-sm); }
 .hero h1, .principles h2, .start-grid h2, .guide-links h3, .not-found h1 {
-  font-family: var(--font-docs-display), var(--font-sans);
+  font-family: var(--font-sans);
 }
 /* Same box as the Fumadocs header (max-w --fd-layout-width, 16px padding), so content lines up with the nav. */
 .home { width: 100%; max-width: var(--fd-layout-width, 1400px); padding: var(--space-5xl) var(--space-lg) 0; margin: 0 auto; }
@@ -249,9 +203,9 @@ html > body[data-scroll-locked] {
 .hero-copy { min-width: 0; }
 .eyebrow { display: flex; align-items: center; gap: var(--space-sm); color: var(--color-fd-muted-foreground); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
 .status-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--color-fd-primary); }
-.hero h1 { margin: var(--space-xl) 0 0; font-size: clamp(var(--text-5xl), 4.4vw, 4rem); line-height: 1.07; font-weight: 700; letter-spacing: -.04em; }
+.hero h1 { margin: var(--space-xl) 0 0; font-size: clamp(var(--text-5xl), 4.4vw, 4rem); line-height: 1.07; font-weight: 600; letter-spacing: -.04em; }
 .hero h1 span { color: var(--color-fd-foreground); }
-.hero-description { max-width: 35rem; margin-top: var(--space-xl); color: var(--color-fd-muted-foreground); line-height: 1.75; font-size: var(--text-lg); }
+.hero-description { max-width: 35rem; margin-top: var(--space-xl); color: var(--color-fd-muted-foreground); line-height: 1.5; font-size: var(--text-lg); }
 .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); margin: var(--space-2xl) 0 var(--space-xl); }
 .package-install { width: fit-content; max-width: 100%; margin-top: var(--space-2xl); }
 .install-tabs { display: inline-flex; max-width: 100%; gap: var(--space-xs); padding: var(--space-xs); border-radius: var(--radius-full); background: var(--card); }
@@ -263,7 +217,7 @@ html > body[data-scroll-locked] {
 .install-tabs button:hover { color: var(--foreground); }
 .install-tabs button[aria-selected='true'] { background: var(--muted); color: var(--foreground); }
 .install-command {
-  display: flex; align-items: center; gap: var(--space-lg); min-width: 0; margin-top: var(--space-md);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-lg); min-width: 0; margin-top: var(--space-md);
   padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-xl); border-radius: var(--radius-full);
   background: var(--card); font: 600 var(--text-sm) / 1.5 var(--font-mono);
 }
@@ -330,7 +284,7 @@ button[data-search-full] kbd {
   scroll-margin-top: 5rem;
 }
 .preview-intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); margin-bottom: var(--space-2xl); }
-.preview-intro h2 { margin: 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 700; }
+.preview-intro h2 { margin: 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 600; }
 .preview-intro > p:not(.eyebrow) { margin: 0; max-width: 25rem; color: var(--color-fd-muted-foreground); font-size: var(--text-sm); line-height: 1.7; }
 .preview-intro--section { align-items: center; text-align: center; }
 .preview-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs); }
@@ -362,10 +316,10 @@ button[data-search-full] kbd {
   padding: var(--space-xl);
 }
 .feature-number { color: var(--color-fd-primary); font: var(--text-2xs) var(--font-mono); }
-.principles h2 { font-size: var(--text-base); font-weight: 700; margin: var(--space-md) 0 var(--space-sm); }
+.principles h2 { font-size: var(--text-base); font-weight: 600; margin: var(--space-md) 0 var(--space-sm); }
 .principles p { font-size: var(--text-sm); color: var(--color-fd-muted-foreground); line-height: 1.7; }
 .start-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6xl); padding: var(--space-5xl) 0 var(--space-6xl); }
-.start-grid h2 { margin: var(--space-xl) 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 700; }
+.start-grid h2 { margin: var(--space-xl) 0; font-size: var(--text-3xl); letter-spacing: -.04em; line-height: 1.2; font-weight: 600; }
 .start-grid > div > p:last-child { color: var(--color-fd-muted-foreground); font-size: var(--text-sm); max-width: 25rem; line-height: 1.7; }
 .guide-links { display: grid; gap: var(--space-md); }
 .guide-links a {
@@ -376,7 +330,7 @@ button[data-search-full] kbd {
 .guide-links a > span { font: var(--text-2xs) var(--font-mono); color: var(--color-fd-muted-foreground); }
 .guide-links a > svg { flex: none; margin-left: auto; width: var(--icon-md); height: var(--icon-md); color: var(--color-fd-muted-foreground); transition: color var(--duration-fast) var(--ease-spring), transform var(--duration-fast) var(--ease-spring); }
 .guide-links a:hover > svg { color: var(--color-fd-primary); transform: translateX(2px); }
-.guide-links h3 { font-size: var(--text-sm); margin-bottom: var(--space-xs); font-weight: 700; transition: color var(--duration-fast) var(--ease-spring); }
+.guide-links h3 { font-size: var(--text-sm); margin-bottom: var(--space-xs); font-weight: 600; transition: color var(--duration-fast) var(--ease-spring); }
 .guide-links a:hover h3 { color: var(--color-fd-primary); }
 .guide-links p { color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
 /* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
@@ -438,3 +392,32 @@ button[data-search-full] kbd {
   .start-grid { padding: var(--space-4xl) 0; }
   .chart-frame { height: clamp(320px, 72svh, 600px); }
 }
+
+/* HIG type roles and adaptive targets; the dense chart keeps compact controls. */
+body { font-size: var(--type-body-size); line-height: var(--type-body-line); }
+.hero h1 { font-size: clamp(var(--type-title-size), 4.4vw, var(--type-display-size)); line-height: 1.0833; font-weight: var(--type-display-weight); }
+#nd-page h1 { font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: var(--type-title-weight); }
+.install-tabs button { min-height: var(--control-h-sm); }
+.install-feedback, .copy-feedback { color: var(--destructive); font-size: var(--type-caption-size); }
+.btn--icon { min-height: var(--control-h-sm); }
+@media (pointer: coarse) {
+  .btn--sm, .btn--icon, .install-tabs button, .docs-app-link, #nd-page .edit-on-github { min-height: var(--control-h); }
+  .btn--icon { min-width: var(--control-h); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; scroll-behavior: auto !important; }
+  .btn:active, .guide-links a:hover > svg { transform: none; }
+}
+
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border); --color-primary: var(--primary);
+  --color-bloxwap-green: var(--hig-action); --color-bloxwap-black: var(--hig-background);
+  --text-3xs: 0.625rem; --text-2xs: 0.6875rem;
+}
+
+.search-error { color: var(--destructive); padding: var(--space-lg); }
+
+.install-command .copy-feedback { grid-column: 1 / -1; padding-inline-end: var(--space-lg); }

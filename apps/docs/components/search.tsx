@@ -18,6 +18,7 @@ export default function StaticSearch(props: SharedProps) {
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader><SearchDialogIcon /><SearchDialogInput /><SearchDialogClose /></SearchDialogHeader>
+        {query.error && <p role="alert" className="search-error">Search is unavailable. Use the documentation navigation or close search and try again.</p>}
         <SearchDialogList items={query.data === 'empty' ? null : query.data} />
       </SearchDialogContent>
     </SearchDialog>
