@@ -1,5 +1,7 @@
 # Chart adoption · HIG 0.1.0 candidate
 
+Owning PR: https://github.com/bloxwap/chart/pull/52.
+
 Owner: Chart maintainers. Recorded 2026-10-13; exceptions reviewed by 2026-11-13.
 
 This repository owns the Chart row of [hig#34](https://github.com/bloxwap/hig/issues/34) and its repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36). It supplies a token-themed embedded chart for the #33 Pro pilot, but cannot certify any product origin. #35's React Native application is outside this repository; the HIG candidate explicitly does not support a native canvas chart.
