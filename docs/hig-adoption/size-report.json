@@ -1,0 +1,34 @@
+{
+  "baselineCommit": "e08198bcff27451defeca238e832d4be54be1896",
+  "higCommit": "1a776b9326c6ba03702894943b3edbfd178c4b40",
+  "toolchain": {
+    "node": "v24.21.0",
+    "next": "16.3.6",
+    "basePath": "/chart"
+  },
+  "measurement": "sum of uncompressed emitted CSS/JS/font files in static export (not transfer or per-route bundle sizes)",
+  "before": {
+    "css": 146652,
+    "javascript": 2183639,
+    "fonts": 14321768
+  },
+  "after": {
+    "css": 145759,
+    "javascript": 2172631,
+    "fonts": 14205712
+  },
+  "delta": {
+    "css": -893,
+    "javascript": -11008,
+    "fonts": -116056
+  },
+  "removedSource": {
+    "paletteCssBytes": 5921,
+    "unusedHeadingFontBytes": 116056
+  },
+  "notes": [
+    "No runtime dependency added; chart SDK API and engine unchanged.",
+    "OG static Bloxwap faces remain referenced; their licenses are retained.",
+    "Decorative OG spectrum colors are brand assets, not semantic UI palette; exception reviewed 2026-11-13."
+  ]
+}

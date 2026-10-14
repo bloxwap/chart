@@ -1,0 +1,10 @@
+Local validation on Linux, Node v24.21.0, Next 16.3.6, Chrome 154.0.8037.97
+
+npm run lint: passed (137 icons; HIG provenance/generation/scoped drift checks).
+npm run typecheck: passed (SDK tsc + Next route generation + docs tsc).
+npm run coverage: passed; 1869 tests, 0 failures; 100% line/branch/function, 138 covered files.
+NEXT_PUBLIC_BASE_PATH=/chart NEXT_PUBLIC_SITE_URL=https://bloxwap.github.io npm run docs:build: passed.
+Static export verified: 30 HTML pages, 1530 local links/assets, 25 social cards, /chart base path.
+npm run docs:check: passed on final production build.
+npm run docs:test: passed; see browser.json for observed WebGL2 offline data and individual checks.
+No physical device/iOS/VoiceOver/TalkBack/tactile/wide-gamut certification; see README.md.

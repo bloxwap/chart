@@ -11,10 +11,11 @@ import { assetUrl } from '@/lib/site';
 export function ChartPreview({ children }: { children?: ReactNode }) {
   const container = useRef<HTMLDivElement>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
+  const [loaded, setLoaded] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   // Name the file: `next dev` does not map directory URLs in public/ to index.html.
-  const demoUrl = assetUrl('/chart-demo/demo/index.html');
+  const demoUrl = assetUrl('/chart-demo/demo/index.html?lockedTheme=dark');
 
   useEffect(() => {
     setCanFullscreen(document.fullscreenEnabled);
@@ -68,8 +69,10 @@ export function ChartPreview({ children }: { children?: ReactNode }) {
         </button>}
       </div>
     </div>
+    <p className="preview-summary">Interactive candlestick chart with price and volume readouts, interval selection, drawings, pan and zoom. Live market data may be unavailable; choose a synthetic market in the playground to explore offline.</p>
+    {!loaded && <p role="status">Loading chart playground…</p>}
     <div ref={container} className="chart-preview">
-      <iframe ref={iframe} className="chart-frame" src={demoUrl} title="Interactive Bloxwap chart playground" allowFullScreen />
+      <iframe ref={iframe} className="chart-frame" src={demoUrl} onLoad={() => setLoaded(true)} title="Interactive Bloxwap chart playground" allowFullScreen />
     </div>
   </div>;
 }

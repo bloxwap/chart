@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import localFont from 'next/font/local';
 import { BloxwapSans as sans } from '@bloxwap/font/sans';
 import { BloxwapMono as mono } from '@bloxwap/font/mono';
 import type { ReactNode } from 'react';
@@ -7,11 +6,6 @@ import { Provider } from '@/components/provider';
 import { basePath, siteUrl } from '@/lib/site';
 import { homeSocial, socialImagePath, socialMetadata } from '@/lib/social';
 import './global.css';
-
-const display = localFont({
-  src: '../fonts/SpaceGrotesk-Bold.ttf', weight: '700',
-  variable: '--font-docs-display', display: 'swap',
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(`${siteUrl}${basePath}/`),
@@ -22,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${display.variable} dark`}>
+  return <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} dark`}>
     <body className="flex min-h-screen flex-col antialiased">
       <link rel="service-desc" type="application/json" href={`${basePath}/openapi.json`} />
       <Provider>{children}</Provider>

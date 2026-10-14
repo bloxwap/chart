@@ -1,0 +1,67 @@
+/* Generated from pinned HIG manifest by scripts/hig-tokens.mjs. */
+:root {
+  --bloxwap-black: var(--hig-background);
+  --bloxwap-green: var(--hig-action);
+  --background: var(--hig-background);
+  --foreground: var(--hig-text);
+  --card: var(--hig-surface);
+  --card-foreground: var(--hig-text);
+  --popover: var(--hig-nested);
+  --popover-foreground: var(--hig-text);
+  --primary: var(--hig-action);
+  --primary-foreground: var(--hig-onAction);
+  --secondary: var(--hig-nested);
+  --secondary-foreground: var(--hig-text);
+  --muted: var(--hig-nested);
+  --muted-foreground: var(--hig-muted);
+  --accent: var(--hig-nested);
+  --accent-foreground: var(--hig-text);
+  --destructive: var(--hig-negative);
+  --border: var(--hig-border);
+  --input: var(--hig-border);
+  --ring: var(--hig-focus);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-full: 624.9375rem;
+  --radius: var(--radius-lg);
+  --radius-2xl: var(--radius-xl);
+  --space-xs: var(--hig-space-xs);
+  --space-sm: var(--hig-space-sm);
+  --space-md: var(--hig-space-md);
+  --space-lg: var(--hig-space-lg);
+  --space-xl: var(--hig-space-xl);
+  --space-2xl: var(--hig-space-xxl);
+  --space-3xl: var(--hig-space-xxxl);
+  --space-4xl: var(--hig-space-section);
+  --space-5xl: var(--hig-space-section);
+  --space-6xl: var(--hig-space-section);
+  --duration-fast: 180ms;
+  --duration-base: 260ms;
+  --duration-slow: 320ms;
+  --type-caption-size: 0.75rem;
+  --type-caption-line: 1.125rem;
+  --type-caption-weight: 500;
+  --type-label-size: 0.875rem;
+  --type-label-line: 1.25rem;
+  --type-label-weight: 600;
+  --type-body-size: 1rem;
+  --type-body-line: 1.5rem;
+  --type-body-weight: 400;
+  --type-title-size: 1.5rem;
+  --type-title-line: 1.875rem;
+  --type-title-weight: 600;
+  --type-display-size: 3rem;
+  --type-display-line: 3.25rem;
+  --type-display-weight: 600;
+  --control-h: 3rem;
+  --control-h-sm: 2.25rem;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: ease-out;
+  --icon-md: 16px;
+  --control-min-w: 6rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration-base: 0ms; --duration-slow: 0ms; }
+}

@@ -32,6 +32,8 @@ jobs:
       - run: npm ci
       - run: npm run docs:build
       - run: npm run docs:check
+      - run: npm run lint
+      - run: npm run docs:test
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/docs/out

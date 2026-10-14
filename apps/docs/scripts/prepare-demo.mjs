@@ -1,3 +1,4 @@
+import { chartTheme } from './hig-tokens.mjs';
 import { cp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 
 const repository = new URL('../../../', import.meta.url);
@@ -11,6 +12,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(new URL('demo/', output), { recursive: true });
 await Promise.all([
   cp(new URL('apps/playground/index.html', repository), new URL('demo/index.html', output)),
+  cp(new URL('../vendor/hig/tokens.css', import.meta.url), new URL('assets/hig-tokens.css', output)),
   cp(new URL('packages/chart/dist/', repository), new URL('dist/', output), { recursive: true }),
 ]);
 
@@ -35,15 +37,19 @@ const SANS = '"Bloxwap Sans", system-ui, sans-serif';
 const MONO = '"Bloxwap Mono", ui-monospace, monospace';
 const demo = new URL('demo/index.html', output);
 const html = (await readFile(demo, 'utf8'))
-  .replace('<style>', `<link rel="stylesheet" href="../assets/bloxwap-font/bloxwap-font.css" /><style>
+  .replace('<style>', `<link rel="stylesheet" href="../assets/hig-tokens.css" /><link rel="stylesheet" href="../assets/bloxwap-font/bloxwap-font.css" /><style>
     /* SDK chrome (header, rails, menus, dialogs): doubled class outranks the injected TOOLBAR_CSS. */
+    body { background: var(--hig-surface); color: var(--hig-text); }
+    body:not(.light) .cts-theme.cts-theme { --cts-bg: var(--hig-background); --cts-panel: var(--hig-surface); --cts-panel-raised: var(--hig-nested); --cts-edge: var(--hig-border); --cts-idle: var(--hig-muted); --cts-muted: var(--hig-faint); --cts-hover: var(--hig-text); --cts-accent: var(--hig-action); --cts-on-accent: var(--hig-onAction); }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
     .cts-theme.cts-theme { --cts-font: ${SANS}; --cts-mono: ${MONO}; }`)
   .replace(/@font-face \{[^}]+\}/g, '')
   .replaceAll("'Geist'", "'Bloxwap Sans'")
   .replaceAll('12px "Geist"', '12px "Bloxwap Sans"')
   .replaceAll('12px "Geist Mono"', '12px "Bloxwap Mono"')
   // Canvas text: the bloxwapDark preset uses system-ui for all three families.
-  .replace('config: defineConfig({', `config: defineConfig({ theme: { fontFamily: '${SANS}', monoFamily: '${MONO}', scaleFontFamily: '${MONO}' },`);
-if (/Geist/.test(html)) throw new Error('The docs chart demo still references Geist.');
-await writeFile(demo, html);
+  .replace('config: defineConfig({', `config: defineConfig({ ...${JSON.stringify(chartTheme)},`);
+const themedHtml = html.replace("presetChartTheme('bloxwapDark')", `presetChartTheme(${JSON.stringify(chartTheme)})`);
+if (/Geist/.test(themedHtml)) throw new Error('The docs chart demo still references Geist.');
+await writeFile(demo, themedHtml);
 console.log('Prepared the complete chart demo for the documentation site.');

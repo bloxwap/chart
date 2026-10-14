@@ -25,4 +25,4 @@ const server = createServer(async (request, response) => {
   }
 });
 const port = Number(process.env.PORT ?? 3902);
-server.listen(port, '127.0.0.1', () => console.log(`Static docs preview → http://localhost:${port}${basePath}/`));
+server.listen(port, '127.0.0.1', () => console.log(`Static docs preview → http://localhost:${server.address().port}${basePath}/`));
