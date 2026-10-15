@@ -1,8 +1,8 @@
-// HIG adoption guard for the docs site. Tokens, CSS and components come from the vendored
-// @bloxwap/hig-* candidate tarballs (vendor/bloxwap-hig); this script only derives the manifest roles
-// that @bloxwap/hig-tokens/css does not emit as variables yet (radius, type, motion, density) and the
-// canvas-compatible sRGB chart theme, and fails CI when copies of HIG sources creep back in.
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+// HIG adoption guard for the docs site. Tokens, CSS (including the radius, type, motion and density
+// roles) and components come from the vendored @bloxwap/hig-* candidate tarballs (vendor/bloxwap-hig);
+// this script only derives the canvas-compatible sRGB chart theme from the typed manifest and fails CI
+// when copies of HIG sources creep back in or the docs use a --hig-* role HIG does not define.
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
@@ -21,28 +21,22 @@ export const chartTheme = {
   series: { upColor: colors.buy, downColor: colors.sell, wickUpColor: colors.buy, wickDownColor: colors.sell, borderUpColor: colors.buy, borderDownColor: colors.sell },
 };
 
-const rem = (px) => `${px / 16}rem`;
-const vars = [];
-for (const [key, value] of Object.entries(manifest.radius)) vars.push(`  --hig-radius-${key}: ${key === 'pill' ? '9999px' : rem(value)};`);
-for (const [key, role] of Object.entries(manifest.type)) vars.push(`  --hig-type-${key}-size: ${rem(role.size)};`, `  --hig-type-${key}-line: ${rem(role.lineHeight)};`, `  --hig-type-${key}-weight: ${role.weight};`);
-for (const [key, value] of Object.entries(manifest.motion)) vars.push(`  --hig-duration-${key}: ${value}ms;`);
-for (const [key, value] of Object.entries(manifest.density)) vars.push(`  --hig-control-${key}: ${rem(value.control)};`);
-const css = `/* Generated from @bloxwap/hig-tokens ${manifest.version} manifest by scripts/hig-tokens.mjs; do not edit. */\n:root {\n${vars.join('\n')}\n}\n@media (prefers-reduced-motion: reduce) {\n  :root { ${Object.keys(manifest.motion).map((key) => `--hig-duration-${key}: 0ms;`).join(' ')} }\n}\n`;
-const output = new URL('../styles/hig-roles.generated.css', import.meta.url);
-if (process.argv.includes('--write')) await writeFile(output, css);
+export const reactCssPath = require.resolve('@bloxwap/hig-react/css');
+const docs = new URL('../', import.meta.url);
+const surfaces = ['app/', 'components/', 'lib/'];
 
 if (process.argv.includes('--check')) {
-  assert.equal(await readFile(output, 'utf8'), css, 'HIG role drift: run node apps/docs/scripts/hig-tokens.mjs --write');
   const vendor = new URL('../../../vendor/bloxwap-hig/', import.meta.url);
   const provenance = JSON.parse(await readFile(new URL('provenance.json', vendor), 'utf8'));
   for (const [file, hash] of Object.entries(provenance.sha256)) assert.equal(createHash('sha256').update(await readFile(new URL(file, vendor))).digest('hex'), hash, `Vendored HIG tarball changed: ${file}`);
   const docsPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  for (const name of ['tokens', 'contracts', 'react']) {
+  for (const name of ['tokens', 'contracts', 'react', 'native-fonts']) {
     const spec = docsPackage.dependencies[`@bloxwap/hig-${name}`];
     assert.ok(spec?.startsWith('file:../../vendor/bloxwap-hig/') && spec.includes(provenance.version), `@bloxwap/hig-${name} must come from the pinned vendored tarball`);
     assert.equal(JSON.parse(await readFile(new URL(`../../../node_modules/@bloxwap/hig-${name}/package.json`, import.meta.url), 'utf8')).version, provenance.version, `Installed @bloxwap/hig-${name} is not ${provenance.version}; run npm ci`);
   }
-  assert.deepEqual((await readdir(new URL('../styles/', import.meta.url))).sort(), ['hig-roles.generated.css'], 'Only the generated HIG role file belongs in styles/');
+  // @bloxwap/hig-tokens/css ships the radius/type/motion/density roles (hig#66): no generated role copies.
+  await assert.rejects(readdir(new URL('styles/', docs)), { code: 'ENOENT' }, 'apps/docs/styles/ is gone; use the roles from @bloxwap/hig-tokens/css instead of generating copies');
   // No copied palettes, token snapshots, primitive classes or font binaries in the docs shell.
   const forbidden = [
     [/--(hig|bloxwap)-[\w-]+\s*:\s*(#|oklch\(|rgb|color\()/, 'copied palette declaration'],
@@ -54,12 +48,22 @@ if (process.argv.includes('--check')) {
       const path = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
       if (entry.isDirectory()) await checkSurface(path);
       else if (/\.(ttf|otf|woff2?)$/.test(entry.name)) assert.fail(`Copied font binary: ${path}`);
-      else if (/\.(css|tsx?)$/.test(entry.name) && !entry.name.endsWith('.generated.css')) {
+      else if (/\.generated\.css$/.test(entry.name)) assert.fail(`Generated HIG copy: ${path.pathname}`);
+      else if (/\.(css|tsx?)$/.test(entry.name)) {
         const source = await readFile(path, 'utf8');
         for (const [pattern, reason] of forbidden) assert.ok(!pattern.test(source), `${reason}: ${path.pathname}`);
+        for (const [, name] of source.matchAll(/var\((--hig-[\w-]+)/g)) used.add(name);
+        for (const [, name] of source.matchAll(/(--hig-[\w-]+)\s*:/g)) declared.add(name);
       }
     }
   }
-  for (const dir of ['app/', 'components/', 'lib/', 'styles/']) await checkSurface(new URL(`../${dir}`, import.meta.url));
-  console.log(`HIG ${provenance.version} tarball provenance, installed versions, generated roles and copy drift checks passed.`);
+  const used = new Set(), declared = new Set();
+  for (const dir of surfaces) await checkSurface(new URL(dir, docs));
+  // Every --hig-* role the docs read must come from the installed HIG CSS (or be a local remap of one).
+  const higCss = (await readFile(tokensCssPath, 'utf8')) + (await readFile(reactCssPath, 'utf8'));
+  const defined = new Set([...higCss.matchAll(/(--hig-[\w-]+)\s*:/g)].map(([, name]) => name));
+  for (const role of ['--hig-radius-xl', '--hig-type-body-line-height', '--hig-motion-duration-fast', '--hig-density-compact-control']) assert.ok(defined.has(role), `@bloxwap/hig-tokens/css defines ${role}`);
+  const undefinedRoles = [...used].filter((name) => !defined.has(name) && !declared.has(name)).sort();
+  assert.deepEqual(undefinedRoles, [], `--hig-* roles not defined by @bloxwap/hig-tokens/css or @bloxwap/hig-react/css: ${undefinedRoles.join(', ')}`);
+  console.log(`HIG ${provenance.version} tarball provenance, installed versions, ${used.size} --hig-* roles defined upstream and copy drift checks passed.`);
 }

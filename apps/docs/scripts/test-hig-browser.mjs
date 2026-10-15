@@ -80,15 +80,17 @@ try {
   const presentation = await page.evaluate(() => {
     const css = getComputedStyle(document.documentElement);
     const button = document.querySelector('.hig-button');
-    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-duration-fast').trim(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
+    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-motion-duration-fast').trim(), roles: (() => { const probe = document.createElement('i'); probe.style.cssText = 'display:block;border-radius:var(--hig-radius-xl);line-height:var(--hig-type-body-line-height);min-height:var(--hig-density-compact-control);transition:opacity 1s var(--hig-motion-easing-standard)'; document.body.append(probe); const s = getComputedStyle(probe); const out = { radius: s.borderTopLeftRadius, lineHeight: s.lineHeight, control: s.minHeight, easing: s.transitionTimingFunction }; probe.remove(); return out; })(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
   });
   assert.ok(await sameColor(page, presentation.surface, cssColor('surface')), `--hig-surface ${presentation.surface}`);
   assert.match(presentation.font, /BloxwapSans|Bloxwap Sans|bloxwap/i);
   assert.match(presentation.buttonFont, /BloxwapSans|Bloxwap Sans|bloxwap/i);
   assert.deepEqual(presentation.legacy, []);
   assert.match(presentation.motion, /^0(m?s)$/);
+  // Radius/type/density/motion roles come straight from @bloxwap/hig-tokens/css (hig#66), not a generated copy.
+  assert.deepEqual(presentation.roles, { radius: `${manifest.radius.xl}px`, lineHeight: `${manifest.type.body.lineHeight}px`, control: `${manifest.density.compact.control}px`, easing: `cubic-bezier(${manifest.easing.standard.join(', ')})` });
   assert.equal(presentation.transform, 'none');
-  record('@bloxwap/hig-tokens palette, HIG controls in Bloxwap typography, no legacy aliases, reduced motion');
+  record('@bloxwap/hig-tokens palette and radius/type/motion/density roles, HIG controls in Bloxwap typography, no legacy aliases, reduced motion');
   await page.getByRole('tab', { name: 'npm', exact: true }).click();
   await page.getByRole('tab', { name: 'bun', exact: true }).click();
   if (evidence) { await mkdir(evidence, { recursive: true }); await page.screenshot({ path: `${evidence}/after-home.png`, fullPage: true }); }

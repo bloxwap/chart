@@ -6,13 +6,14 @@ feedback engines are copied into this repository.
 
 | Tarball | Used for |
 | --- | --- |
-| `bloxwap-hig-tokens-0.1.0-candidate.sha7c67a07c.tgz` | `@bloxwap/hig-tokens/css` (shell and chart demo), typed manifest (chart theme, generated roles, OG colors), static OG font faces |
-| `bloxwap-hig-contracts-0.1.0-candidate.sha7c67a07c.tgz` | runtime dependency of `@bloxwap/hig-react` |
-| `bloxwap-hig-react-0.1.0-candidate.sha7c67a07c.tgz` | `@bloxwap/hig-react/css`, `button`, `navigation`, `surface`, `status` entries |
+| `bloxwap-hig-tokens-0.1.0-candidate.shad7ff4780.tgz` | `@bloxwap/hig-tokens/css` (shell and chart demo: palette, space, font, radius, type, motion and density roles), typed manifest (chart theme, OG colors) |
+| `bloxwap-hig-contracts-0.1.0-candidate.shad7ff4780.tgz` | runtime dependency of `@bloxwap/hig-react` |
+| `bloxwap-hig-react-0.1.0-candidate.shad7ff4780.tgz` | `@bloxwap/hig-react/css`, `button`, `navigation`, `surface`, `status` entries |
+| `bloxwap-hig-native-fonts-0.1.0-candidate.shad7ff4780.tgz` | static Bloxwap Sans TTFs for the build-time OG renderer only (`lib/og-card.tsx`); no page loads them |
 
-Provenance: [bloxwap/hig@7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc),
-built with `npm ci && npm run build && npm run release:dry-run -- --channel candidate` (plus
-`npm run generate:fonts` for the native TTFs the dry run packs). SHA-256 hashes are in `provenance.json`
+Provenance: [bloxwap/hig@d7ff478](https://github.com/bloxwap/hig/tree/d7ff478049bbe71056d9248dc48e08166be4431e),
+built with `npm ci && npm run generate:fonts && npm run build && npm run release:dry-run -- --channel candidate`
+(`generate:fonts` produces the native TTFs the dry run packs into `@bloxwap/hig-native-fonts`). SHA-256 hashes are in `provenance.json`
 and checked by `npm run lint`. MIT licenses travel inside each tarball.
 
 ## Notes
@@ -29,6 +30,6 @@ and checked by `npm run lint`. MIT licenses travel inside each tarball.
 ## Upgrade or roll back
 
 Rebuild the tarballs from a reviewed HIG commit, replace them here, update `provenance.json` and the
-three `file:` specs, run `npm install`, `node apps/docs/scripts/hig-tokens.mjs --write`, then
+four `file:` specs, run `npm install`, then
 `npm run lint`, `npm run typecheck`, the docs build and `npm run docs:test`. Rolling back is an atomic
 revert of the commit that changed this folder, the lockfile and the docs imports together.

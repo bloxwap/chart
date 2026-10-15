@@ -8,14 +8,29 @@ repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36)
 | Step | PR | HIG source | How HIG is consumed |
 | --- | --- | --- | --- |
 | 1 | [#52](https://github.com/bloxwap/chart/pull/52) ([evidence](https://github.com/bloxwap/chart/tree/c4dff80/docs/hig-adoption)) | [1a776b9](https://github.com/bloxwap/hig/tree/1a776b9326c6ba03702894943b3edbfd178c4b40) | Copied plain-CSS snapshot + manifest, alias adapter, local `.btn`/copy/install primitives |
-| 2 | this migration | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs ([vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md)) |
+| 2 | [#53](https://github.com/bloxwap/chart/pull/53) | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs ([vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md)) |
+| 3 | this change | [d7ff478](https://github.com/bloxwap/hig/tree/d7ff478049bbe71056d9248dc48e08166be4431e) | Same tarballs plus `-native-fonts` (OG only); roles from `@bloxwap/hig-tokens/css`, no generated role file |
+
+## What changed in step 3 ([hig#66](https://github.com/bloxwap/hig/issues/66), [hig#65](https://github.com/bloxwap/hig/issues/65), [hig#64](https://github.com/bloxwap/hig/issues/64))
+
+- **Roles from the package.** `@bloxwap/hig-tokens/css` now emits `--hig-radius-*`, `--hig-type-*`
+  (size, line height, weight), `--hig-motion-*` (0ms under reduced motion) and `--hig-density-*`. The docs
+  use them directly, so `styles/hig-roles.generated.css` and its generator are deleted. Renamed uses:
+  `--hig-type-<role>-line` → `--hig-type-<role>-line-height`, `--hig-duration-<speed>` →
+  `--hig-motion-duration-<speed>`, `--hig-control-<mode>` → `--hig-density-<mode>-control`.
+- **No font bridge.** HIG buttons read `--hig-font-sans`, which resolves the `@bloxwap/font` loader
+  variable on `<html>`, so the `.hig-button { font-family: var(--font-sans) }` override is gone.
+- **OG fonts.** The static TTFs moved from `@bloxwap/hig-tokens` to `@bloxwap/hig-native-fonts` (same
+  bytes). The OG renderer reads them from there; the tokens tarball drops from 4.2 MB to 8 KB.
+- **Guard.** `npm run lint` now fails when the docs read a `--hig-*` role the installed HIG CSS does not
+  define, or when a generated role copy or `apps/docs/styles/` comes back.
 
 ## What changed in step 2
 
 - **Tokens and fonts.** The shell imports `@bloxwap/hig-tokens/css` and `@bloxwap/hig-react/css` and
   uses `--hig-*` roles directly. The shadcn-style alias layer (`--card`, `--bloxwap-green`, `--space-*`, …)
   and the copied token snapshot are gone. Radius/type/motion/density roles, which the CSS distribution
-  does not emit yet, are generated from the package manifest (`styles/hig-roles.generated.css`). Body and
+  did not emit yet, were generated from the package manifest (`styles/hig-roles.generated.css`, removed in step 3). Body and
   code fonts stay on `@bloxwap/font@0.1.2`; the social-card renderer now reads the static Bloxwap Sans faces
   from `@bloxwap/hig-tokens/fonts` instead of copied TTFs.
 - **Shell, navigation and search.** Fumadocs keeps layout, sidebar, mobile navigation and the static
@@ -69,7 +84,7 @@ copy guards) and `docs:test` (browser checks).
 
 | Repository/surface | Applicability | Version | Owner | Status | Residual work / review date |
 | --- | --- | --- | --- | --- | --- |
-| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0-candidate.sha7c67a07c (tokens, contracts, react); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; stable HIG publication; 2026-11-13 |
+| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0-candidate.shad7ff4780 (tokens, contracts, react; native-fonts for OG only); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; stable HIG publication; 2026-11-13 |
 | chart / published SDK | Engine and optional DOM UI | SDK 0.3.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
 
 Exceptions (Chart maintainers, review 2026-11-13):

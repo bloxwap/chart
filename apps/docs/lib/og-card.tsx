@@ -12,9 +12,10 @@ import { socialImageSize } from './social';
 const ink = hig.colors.text.srgb; // --foreground
 const muted = hig.colors.muted.srgb; // --muted-foreground
 const bar: [color: string, share: number][] = [[hig.colors.action.srgb, 62], [hig.colors.info.srgb, 14], ['#b300ff', 10], ['#ff479c', 8], ['#fffb38', 6]];
-// Static Bloxwap Sans faces for the OG renderer come from @bloxwap/hig-tokens/fonts (OFL, derived from
-// @bloxwap/font 0.1.2 upstream); the docs no longer keep copied font binaries. Hoisted by the workspace lock.
-const higFonts = join(process.cwd(), '../../node_modules/@bloxwap/hig-tokens/assets/fonts');
+// Static Bloxwap Sans faces for the OG renderer come from @bloxwap/hig-native-fonts/fonts (OFL, derived from
+// @bloxwap/font 0.1.2 upstream; they left @bloxwap/hig-tokens in hig#64). Build-time only: no page loads them.
+// The docs keep no copied font binaries. Hoisted by the workspace lock.
+const higFonts = join(process.cwd(), '../../node_modules/@bloxwap/hig-native-fonts/fonts');
 const assets = Promise.all([
   readFile(join(higFonts, 'BloxwapSans-Bold.ttf')),
   readFile(join(higFonts, 'BloxwapSans-Black.ttf')),
