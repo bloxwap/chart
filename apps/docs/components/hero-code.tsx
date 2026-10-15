@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReactNode } from 'react';
+import { Surface, Text } from '@bloxwap/hig-react/surface';
 import { CopyButton } from './copy-button';
 
 /*
@@ -39,13 +40,14 @@ function highlight(code: string): ReactNode[] {
 export function HeroCode() {
   // Read per render (build time for the static export), so dev edits to the snippet show up.
   const source = readFileSync(join(process.cwd(), 'snippets', SNIPPET_FILE), 'utf8').trimEnd();
-  return <figure className="code-window" aria-label="A React component that renders a default chart">
+  return <figure className="code-window" aria-label="A React component that renders a default chart" data-hig-density="compact">
     <figcaption className="code-toolbar">
       <span className="window-dots" aria-hidden="true"><i /><i /><i /></span>
       <span>{SNIPPET_FILE}</span>
-      <span className="code-actions"><span className="code-language">TSX</span><CopyButton text={`${source}\n`} label="Copy code" /></span>
+      <span className="code-actions"><CopyButton text={`${source}\n`} label="Copy code" /></span>
     </figcaption>
-    <pre><code>{highlight(source)}</code></pre>
+    {/* HIG CodeWindow recipe markup (language label + focusable code) from HIG primitives; see install-command.tsx. */}
+    <Surface><Text>TSX</Text><pre tabIndex={0}><code>{highlight(source)}</code></pre></Surface>
     <p className="code-status"><span aria-hidden="true" /> A candlestick chart that follows the system theme and fills its box</p>
   </figure>;
 }

@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { IconButton } from '@bloxwap/hig-react/button';
+import { useClipboard } from '@/lib/clipboard';
 
-/** A quiet icon button that copies `text`, with a check mark and a screen-reader status on success. */
+/** HIG icon button that copies `text`, with a check mark, a screen-reader status and visible failure recovery. */
 export function CopyButton({ text, label }: { text: string; label: string }) {
-  const pending = useRef(false);
+  const copyText = useClipboard();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<'copied' | 'failed' | null>(null);
 
@@ -16,25 +18,23 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   }, [result]);
 
   async function copy() {
-    if (pending.current) return;
-    pending.current = true;
+    if (busy) return;
     setBusy(true);
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setResult('copied');
     } catch {
       setResult('failed');
     } finally {
-      pending.current = false;
       setBusy(false);
     }
   }
 
   return <>
-    <button type="button" className="btn btn--ghost btn--icon" aria-label={label} disabled={busy} aria-busy={busy} title={result === 'copied' ? 'Copied!' : label} onClick={copy}>
-      {result === 'copied' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-    </button>
-    <span role="status" className={result === 'failed' ? 'copy-feedback' : 'sr-only'}>
+    <IconButton intent="ghost" className="docs-icon-button" label={label} busy={busy} title={result === 'copied' ? 'Copied' : label} onClick={copy}>
+      {result === 'copied' ? <Check /> : <Copy />}
+    </IconButton>
+    <span role="status" className={result === 'failed' ? 'copy-feedback' : 'hig-sr-only'}>
       {result === 'copied' ? 'Code copied to clipboard.' : result === 'failed' ? 'Could not copy. Select the code to copy it manually.' : ''}
     </span>
   </>;

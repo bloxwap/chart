@@ -1,4 +1,4 @@
-import hig from '@/vendor/hig/manifest.json';
+import { tokens as hig } from '@bloxwap/hig-tokens';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
@@ -12,9 +12,12 @@ import { socialImageSize } from './social';
 const ink = hig.colors.text.srgb; // --foreground
 const muted = hig.colors.muted.srgb; // --muted-foreground
 const bar: [color: string, share: number][] = [[hig.colors.action.srgb, 62], [hig.colors.info.srgb, 14], ['#b300ff', 10], ['#ff479c', 8], ['#fffb38', 6]];
+// Static Bloxwap Sans faces for the OG renderer come from @bloxwap/hig-tokens/fonts (OFL, derived from
+// @bloxwap/font 0.1.2 upstream); the docs no longer keep copied font binaries. Hoisted by the workspace lock.
+const higFonts = join(process.cwd(), '../../node_modules/@bloxwap/hig-tokens/assets/fonts');
 const assets = Promise.all([
-  readFile(join(process.cwd(), 'fonts/BloxwapSans-Bold.ttf')),
-  readFile(join(process.cwd(), 'fonts/BloxwapSans-Black.ttf')),
+  readFile(join(higFonts, 'BloxwapSans-Bold.ttf')),
+  readFile(join(higFonts, 'BloxwapSans-Black.ttf')),
   readFile(join(process.cwd(), '../../packages/chart/package.json'), 'utf8'),
 ]);
 

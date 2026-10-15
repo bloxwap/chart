@@ -1,4 +1,4 @@
-import { chartTheme } from './hig-tokens.mjs';
+import { chartTheme, tokensCssPath } from './hig-tokens.mjs';
 import { cp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 
 const repository = new URL('../../../', import.meta.url);
@@ -12,7 +12,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(new URL('demo/', output), { recursive: true });
 await Promise.all([
   cp(new URL('apps/playground/index.html', repository), new URL('demo/index.html', output)),
-  cp(new URL('../vendor/hig/tokens.css', import.meta.url), new URL('assets/hig-tokens.css', output)),
+  cp(tokensCssPath, new URL('assets/hig-tokens.css', output)), // @bloxwap/hig-tokens/css, unmodified
   cp(new URL('packages/chart/dist/', repository), new URL('dist/', output), { recursive: true }),
 ]);
 
