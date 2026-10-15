@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReactNode } from 'react';
-import { Surface, Text } from '@bloxwap/hig-react/surface';
+import { CodeWindow } from '@bloxwap/hig-react/recipes/code-window';
 import { CopyButton } from './copy-button';
 
 /*
@@ -46,8 +46,8 @@ export function HeroCode() {
       <span>{SNIPPET_FILE}</span>
       <span className="code-actions"><CopyButton text={`${source}\n`} label="Copy code" /></span>
     </figcaption>
-    {/* HIG CodeWindow recipe markup (language label + focusable code) from HIG primitives; see install-command.tsx. */}
-    <Surface><Text>TSX</Text><pre tabIndex={0}><code>{highlight(source)}</code></pre></Surface>
+    {/* HIG CodeWindow recipe (language label + focusable code); its entry imports no overlay or Radix peer. */}
+    <CodeWindow language="TSX">{highlight(source)}</CodeWindow>
     <p className="code-status"><span aria-hidden="true" /> A candlestick chart that follows the system theme and fills its box</p>
   </figure>;
 }

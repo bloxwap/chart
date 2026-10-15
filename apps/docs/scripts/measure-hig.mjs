@@ -19,7 +19,7 @@ async function sizes(dir) {
   await walk(dir);
   return result;
 }
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 const [baselineDirectory, baselineCommit] = process.argv.slice(2);
 if (!baselineDirectory || !baselineCommit) throw new Error('Usage: node apps/docs/scripts/measure-hig.mjs <baseline-export-directory> <baseline-commit>');
 const before = await sizes(baselineDirectory);
@@ -36,7 +36,9 @@ const beforeLock = lockPackages(git('show', `${baselineCommit}:package-lock.json
 const afterLock = lockPackages(await readFile('package-lock.json', 'utf8'));
 const docsDeps = (text) => Object.keys({ ...JSON.parse(text).dependencies, ...JSON.parse(text).devDependencies });
 const provenance = JSON.parse(await readFile('vendor/bloxwap-hig/provenance.json', 'utf8'));
-const generated = (ref) => { try { return Buffer.byteLength(git('show', `${ref}:apps/docs/styles/${ref === baselineCommit ? 'hig.generated.css' : 'hig-roles.generated.css'}`)); } catch { return 0; } };
+// Generated token adapters: hig.generated.css (copied snapshot, step 1), hig-roles.generated.css (step 2), none since
+// @bloxwap/hig-tokens/css emits the roles itself.
+const generated = (ref) => ['hig.generated.css', 'hig-roles.generated.css'].reduce((sum, file) => { try { return sum + Buffer.byteLength(git('show', `${ref}:apps/docs/styles/${file}`)); } catch { return sum; } }, 0);
 
 console.log(JSON.stringify({
   baselineCommit,
