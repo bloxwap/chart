@@ -37,7 +37,15 @@ try {
   assert.equal(await page.getByRole('tab', { name: 'yarn', exact: true }).getAttribute('aria-selected'), 'true');
   await page.keyboard.press('Home');
   assert.equal(await page.getByRole('tab', { name: 'bun', exact: true }).getAttribute('aria-selected'), 'true');
-  record('Install tabs: arrows/Home/End, selected state and focus');
+  // HIG Tabs + InstallCommand recipe (hig#69): the command's focusable <pre> is the panel's single tab stop.
+  // Tabs drops the panel's own tabindex in an effect after the switch, so wait for that commit first.
+  await page.waitForFunction(() => !document.querySelector('[role="tabpanel"]:not([hidden])').hasAttribute('tabindex'));
+  await page.keyboard.press('Tab');
+  const afterTabs = await page.evaluate(() => { const el = document.activeElement; return { tag: el.tagName, role: el.getAttribute('role'), inPanel: !!el.closest('[role="tabpanel"]') }; });
+  assert.deepEqual(afterTabs, { tag: 'PRE', role: null, inPanel: true });
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Copy install command');
+  record('Install tabs: arrows/Home/End, selected state and focus; one tab stop per install command');
   await page.evaluate(() => {
     window.copyStatusLog = [];
     const observe = () => {
@@ -77,14 +85,19 @@ try {
   await page.waitForFunction(() => window.copyStatusLog.some(entry => entry.text.includes('Could not copy.') && entry.visibleError));
   assert.equal(await copyCode.isDisabled(), false);
   record('Copy: pending suppresses repeat activation, success status, visible denial and recovery');
-  const presentation = await page.evaluate(() => {
+  const presentation = await page.evaluate(async () => {
     const css = getComputedStyle(document.documentElement);
     const button = document.querySelector('.hig-button');
-    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-duration-fast').trim(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
+    await document.fonts.ready;
+    // hig#65: HIG CSS reads --hig-font-sans, so the button's first family is the Next-loaded Bloxwap face.
+    const first = (el) => getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/["']/g, '');
+    const loaded = (el) => [...document.fonts].some(face => face.family.replace(/["']/g, '') === first(el) && face.status === 'loaded');
+    return { buttonFaceLoaded: loaded(button), surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-motion-duration-fast').trim(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
   });
   assert.ok(await sameColor(page, presentation.surface, cssColor('surface')), `--hig-surface ${presentation.surface}`);
   assert.match(presentation.font, /BloxwapSans|Bloxwap Sans|bloxwap/i);
   assert.match(presentation.buttonFont, /BloxwapSans|Bloxwap Sans|bloxwap/i);
+  assert.equal(presentation.buttonFaceLoaded, true, 'HIG button renders in a loaded Bloxwap face, not a fallback');
   assert.deepEqual(presentation.legacy, []);
   assert.match(presentation.motion, /^0(m?s)$/);
   assert.equal(presentation.transform, 'none');

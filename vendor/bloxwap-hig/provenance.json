@@ -1,12 +1,13 @@
 {
   "repository": "bloxwap/hig",
-  "commit": "7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc",
-  "version": "0.1.0-candidate.sha7c67a07c",
-  "producedBy": "npm ci && npm run build && npm run release:dry-run -- --channel candidate (Node 22.22.0; native TTFs generated with scripts/generate-native-fonts.py, fonttools 4.61.1)",
+  "commit": "872906a9071469af8714b3b6fb5cc7bd64d2d6f3",
+  "version": "0.1.0-candidate.sha872906a9",
+  "producedBy": "npm ci && npm run build && npm run generate:fonts && npm run release:dry-run -- --channel candidate (Node 22.22.0, npm 11.6.1; fonttools 4.61.1 + brotli for the native faces in @bloxwap/hig-native-fonts)",
   "distribution": "unpublished candidate tarballs; no npm release, tag or GitHub release exists",
   "sha256": {
-    "bloxwap-hig-contracts-0.1.0-candidate.sha7c67a07c.tgz": "4519befc8d35c787b2f91302cf46801c82295f6dd33cbf84331be11308d71ef7",
-    "bloxwap-hig-react-0.1.0-candidate.sha7c67a07c.tgz": "6f3d7cc721ff246c647a2479ba39e898f4ba9d2ba75177b800a9942f5dab11f9",
-    "bloxwap-hig-tokens-0.1.0-candidate.sha7c67a07c.tgz": "701750f9b85f148533995d9b603f2ea1a6acbe31ac475ac7f8ecce8cd3cd61dc"
+    "bloxwap-hig-contracts-0.1.0-candidate.sha872906a9.tgz": "ca8d5e0fe7e6138c056e9b45182e664c69d7217295264dff56a09290acabd352",
+    "bloxwap-hig-native-fonts-0.1.0-candidate.sha872906a9.tgz": "2de088737f6f76c594e95de237342dbe4457387ed9134628ef12049266195f77",
+    "bloxwap-hig-react-0.1.0-candidate.sha872906a9.tgz": "5835fea5e4f701815fb4152cf079901d0f8af634ef3fbb537b40fc48500670c4",
+    "bloxwap-hig-tokens-0.1.0-candidate.sha872906a9.tgz": "62b4007b5e06ee571352f8a33bd7e14025745fe42234d8532092739ff49f6196"
   }
 }

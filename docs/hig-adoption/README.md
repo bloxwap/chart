@@ -1,6 +1,6 @@
 # Chart docs adoption · HIG 0.1.0 candidate
 
-Owner: Chart maintainers. Updated 2026-10-14; exceptions reviewed by 2026-11-13.
+Owner: Chart maintainers. Updated 2026-10-15; exceptions reviewed by 2026-11-13.
 
 This repository owns the Chart row of [hig#34](https://github.com/bloxwap/hig/issues/34) and its
 repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36).
@@ -8,7 +8,8 @@ repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36)
 | Step | PR | HIG source | How HIG is consumed |
 | --- | --- | --- | --- |
 | 1 | [#52](https://github.com/bloxwap/chart/pull/52) ([evidence](https://github.com/bloxwap/chart/tree/c4dff80/docs/hig-adoption)) | [1a776b9](https://github.com/bloxwap/hig/tree/1a776b9326c6ba03702894943b3edbfd178c4b40) | Copied plain-CSS snapshot + manifest, alias adapter, local `.btn`/copy/install primitives |
-| 2 | this migration | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs ([vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md)) |
+| 2 | [#53](https://github.com/bloxwap/chart/pull/53) | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs ([vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md)) |
+| 3 | candidate refresh (this change) | [872906a](https://github.com/bloxwap/hig/tree/872906a9071469af8714b3b6fb5cc7bd64d2d6f3) | Same packages plus build-time `@bloxwap/hig-native-fonts`; upstream fixes replace the step 2 workarounds |
 
 ## What changed in step 2
 
@@ -30,7 +31,53 @@ repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36)
   `@bloxwap/hig-tokens/css` unmodified and a chart theme from the typed package manifest. Base path,
   metadata, deep links, API examples and capability wording are unchanged.
 
-## Measured before/after
+## What changed in step 3 (HIG 872906a candidate)
+
+Upstream fixes from [hig#63](https://github.com/bloxwap/hig/issues/63), [#64](https://github.com/bloxwap/hig/issues/64),
+[#65](https://github.com/bloxwap/hig/issues/65), [#66](https://github.com/bloxwap/hig/issues/66) and
+[#69](https://github.com/bloxwap/hig/issues/69) let the docs drop their workarounds:
+
+- **Roles (#66).** `@bloxwap/hig-tokens/css` emits `--hig-radius-*`, `--hig-type-*`, `--hig-motion-*` and
+  `--hig-density-*`. `styles/hig-roles.generated.css`, its generator and its lint drift guard are deleted; the shell
+  uses the package names (`--hig-motion-duration-fast`, `--hig-density-compact-control`,
+  `--hig-type-body-line-height`, …). The undefined local `--ease-spring` is replaced by `--hig-motion-easing-standard`.
+  `npm run lint` now rejects local role declarations and the retired generated names instead.
+- **Peers and recipes (#63).** `.npmrc` (`legacy-peer-deps=true`) is deleted: `npm ci` installs with one Radix tree
+  and the `packages/chart` workspace link intact. Install commands render the HIG `recipes/install-command` entry and
+  the hero code renders `recipes/code-window`; neither entry imports the overlay or a Radix peer.
+- **Fonts (#64, #65).** HIG CSS reads `--hig-font-sans`/`--hig-font-mono`, which resolve to the `@bloxwap/font` Next
+  loader variables, so the `.hig-button { font-family }` bridge is gone; the browser test asserts the button's first
+  family is a loaded Bloxwap face. The tokens tarball has no TTFs (4,428,734 → 8,108 bytes). Social cards read their
+  two static faces from the build-time `@bloxwap/hig-native-fonts` devDependency (Satori cannot read WOFF2).
+- **Callout and Tabs (#69).** MDX `<Callout>` passes ReactNode titles through and maps `note`/`idea` to HIG `note`/`tip`;
+  the local info/success edge rules are deleted. HIG Tabs no longer adds a second tab stop before the install
+  command; the browser test checks that Tab from the selected tab lands on the command, then on Copy.
+- **Touch targets.** HIG buttons are now 44 px by default (hig#80). On coarse pointers the compact install/code regions
+  set `--hig-button` to the comfortable 48 px target role, so the existing 48 px touch check still holds.
+
+| Measure (baseline `a3b0f6b`, same `/chart` export settings) | Before | After | Delta |
+| --- | ---: | ---: | ---: |
+| Vendored tarballs (bytes) | 4,446,466 (3) | 4,454,889 (4) | +8,423 |
+| … web packages only (tokens + contracts + react) | 4,446,466 | 34,514 | −4,411,952 |
+| Lockfile packages | 403 | 404 | +1 (`@bloxwap/hig-native-fonts`) |
+| Lockfile Radix entries (nested) | 34 (0) | 34 (0) | 0, without `legacy-peer-deps` |
+| Emitted CSS (bytes, whole export) | 152,712 | 163,176 | +10,464 |
+| Emitted JS (bytes, whole export) | 2,188,721 | 2,191,579 | +2,858 |
+| Emitted fonts (bytes) | 14,205,712 | 14,205,712 | 0 |
+| Static export total (bytes / files) | 29,686,679 / 827 | 29,701,348 / 827 | +14,669 / 0 |
+| Hand-maintained docs CSS (lines / bytes) | 406 / 23,456 | 403 / 23,752 | −3 / +296 |
+| Generated role adapter (bytes) | 1,046 | 0 | −1,046 |
+| Repo config/workaround files | `.npmrc`, `hig-roles.generated.css` | none | −2 |
+
+CSS grows because HIG's own stylesheet now carries the role variables, density/motion selectors and Callout severities
+the docs used to generate or patch locally; JS grows by the recipe modules. Hand-written CSS bytes rise slightly
+because the package role names are longer. The repository carries about the same tarball bytes as before only
+because the OG renderer still needs two static TTFs, which now come from the native-fonts package instead of the web
+tokens package. Full numbers: [`hig-872906a9/size-report.json`](hig-872906a9/size-report.json); screenshots before/after
+at 1440×1000 and 390×844 are in [`hig-872906a9/`](hig-872906a9/) (visually equivalent; buttons are 4 px shorter on
+desktop per hig#80). Validation: [`hig-872906a9/validation.txt`](hig-872906a9/validation.txt).
+
+## Measured before/after (step 2)
 
 Baseline `c4dff80` (main), same Node 24 / Next 16.3.6 / `/chart` export settings. Full numbers are in
 [`hig-7c67a07/size-report.json`](hig-7c67a07/size-report.json); reproduce with
@@ -69,14 +116,17 @@ copy guards) and `docs:test` (browser checks).
 
 | Repository/surface | Applicability | Version | Owner | Status | Residual work / review date |
 | --- | --- | --- | --- | --- | --- |
-| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0-candidate.sha7c67a07c (tokens, contracts, react); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; stable HIG publication; 2026-11-13 |
+| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0-candidate.sha872906a9 (tokens, contracts, react; native-fonts build-time); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; stable HIG publication; 2026-11-13 |
 | chart / published SDK | Engine and optional DOM UI | SDK 0.3.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
 
 Exceptions (Chart maintainers, review 2026-11-13):
 
-- `.npmrc` `legacy-peer-deps=true`: HIG React's optional exact Radix peers conflict with Fumadocs.
-- `InstallCommand`/`CodeWindow` recipes are composed from HIG primitives because the `recipes` entry pulls
-  the overlay entry's Radix dropdown-menu/tooltip peers. Upstream follow-up: split that entry.
+- Resolved in step 3: `.npmrc` `legacy-peer-deps=true`, primitive-composed `InstallCommand`/`CodeWindow`,
+  generated role CSS, the button font bridge and local Callout edges.
+- Regenerating `package-lock.json` from scratch without `--legacy-peer-deps` drops the `packages/chart` workspace
+  (npm 11.6; `@bloxwap/hig-react`'s optional `@bloxwap/chart` peer). `npm ci` and normal installs are unaffected;
+  see [vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md#notes).
+- `@bloxwap/hig-native-fonts` (4.4 MB tarball) is vendored only for two static OG faces.
 - Decorative OG brand-spectrum colors (purple/pink/yellow) are illustration assets, not a control palette.
 - HIG tokens are unpublished candidates, vendored as packed tarballs with SHA-256 provenance.
 
@@ -84,5 +134,5 @@ The canonical org matrix lives in `bloxwap/hig/planning/adoption.json`; HIG main
 PR link and version there. This repository does not close or declare hig#34 complete; the other four
 SDK docs rows and physical/assistive-technology review stay open upstream.
 
-Rollback: revert this migration's commits together (tarballs, lockfile, `.npmrc`, imports and CSS). There
+Rollback: revert the step's commits together (tarballs, lockfile, `.npmrc`, imports and CSS). There
 are no storage or schema changes. No release, tag, npm publish or manual deployment is part of it.

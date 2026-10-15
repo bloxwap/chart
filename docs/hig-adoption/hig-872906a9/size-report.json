@@ -1,0 +1,75 @@
+{
+  "baselineCommit": "a3b0f6b",
+  "hig": {
+    "commit": "872906a9071469af8714b3b6fb5cc7bd64d2d6f3",
+    "version": "0.1.0-candidate.sha872906a9"
+  },
+  "toolchain": {
+    "node": "v24.10.0",
+    "next": "16.3.6",
+    "basePath": "/chart"
+  },
+  "measurement": "uncompressed bytes of the complete static export (not transfer size or per-route bundles)",
+  "export": {
+    "before": {
+      "css": 152712,
+      "javascript": 2188721,
+      "fonts": 14205712,
+      "total": 29686679,
+      "files": 827
+    },
+    "after": {
+      "css": 163176,
+      "javascript": 2191579,
+      "fonts": 14205712,
+      "total": 29701348,
+      "files": 827
+    },
+    "delta": {
+      "css": 10464,
+      "javascript": 2858,
+      "fonts": 0,
+      "total": 14669,
+      "files": 0
+    }
+  },
+  "docsCss": {
+    "handWritten": {
+      "before": {
+        "files": 1,
+        "lines": 406,
+        "bytes": 23456
+      },
+      "after": {
+        "files": 1,
+        "lines": 403,
+        "bytes": 23752
+      }
+    },
+    "generatedAdapterBytes": {
+      "before": 1046,
+      "after": 0
+    }
+  },
+  "removedDocsFiles": {
+    "count": 1,
+    "bytes": 1046,
+    "files": [
+      "apps/docs/styles/hig-roles.generated.css"
+    ]
+  },
+  "dependencies": {
+    "docsDirect": {
+      "before": 19,
+      "after": 20
+    },
+    "lockfilePackages": {
+      "before": 403,
+      "after": 404,
+      "added": [
+        "node_modules/@bloxwap/hig-native-fonts"
+      ],
+      "removed": []
+    }
+  }
+}
