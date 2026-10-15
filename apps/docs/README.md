@@ -25,24 +25,24 @@ path from the built artifact. It does not run Next.js or a search backend.
 
 Edit MDX in `content/docs/` and sidebar order in each `meta.json`. The build
 checks local HTML links and assets, and emits a browser-searchable index at
-`search.json`. Fonts are local repository assets, so builds do not fetch Google Fonts.
+`search.json`. Fonts come from the installed `@bloxwap/font` and `@bloxwap/hig-tokens` packages, so builds do not fetch Google Fonts.
 
-The design follows `bloxwap/src/monorepo/workers/docs`: dark surfaces, green
-accents, Bloxwap Sans body copy, Space Grotesk headings, and Bloxwap Mono code. The theme
-is intentionally dark, matching the main Bloxwap docs.
+The presentation follows the Bloxwap HIG and consumes it as packages, not copies:
 
-- `styles/tokens.generated.css` is a vendored copy of the monorepo's
-  `packages/ui/src/styles/tokens.generated.css`. Update it from that source;
-  do not hand-edit generated tokens.
-- `app/global.css` maps those tokens to Fumadocs and the playground wrapper,
-  using the same typography and navigation rules as the monorepo docs. The
-  embedded demo keeps the library's own appearance and controls.
+- `@bloxwap/hig-tokens`, `@bloxwap/hig-contracts` and `@bloxwap/hig-react` are installed from the
+  pinned, unpublished candidate tarballs in [`vendor/bloxwap-hig/`](../../vendor/bloxwap-hig/README.md).
+  `app/global.css` imports `@bloxwap/hig-tokens/css` and `@bloxwap/hig-react/css` and maps HIG roles
+  onto Fumadocs; it does not declare palette values.
+- `styles/hig-roles.generated.css` is generated from the package manifest by
+  `scripts/hig-tokens.mjs --write` (radius, type, motion and density roles the CSS distribution does not
+  emit yet). `npm run lint` fails on drift, tarball hash changes, copied palettes, `.btn`-style primitive
+  copies or font binaries in the docs source.
+- Buttons, install tabs/copy, code-window copy, callouts, search error/empty states and the playground
+  loading status use HIG components (`Button`, `IconButton`, `Tabs`, `Surface`, `Callout`, `Alert`,
+  `EmptyState`, `Spinner`). The embedded demo keeps the SDK's own controls, themed from HIG roles.
 - `public/logos/bloxwap-wordmark-white.svg` and `public/icon.svg` are the supplied
   monorepo documentation artwork. Preserve the marks instead of typesetting them.
-- `fonts/README.md` records font sources and licenses.
 
-These copies keep this repository's GitHub Pages build independent of a sibling
-monorepo checkout.
 
 ## Social cards
 
@@ -94,7 +94,7 @@ chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
 `theme.fontFamily` to Bloxwap Sans and `monoFamily`/`scaleFontFamily` (status
 line, drawing labels and scales) to Bloxwap Mono. The standalone playground and
 SDK presets retain their existing font defaults.
-Static social-image font provenance is recorded in `fonts/README.md`.
+Social cards use the static Bloxwap Sans faces shipped in `@bloxwap/hig-tokens/fonts` (OFL).
 
 HIG presentation, pinned candidate provenance, validation, exceptions and upgrade/rollback
 instructions are recorded in [the adoption report](../../docs/hig-adoption/README.md).

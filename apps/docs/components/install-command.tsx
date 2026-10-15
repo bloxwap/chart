@@ -1,7 +1,10 @@
 'use client';
 
-import { useId, useState } from 'react';
-import { CopyButton } from './copy-button';
+import { useState } from 'react';
+import { Button } from '@bloxwap/hig-react/button';
+import { Tabs } from '@bloxwap/hig-react/navigation';
+import { Surface } from '@bloxwap/hig-react/surface';
+import { useClipboard } from '@/lib/clipboard';
 
 const managers = [
   { name: 'bun', command: 'bun add @bloxwap/chart' },
@@ -10,44 +13,31 @@ const managers = [
   { name: 'yarn', command: 'yarn add @bloxwap/chart' },
 ];
 
+/*
+ * The HIG `InstallCommand` recipe (command + host clipboard adapter, "Copied" / manual-selection recovery),
+ * composed from the same HIG primitives. `@bloxwap/hig-react/recipes` also bundles the overlay entry, which
+ * needs the Radix dropdown-menu and tooltip peers this site does not otherwise install; switch to the recipe
+ * import once HIG ships it without those peers (exception recorded in docs/hig-adoption/README.md).
+ */
+function Command({ command, onCopy }: { command: string; onCopy: () => Promise<void> }) {
+  const [status, setStatus] = useState('');
+  return <Surface>
+    <pre tabIndex={0}><code>{command}</code></pre>
+    <Button intent="secondary" onClick={() => {
+      Promise.resolve().then(onCopy).then(() => setStatus('Copied')).catch(() => setStatus('Copy failed. Select the command and copy manually.'));
+    }}>Copy install command</Button>
+    <p role="status">{status}</p>
+  </Surface>;
+}
+
+/** HIG Tabs (arrow/Home/End keys) around one install command per package manager. */
 export function InstallCommand() {
-  const id = useId();
-  const [selected, setSelected] = useState(0);
-  const { command } = managers[selected];
-
-  function select(index: number) {
-    setSelected(index);
-  }
-
-  return <div className="package-install">
-    <div className="install-tabs" role="tablist" aria-label="Package manager">
-      {managers.map(({ name }, index) => <button
-        key={name}
-        type="button"
-        role="tab"
-        id={`${id}-tab-${index}`}
-        aria-controls={`${id}-command`}
-        aria-selected={selected === index}
-        tabIndex={selected === index ? 0 : -1}
-        onClick={() => select(index)}
-        onKeyDown={(event) => {
-          let next: number;
-          if (event.key === 'ArrowRight') next = (index + 1) % managers.length;
-          else if (event.key === 'ArrowLeft') next = (index + managers.length - 1) % managers.length;
-          else if (event.key === 'Home') next = 0;
-          else if (event.key === 'End') next = managers.length - 1;
-          else return;
-          event.preventDefault();
-          select(next);
-          document.getElementById(`${id}-tab-${next}`)?.focus();
-        }}
-      >{name}</button>)}
-    </div>
-    <div className="install-command" role="tabpanel" id={`${id}-command`} aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
-      <span className="install-prompt" aria-hidden="true">$</span>
-      <code>{command}</code>
-      <CopyButton key={command} text={command} label="Copy install command" />
-    </div>
+  const copy = useClipboard();
+  return <div className="package-install" data-hig-density="compact">
+    <Tabs
+      label="Package manager"
+      items={managers.map(({ name, command }) => ({ value: name, label: name, content: <Command command={command} onCopy={() => copy(command)} /> }))}
+    />
     <p className="install-platforms">Bun · Node.js · Browsers · Workers</p>
   </div>;
 }

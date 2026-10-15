@@ -1,0 +1,40 @@
+Chart docs HIG package migration, validation record (2026-10-14)
+
+Environment: macOS (Darwin 27.2), Node v24.10.0, npm 11.6.1, Next 16.3.6, Google Chrome 155.0.8059.41
+driven by Playwright (playwright-core, channel "chrome"). Evidence kind: automated + browser. No iOS
+Simulator, Android emulator or physical device was used; none is claimed.
+HIG: bloxwap/hig@7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc, 0.1.0-candidate.sha7c67a07c tarballs.
+Baseline: bloxwap/chart@c4dff80 (main), built with the same toolchain and settings.
+
+Env for builds: NEXT_PUBLIC_BASE_PATH=/chart NEXT_PUBLIC_SITE_URL=https://bloxwap.github.io NEXT_TELEMETRY_DISABLED=1
+
+npm ci                      exit 0 (no --legacy-peer-deps flag needed; the lock is consistent)
+npm run docs:build          exit 0 - Static export verified: 30 HTML pages, 1530 local links/assets,
+                            25 social cards, basePath "/chart"
+npm run docs:check          exit 0 (next typegen + tsc --noEmit)
+npm run lint                exit 0 - 137 icons clean; HIG 0.1.0-candidate.sha7c67a07c tarball
+                            provenance, installed versions, generated roles and copy drift checks passed
+npm run typecheck           exit 0 (SDK tsc build + docs:check)
+npm run coverage            exit 0 - tests 1869, pass 1869, fail 0; 100% line/branch/function (138 rows)
+npm run docs:test           exit 0 (HIG_PREVIEW_PORT=4113), checks:
+  - Install tabs (HIG Tabs): ArrowRight/End/Home, aria-selected and roving focus
+  - Copy: install command joins a pending write (1 clipboard call for 2 activations) then "Copied";
+    code-window HIG IconButton is disabled/aria-busy while pending, announces success; both show
+    visible recovery text on clipboard denial
+  - @bloxwap/hig-tokens palette resolved in page, HIG buttons in Bloxwap Sans, no legacy
+    --card/--bloxwap-green/--space-* aliases, reduced motion zeroes HIG durations
+  - Distinctive demo (docs/playground): offline synthetic market, 500 bars, 0 duplicates,
+    0 missing buckets, WebGL2 backend, 50/50 book levels, locked dark theme, HIG panel color,
+    settings dialog + Escape, pointer hover + wheel zoom
+  - Static search: results for "datafeed", Escape dismissal, Ctrl/Cmd+K shortcut, HIG EmptyState
+    for no results, HIG error Alert when search.json fails to load
+  - HIG Callout on getting-started (warning severity, not a live region), visible keyboard focus ring
+  - RTL + 200% root text without horizontal overflow
+  - 390x844 touch emulation: >=48px copy target, no horizontal overflow, mobile sidebar opens and
+    navigates to /chart/docs/playground/
+node apps/docs/scripts/capture-hig.mjs  before (baseline export) and after, PORT 4111/4114:
+  home, getting-started, api/configuration, playground at 1440x1000 and 390x844 (16 PNGs here)
+node apps/docs/scripts/measure-hig.mjs ../chart-baseline/out c4dff80 > size-report.json
+
+Not performed: physical touch/mobile chart gestures, iOS/Android hardware, VoiceOver/TalkBack,
+wide-gamut display review. Playwright touch emulation is not physical-device evidence.

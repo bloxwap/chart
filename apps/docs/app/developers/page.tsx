@@ -39,7 +39,7 @@ export default function Developers() {
           <p className="eyebrow"><span className="status-dot" /> DEVELOPER PORTAL</p>
           <h1>Build with the<br /><span>Chart SDK.</span></h1>
           <p className="hero-description">Zero-dependency financial charts for your interface. Install the package, render your first candlestick chart in minutes, and let agents discover the API through the machine-readable resources below.</p>
-          <div className="hero-actions"><Link href="/docs/getting-started" className="btn">Start building <ArrowRight aria-hidden="true" /></Link><a href={repository} className="btn btn--secondary">Source on GitHub <ArrowRight aria-hidden="true" /></a></div>
+          <div className="hero-actions"><Link href="/docs/getting-started" className="hig-button" data-intent="primary">Start building <ArrowRight aria-hidden="true" /></Link><a href={repository} className="hig-button" data-intent="secondary">Source on GitHub <ArrowRight aria-hidden="true" /></a></div>
           <InstallCommand />
         </div>
       </section>

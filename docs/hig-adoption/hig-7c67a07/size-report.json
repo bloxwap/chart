@@ -1,0 +1,85 @@
+{
+  "baselineCommit": "c4dff80",
+  "hig": {
+    "commit": "7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc",
+    "version": "0.1.0-candidate.sha7c67a07c"
+  },
+  "toolchain": {
+    "node": "v24.10.0",
+    "next": "16.3.6",
+    "basePath": "/chart"
+  },
+  "measurement": "uncompressed bytes of the complete static export (not transfer size or per-route bundles)",
+  "export": {
+    "before": {
+      "css": 145759,
+      "javascript": 2172631,
+      "fonts": 14205712,
+      "total": 29653520,
+      "files": 826
+    },
+    "after": {
+      "css": 152712,
+      "javascript": 2188721,
+      "fonts": 14205712,
+      "total": 29686679,
+      "files": 827
+    },
+    "delta": {
+      "css": 6953,
+      "javascript": 16090,
+      "fonts": 0,
+      "total": 33159,
+      "files": 1
+    }
+  },
+  "docsCss": {
+    "handWritten": {
+      "before": {
+        "files": 2,
+        "lines": 460,
+        "bytes": 23147
+      },
+      "after": {
+        "files": 1,
+        "lines": 406,
+        "bytes": 23456
+      }
+    },
+    "generatedAdapterBytes": {
+      "before": 2172,
+      "after": 1046
+    }
+  },
+  "removedDocsFiles": {
+    "count": 9,
+    "bytes": 904638,
+    "files": [
+      "apps/docs/fonts/Bloxwap-OFL.txt",
+      "apps/docs/fonts/BloxwapSans-Black.ttf",
+      "apps/docs/fonts/BloxwapSans-Bold.ttf",
+      "apps/docs/fonts/README.md",
+      "apps/docs/styles/hig.generated.css",
+      "apps/docs/vendor/hig/LICENSE",
+      "apps/docs/vendor/hig/manifest.json",
+      "apps/docs/vendor/hig/provenance.json",
+      "apps/docs/vendor/hig/tokens.css"
+    ]
+  },
+  "dependencies": {
+    "docsDirect": {
+      "before": 16,
+      "after": 19
+    },
+    "lockfilePackages": {
+      "before": 400,
+      "after": 403,
+      "added": [
+        "node_modules/@bloxwap/hig-contracts",
+        "node_modules/@bloxwap/hig-react",
+        "node_modules/@bloxwap/hig-tokens"
+      ],
+      "removed": []
+    }
+  }
+}

@@ -1,11 +1,13 @@
 {
-  "browser": "154.0.8037.97",
+  "browser": "155.0.8059.41",
   "checks": [
     "Install tabs: arrows/Home/End, selected state and focus",
     "Copy: pending suppresses repeat activation, success status, visible denial and recovery",
-    "Pinned HIG palette, Bloxwap typography and reduced motion",
+    "@bloxwap/hig-tokens palette, HIG controls in Bloxwap typography, no legacy aliases, reduced motion",
     "Distinctive demo: canvas/worker assets, offline synthetic bars, HIG chrome, locked dark theme, settings/Escape, pointer/wheel",
     "Static search index, results and keyboard dismissal",
+    "HIG callout (not announced), keyboard focus ring, search shortcut and empty results",
+    "Search index failure shows the HIG error alert with recovery text",
     "Representative docs: RTL and 200% root text without page overflow",
     "Touch emulation: 48px copy target, narrow layout and mobile navigation"
   ],
@@ -24,12 +26,12 @@
         "asks": 50
       },
       "error": null,
-      "firstTime": 1791494100,
-      "lastTime": 1791943200
+      "firstTime": 1791581400,
+      "lastTime": 1792030500
     },
     "light": false,
     "font": "\"Bloxwap Sans\", system-ui, sans-serif",
-    "panel": "#171717",
+    "panel": "oklch(0.205 0 0)",
     "themeButtons": 0
   }
 }

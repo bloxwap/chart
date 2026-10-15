@@ -7,7 +7,12 @@ import {
   SearchDialogIcon, SearchDialogInput, SearchDialogList, SearchDialogOverlay,
   type SharedProps,
 } from 'fumadocs-ui/components/dialog/search';
+import { Alert, EmptyState } from '@bloxwap/hig-react/status';
 import { assetUrl } from '@/lib/site';
+
+function NoResults() {
+  return <div role="status" className="search-empty"><EmptyState title="No results" description="Try a shorter or different term, or browse the documentation navigation." /></div>;
+}
 
 export default function StaticSearch(props: SharedProps) {
   const { search, setSearch, query } = useDocsSearch({
@@ -18,8 +23,8 @@ export default function StaticSearch(props: SharedProps) {
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader><SearchDialogIcon /><SearchDialogInput /><SearchDialogClose /></SearchDialogHeader>
-        {query.error && <p role="alert" className="search-error">Search is unavailable. Use the documentation navigation or close search and try again.</p>}
-        <SearchDialogList items={query.data === 'empty' ? null : query.data} />
+        {query.error && <div className="search-error"><Alert title="Search is unavailable" severity="error"><p>Use the documentation navigation, or close search and try again.</p></Alert></div>}
+        <SearchDialogList items={query.data === 'empty' ? null : query.data} Empty={NoResults} />
       </SearchDialogContent>
     </SearchDialog>
   );

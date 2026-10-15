@@ -1,20 +1,53 @@
-import { readdir, stat } from 'node:fs/promises';
+// Before/after size report for the HIG package migration.
+// Usage (from the repo root, after `npm run docs:build` with the same base path for both exports):
+//   node apps/docs/scripts/measure-hig.mjs <baseline-export-directory> <baseline-commit>
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
+
 async function sizes(dir) {
-  const result = { css: 0, javascript: 0, fonts: 0 };
+  const result = { css: 0, javascript: 0, fonts: 0, total: 0, files: 0 };
   async function walk(path) {
     for (const file of await readdir(path, { withFileTypes: true })) {
       const next = `${path}/${file.name}`;
-      if (file.isDirectory()) await walk(next);
-      else { const kind = file.name.endsWith('.css') ? 'css' : file.name.endsWith('.js') ? 'javascript' : /\.(woff2?|ttf)$/.test(file.name) ? 'fonts' : null; if (kind) result[kind] += (await stat(next)).size; }
+      if (file.isDirectory()) { await walk(next); continue; }
+      const size = (await stat(next)).size;
+      result.total += size; result.files++;
+      const kind = file.name.endsWith('.css') ? 'css' : file.name.endsWith('.js') ? 'javascript' : /\.(woff2?|ttf)$/.test(file.name) ? 'fonts' : null;
+      if (kind) result[kind] += size;
     }
   }
-  await walk(dir); return result;
+  await walk(dir);
+  return result;
 }
-const baselineDirectory = process.argv[2];
-const baselineCommit = process.argv[3];
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+const [baselineDirectory, baselineCommit] = process.argv.slice(2);
 if (!baselineDirectory || !baselineCommit) throw new Error('Usage: node apps/docs/scripts/measure-hig.mjs <baseline-export-directory> <baseline-commit>');
 const before = await sizes(baselineDirectory);
 const after = await sizes('apps/docs/out');
-const report = { baselineCommit, higCommit:'1a776b9326c6ba03702894943b3edbfd178c4b40', toolchain: {node:process.version, next:'16.3.6', basePath:'/chart'}, measurement:'sum of uncompressed emitted CSS/JS/font files in static export (not transfer or per-route bundle sizes)', before, after, delta:Object.fromEntries(Object.keys(before).map(k => [k,after[k]-before[k]])), removedSource:{paletteCssBytes:execFileSync('git',['show',`${baselineCommit}:apps/docs/styles/tokens.generated.css`]).length, unusedHeadingFontBytes:116056}, notes:['No runtime dependency added; chart SDK API and engine unchanged.','OG static Bloxwap faces remain referenced; their licenses are retained.','Decorative OG spectrum colors are brand assets, not semantic UI palette; exception reviewed 2026-11-13.']};
-console.log(JSON.stringify(report,null,2));
+const delta = (a, b) => Object.fromEntries(Object.keys(a).map((key) => [key, b[key] - a[key]]));
+
+// Hand-maintained docs CSS (excludes generated output) and docs source files removed by the migration.
+const cssFiles = (ref) => git('ls-tree', '-r', '--name-only', ref, 'apps/docs').split('\n').filter((f) => f.endsWith('.css') && !f.includes('.generated.'));
+const cssStats = (ref) => cssFiles(ref).reduce((sum, file) => { const text = git('show', `${ref}:${file}`); return { files: sum.files + 1, lines: sum.lines + text.split('\n').length, bytes: sum.bytes + Buffer.byteLength(text) }; }, { files: 0, lines: 0, bytes: 0 });
+const removed = git('diff', '--name-only', '--diff-filter=D', baselineCommit, '--', 'apps/docs').split('\n').filter(Boolean);
+const removedBytes = removed.reduce((sum, file) => sum + Number(git('cat-file', '-s', `${baselineCommit}:${file}`)), 0);
+const lockPackages = (text) => Object.keys(JSON.parse(text).packages).filter(Boolean);
+const beforeLock = lockPackages(git('show', `${baselineCommit}:package-lock.json`));
+const afterLock = lockPackages(await readFile('package-lock.json', 'utf8'));
+const docsDeps = (text) => Object.keys({ ...JSON.parse(text).dependencies, ...JSON.parse(text).devDependencies });
+const provenance = JSON.parse(await readFile('vendor/bloxwap-hig/provenance.json', 'utf8'));
+const generated = (ref) => { try { return Buffer.byteLength(git('show', `${ref}:apps/docs/styles/${ref === baselineCommit ? 'hig.generated.css' : 'hig-roles.generated.css'}`)); } catch { return 0; } };
+
+console.log(JSON.stringify({
+  baselineCommit,
+  hig: { commit: provenance.commit, version: provenance.version },
+  toolchain: { node: process.version, next: JSON.parse(await readFile('node_modules/next/package.json', 'utf8')).version, basePath: JSON.parse(await readFile('apps/docs/out/_docs-config.json', 'utf8')).basePath },
+  measurement: 'uncompressed bytes of the complete static export (not transfer size or per-route bundles)',
+  export: { before, after, delta: delta(before, after) },
+  docsCss: { handWritten: { before: cssStats(baselineCommit), after: cssStats('HEAD') }, generatedAdapterBytes: { before: generated(baselineCommit), after: generated('HEAD') } },
+  removedDocsFiles: { count: removed.length, bytes: removedBytes, files: removed },
+  dependencies: {
+    docsDirect: { before: docsDeps(git('show', `${baselineCommit}:apps/docs/package.json`)).length, after: docsDeps(await readFile('apps/docs/package.json', 'utf8')).length },
+    lockfilePackages: { before: beforeLock.length, after: afterLock.length, added: afterLock.filter((p) => !beforeLock.includes(p)), removed: beforeLock.filter((p) => !afterLock.includes(p)) },
+  },
+}, null, 2));

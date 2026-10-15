@@ -15,7 +15,7 @@ export default function NotFound() {
     <p className="eyebrow">404 / OFF THE CHART</p>
     <h1>That page is missing.</h1>
     <p>The page you requested does not exist on this site. It may have moved, or the URL may be wrong. Head back to the documentation to find your next step, or use one of the machine-readable indexes below.</p>
-    <Link href="/docs" className="btn">Open documentation <ArrowRight aria-hidden="true" /></Link>
+    <Link href="/docs" className="hig-button" data-intent="primary">Open documentation <ArrowRight aria-hidden="true" /></Link>
     <nav className="not-found-links" aria-label="Site indexes">
       {RESOURCES.map(([label, href]) => <a key={href} href={assetUrl(href)}>{label}</a>)}
     </nav>

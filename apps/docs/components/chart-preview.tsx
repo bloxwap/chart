@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '@bloxwap/hig-react/button';
+import { Spinner } from '@bloxwap/hig-react/status';
 import { assetUrl } from '@/lib/site';
 
 /**
@@ -61,16 +63,16 @@ export function ChartPreview({ children }: { children?: ReactNode }) {
   return <div className="chart-preview-section not-prose">
     <div className={children ? 'preview-intro preview-intro--section' : 'preview-intro'}>
       {children}
-      <div className="preview-actions">
-        <a href={demoUrl} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm">Open playground <ArrowUpRight aria-hidden="true" /></a>
-        {canFullscreen && <button type="button" className="btn btn--ghost btn--sm" onClick={toggleFullscreen} aria-pressed={fullscreen}>
+      <div className="preview-actions" data-hig-density="compact">
+        <a href={demoUrl} target="_blank" rel="noreferrer" className="hig-button" data-intent="secondary">Open playground <ArrowUpRight aria-hidden="true" /></a>
+        {canFullscreen && <Button intent="ghost" onClick={toggleFullscreen} aria-pressed={fullscreen}>
           {fullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
           {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        </button>}
+        </Button>}
       </div>
     </div>
     <p className="preview-summary">Interactive candlestick chart with price and volume readouts, interval selection, drawings, pan and zoom. Live market data may be unavailable; choose a synthetic market in the playground to explore offline.</p>
-    {!loaded && <p role="status">Loading chart playground…</p>}
+    {!loaded && <p className="preview-status"><Spinner label="Loading chart playground" /></p>}
     <div ref={container} className="chart-preview">
       <iframe ref={iframe} className="chart-frame" src={demoUrl} onLoad={() => setLoaded(true)} title="Interactive Bloxwap chart playground" allowFullScreen />
     </div>
