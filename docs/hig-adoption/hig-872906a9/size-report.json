@@ -42,13 +42,13 @@
       },
       "after": {
         "files": 1,
-        "lines": 406,
-        "bytes": 23456
+        "lines": 403,
+        "bytes": 23752
       }
     },
     "generatedAdapterBytes": {
-      "before": 0,
-      "after": 1046
+      "before": 1046,
+      "after": 0
     }
   },
   "removedDocsFiles": {

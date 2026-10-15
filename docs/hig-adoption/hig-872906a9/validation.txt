@@ -1,0 +1,40 @@
+Chart docs HIG candidate refresh (step 3), validation record (2026-10-15)
+
+Environment: macOS (Darwin 27.2), Node v24.10.0, npm 11.6.1, Next 16.3.6, Google Chrome 155.0.8059.41
+driven by Playwright (playwright-core, channel "chrome"). Evidence kind: automated + browser. No iOS
+Simulator, Android emulator or physical device was used; none is claimed.
+HIG: bloxwap/hig@872906a9071469af8714b3b6fb5cc7bd64d2d6f3, 0.1.0-candidate.sha872906a9 tarballs built locally
+with npm ci && npm run build && npm run generate:fonts && npm run release:dry-run -- --channel candidate
+(dry run: published false, no tag/release).
+Baseline: bloxwap/chart@a3b0f6b (main, HIG 7c67a07), built with the same toolchain and settings.
+
+Env for builds: NEXT_PUBLIC_BASE_PATH=/chart NEXT_PUBLIC_SITE_URL=https://bloxwap.github.io NEXT_TELEMETRY_DISABLED=1
+
+rm -rf node_modules && npm ci   exit 0, no .npmrc / legacy-peer-deps; npm ls shows @bloxwap/chart -> ./packages/chart,
+                                no invalid/missing entries; lockfile 404 packages, 34 Radix, 0 nested
+npm run docs:build          exit 0 - Static export verified: 30 HTML pages, 1530 local links/assets,
+                            25 social cards, basePath "/chart"
+npm run docs:check          exit 0 (next typegen + tsc --noEmit)
+npm run lint                exit 0 - 137 icons clean; HIG 0.1.0-candidate.sha872906a9 tarball provenance,
+                            installed versions, package-owned roles and copy drift checks passed
+npm run typecheck           exit 0 (SDK tsc build + docs:check)
+npm test                    exit 0 - tests 1869, pass 1869, fail 0
+npm run docs:test           exit 0 (HIG_PREVIEW_PORT=5300), checks (see browser.json):
+  - Install tabs (HIG Tabs): ArrowRight/End/Home, aria-selected and roving focus; Tab from the selected
+    tab lands on the InstallCommand <pre> (no tabpanel stop), then on "Copy install command" (hig#69)
+  - Copy: HIG InstallCommand recipe joins a pending write (1 clipboard call for 2 activations) then
+    "Copied"; code-window IconButton busy/disabled while pending; visible recovery text on denial
+  - Palette from @bloxwap/hig-tokens, reduced motion zeroes --hig-motion-duration-fast, HIG button's first
+    font family is a loaded Bloxwap face (no font bridge, hig#65)
+  - Distinctive demo (docs/playground): offline synthetic market, bars > 0, 0 duplicates, locked dark
+    theme, HIG panel color, settings dialog + Escape, pointer hover + wheel zoom
+  - Static search, Ctrl/Cmd+K, empty results, HIG error Alert when search.json fails
+  - HIG Callout on getting-started (warning, not a live region), visible keyboard focus ring
+  - RTL + 200% root text without horizontal overflow
+  - 390x844 touch emulation: >=48px copy target, no horizontal overflow, mobile sidebar navigation
+node apps/docs/scripts/capture-hig.mjs  before (baseline export, PORT 5302) and after (PORT 5303):
+  home, getting-started, api/configuration, playground at 1440x1000 and 390x844 (16 PNGs here)
+node apps/docs/scripts/measure-hig.mjs <baseline-out> a3b0f6b > size-report.json
+
+Not performed: physical touch/mobile chart gestures, iOS/Android hardware, VoiceOver/TalkBack,
+wide-gamut display review. Playwright touch emulation is not physical-device evidence.
