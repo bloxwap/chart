@@ -14,10 +14,10 @@ repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36)
 
 - **Tokens and fonts.** The shell imports `@bloxwap/hig-tokens/css` and `@bloxwap/hig-react/css` and
   uses `--hig-*` roles directly. The shadcn-style alias layer (`--card`, `--bloxwap-green`, `--space-*`, …)
-  and the copied token snapshot are gone. Radius/type/motion/density roles, which the CSS distribution
-  does not emit yet, are generated from the package manifest (`styles/hig-roles.generated.css`). Body and
+  and the copied token snapshot are gone. Radius/type/motion/density roles come from `@bloxwap/hig-tokens/css`
+  itself since bloxwap/hig#66, so the generated `styles/hig-roles.generated.css` is gone. Body and
   code fonts stay on `@bloxwap/font@0.1.2`; the social-card renderer now reads the static Bloxwap Sans faces
-  from `@bloxwap/hig-tokens/fonts` instead of copied TTFs.
+  from `@bloxwap/hig-native-fonts` (moved out of the web tokens tarball in bloxwap/hig#64) instead of copied TTFs.
 - **Shell, navigation and search.** Fumadocs keeps layout, sidebar, mobile navigation and the static
   search index. HIG roles theme it; search failure renders HIG `Alert`, no results renders HIG `EmptyState`.
 - **Code, install and copy.** Install tabs are HIG `Tabs`; each command follows the HIG `InstallCommand`

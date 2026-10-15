@@ -80,7 +80,7 @@ try {
   const presentation = await page.evaluate(() => {
     const css = getComputedStyle(document.documentElement);
     const button = document.querySelector('.hig-button');
-    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-duration-fast').trim(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
+    return { surface: css.getPropertyValue('--hig-surface').trim(), font: getComputedStyle(document.body).fontFamily, buttonFont: getComputedStyle(button).fontFamily, motion: css.getPropertyValue('--hig-motion-duration-fast').trim(), transform: getComputedStyle(button).transform, legacy: ['--card', '--bloxwap-green', '--space-md'].filter(name => css.getPropertyValue(name).trim()) };
   });
   assert.ok(await sameColor(page, presentation.surface, cssColor('surface')), `--hig-surface ${presentation.surface}`);
   assert.match(presentation.font, /BloxwapSans|Bloxwap Sans|bloxwap/i);

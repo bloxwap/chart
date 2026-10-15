@@ -3,7 +3,6 @@
 @import 'fumadocs-ui/css/preset.css';
 @import '@bloxwap/hig-tokens/css';
 @import '@bloxwap/hig-react/css';
-@import '../styles/hig-roles.generated.css';
 
 @theme inline {
   --font-sans: var(--font-bloxwap-sans), ui-rounded, system-ui, sans-serif;
@@ -73,7 +72,7 @@ html > body[data-scroll-locked] {
 
 #nd-page > p {
   font-size: var(--hig-type-body-size);
-  line-height: var(--hig-type-body-line);
+  line-height: var(--hig-type-body-line-height);
 }
 
 .prose {
@@ -140,7 +139,7 @@ html > body[data-scroll-locked] {
   min-height: 2.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--hig-radius-pill);
-  transition: background-color var(--hig-duration-fast) var(--ease-spring), color var(--hig-duration-fast) var(--ease-spring);
+  transition: background-color var(--hig-motion-duration-fast) var(--ease-spring), color var(--hig-motion-duration-fast) var(--ease-spring);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -155,18 +154,18 @@ html > body[data-scroll-locked] {
  * point HIG's 'Bloxwap Sans'/'Bloxwap Mono' at the loaded faces, and let links and icons share the button.
  * Dense docs regions opt into HIG compact density on fine pointers; coarse pointers keep 48px targets.
  */
-.hig-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--hig-space-sm); font-family: var(--font-sans); text-decoration: none; touch-action: manipulation; transition: filter var(--hig-duration-fast) var(--ease-spring), transform var(--hig-duration-fast) var(--ease-spring); }
+.hig-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--hig-space-sm); font-family: var(--font-sans); text-decoration: none; touch-action: manipulation; transition: filter var(--hig-motion-duration-fast) var(--ease-spring), transform var(--hig-motion-duration-fast) var(--ease-spring); }
 .hig-button svg { flex: none; width: 1rem; height: 1rem; }
 .hig-button > span[aria-hidden='true'] { display: contents; }
 .hig-surface pre { font-family: var(--font-mono); }
-[data-hig-density='compact'] { --hig-control: var(--hig-control-compact); --hig-gap: var(--hig-space-sm); }
+[data-hig-density='compact'] { --hig-control: var(--hig-density-compact-control); --hig-gap: var(--hig-space-sm); }
 [data-hig-density='compact'] .hig-button { padding: 0 var(--hig-space-md); font-size: var(--hig-type-label-size); }
 .docs-icon-button.hig-button { position: relative; width: var(--hig-control); padding: 0; }
 /* HIG busy text stays announced but is visually hidden inside icon-only buttons. */
 .docs-icon-button .hig-busy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .copy-feedback { color: var(--hig-negative); font-size: var(--hig-type-caption-size); }
 @media (pointer: coarse) {
-  [data-hig-density='compact'] { --hig-control: var(--hig-control-comfortable); }
+  [data-hig-density='compact'] { --hig-control: var(--hig-density-comfortable-control); }
 }
 
 /* Chart-specific layout on the scale above; typography, surfaces, and states follow workers/docs. */
@@ -210,7 +209,7 @@ html > body[data-scroll-locked] {
 .window-dots { display: flex; gap: var(--hig-space-xs); }
 .window-dots > i { width: 6px; height: 6px; border-radius: var(--hig-radius-pill); background: var(--hig-nested); }
 .code-actions { display: flex; align-items: center; gap: var(--hig-space-xs); margin-right: calc(-1 * var(--hig-space-md)); }
-.code-toolbar { min-height: var(--hig-control-compact); }
+.code-toolbar { min-height: var(--hig-density-compact-control); }
 /* HIG CodeWindow recipe inside the hero card: the card supplies the surface, the recipe its language label and code. */
 .code-window > .hig-surface { padding: 0; border-radius: 0; background: transparent; }
 .code-window > .hig-surface > .hig-text { margin: 0; padding: var(--hig-space-sm) var(--hig-space-xxl) 0; font: var(--text-2xs) / 1.5 var(--font-mono); color: color-mix(in oklab, var(--hig-info) 60%, var(--hig-text)); }
@@ -244,9 +243,9 @@ html > body[data-scroll-locked] {
 
 /* Search (header and docs sidebar): a zero-stroke filled pill at the small control height, with key chips one step lighter than the box. */
 button[data-search-full] {
-  height: var(--hig-control-compact); gap: var(--hig-space-sm); padding: 0 var(--hig-space-xs) 0 var(--hig-space-md);
+  height: var(--hig-density-compact-control); gap: var(--hig-space-sm); padding: 0 var(--hig-space-xs) 0 var(--hig-space-md);
   border: 0; border-radius: var(--hig-radius-pill); background: var(--hig-surface); color: var(--hig-muted); font-size: var(--text-sm);
-  transition: background-color var(--hig-duration-fast) var(--ease-spring), color var(--hig-duration-fast) var(--ease-spring);
+  transition: background-color var(--hig-motion-duration-fast) var(--ease-spring), color var(--hig-motion-duration-fast) var(--ease-spring);
 }
 button[data-search-full]:hover { background: var(--hig-nested); color: var(--hig-text); }
 button[data-search-full] kbd {
@@ -300,13 +299,13 @@ button[data-search-full] kbd {
 .guide-links { display: grid; gap: var(--hig-space-md); }
 .guide-links a {
   display: flex; align-items: center; gap: var(--hig-space-xl);
-  transition: background-color var(--hig-duration-fast) var(--ease-spring);
+  transition: background-color var(--hig-motion-duration-fast) var(--ease-spring);
 }
 .guide-links a:hover { background: var(--hig-nested); }
 .guide-links a > span { font: var(--text-2xs) var(--font-mono); color: var(--color-fd-muted-foreground); }
-.guide-links a > svg { flex: none; margin-left: auto; width: 1rem; height: 1rem; color: var(--color-fd-muted-foreground); transition: color var(--hig-duration-fast) var(--ease-spring), transform var(--hig-duration-fast) var(--ease-spring); }
+.guide-links a > svg { flex: none; margin-left: auto; width: 1rem; height: 1rem; color: var(--color-fd-muted-foreground); transition: color var(--hig-motion-duration-fast) var(--ease-spring), transform var(--hig-motion-duration-fast) var(--ease-spring); }
 .guide-links a:hover > svg { color: var(--color-fd-primary); transform: translateX(2px); }
-.guide-links h3 { font-size: var(--text-sm); margin-bottom: var(--hig-space-xs); font-weight: 600; transition: color var(--hig-duration-fast) var(--ease-spring); }
+.guide-links h3 { font-size: var(--text-sm); margin-bottom: var(--hig-space-xs); font-weight: 600; transition: color var(--hig-motion-duration-fast) var(--ease-spring); }
 .guide-links a:hover h3 { color: var(--color-fd-primary); }
 .guide-links p { color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
 /* Full-bleed rule; content inset to the header's box so both edges line up with the nav. */
@@ -314,14 +313,14 @@ button[data-search-full] kbd {
 .site-footer { margin-top: auto; padding: var(--hig-space-section) max(var(--hig-space-lg), calc((100% - var(--fd-layout-width, 1400px)) / 2 + var(--hig-space-lg))) var(--hig-space-section); }
 /* Page end: Edit on GitHub as a quiet ghost pill, prev/next as zero-stroke fill cards (the landing's card style). */
 #nd-page .edit-on-github {
-  align-self: flex-start; height: var(--hig-control-compact); padding: 0 var(--hig-space-md); border: 0; border-radius: var(--hig-radius-pill);
+  align-self: flex-start; height: var(--hig-density-compact-control); padding: 0 var(--hig-space-md); border: 0; border-radius: var(--hig-radius-pill);
   background: transparent; color: var(--hig-muted); font-size: var(--text-sm);
-  transition: background-color var(--hig-duration-fast) var(--ease-spring), color var(--hig-duration-fast) var(--ease-spring);
+  transition: background-color var(--hig-motion-duration-fast) var(--ease-spring), color var(--hig-motion-duration-fast) var(--ease-spring);
 }
 #nd-page .edit-on-github:hover { background: var(--hig-surface); color: var(--hig-text); }
 .page-nav > a {
   padding: var(--hig-space-xl) var(--hig-space-xxl); border: 0; border-radius: var(--hig-radius-xl); background: var(--hig-surface);
-  transition: background-color var(--hig-duration-fast) var(--ease-spring), color var(--hig-duration-fast) var(--ease-spring);
+  transition: background-color var(--hig-motion-duration-fast) var(--ease-spring), color var(--hig-motion-duration-fast) var(--ease-spring);
 }
 .page-nav > a:hover { background: var(--hig-nested); color: var(--hig-action); }
 .footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--hig-space-xxl); row-gap: var(--hig-space-section); }
@@ -332,7 +331,7 @@ button[data-search-full] kbd {
 /* The wordmark's box reserves descender room for the "p"; shift it so the cap height (not the box) centers on the icon: (143/2 - (149-74.6)/2) / 223.6 of the viewBox. */
 .footer-wordmark { width: auto; height: 32px; transform: translateY(15.3%); }
 .footer-col h2 { margin: 0 0 var(--hig-space-md); color: var(--color-fd-muted-foreground); font: 700 var(--text-2xs) / 1.5 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-.footer-col a, .footer-base a { transition: color var(--hig-duration-fast) var(--ease-spring), opacity var(--hig-duration-fast) var(--ease-spring); }
+.footer-col a, .footer-base a { transition: color var(--hig-motion-duration-fast) var(--ease-spring), opacity var(--hig-motion-duration-fast) var(--ease-spring); }
 .footer-col a { display: block; width: fit-content; padding: var(--hig-space-xs) 0; color: var(--color-fd-foreground); font-size: var(--text-sm); opacity: .8; }
 .footer-col a:hover, .footer-base a:hover { color: var(--color-fd-primary); opacity: 1; }
 .footer-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--hig-space-sm); margin-top: var(--hig-space-section); color: var(--color-fd-muted-foreground); font-size: var(--text-xs); }
@@ -344,13 +343,13 @@ button[data-search-full] kbd {
 }
 @media (max-width: 480px) { .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .docs-sidebar-links { display: flex; align-items: center; gap: var(--hig-space-lg); padding-top: var(--hig-space-lg); font-size: var(--text-xs); color: var(--color-fd-muted-foreground); }
-.docs-sidebar-links a { transition: color var(--hig-duration-fast) var(--ease-spring); }
+.docs-sidebar-links a { transition: color var(--hig-motion-duration-fast) var(--ease-spring); }
 .docs-sidebar-links a:hover { color: var(--color-fd-foreground); }
 .not-found { max-width: 37.5rem; padding: 7.5rem var(--hig-space-xxl); margin: 0 auto; }
 .not-found h1 { font-size: var(--text-4xl); margin: var(--hig-space-xxl) 0; }
 .not-found .hig-button { margin-top: var(--hig-space-xxxl); }
 .not-found-links { display: flex; flex-wrap: wrap; gap: var(--hig-space-sm) var(--hig-space-xl); margin-top: var(--hig-space-xxxl); font: var(--text-2xs) / 1.5 var(--font-mono); letter-spacing: .09em; }
-.not-found-links a { color: var(--color-fd-muted-foreground); transition: color var(--hig-duration-fast) var(--ease-spring); }
+.not-found-links a { color: var(--color-fd-muted-foreground); transition: color var(--hig-motion-duration-fast) var(--ease-spring); }
 .not-found-links a:hover { color: var(--color-fd-foreground); }
 @media (max-width: 800px) {
   .home { padding-top: var(--hig-space-xxxl); }
@@ -371,11 +370,11 @@ button[data-search-full] kbd {
 }
 
 /* HIG type roles and adaptive targets; the dense chart keeps compact controls. */
-body { font-size: var(--hig-type-body-size); line-height: var(--hig-type-body-line); }
+body { font-size: var(--hig-type-body-size); line-height: var(--hig-type-body-line-height); }
 .hero h1 { font-size: clamp(var(--hig-type-title-size), 4.4vw, var(--hig-type-display-size)); line-height: 1.0833; font-weight: var(--hig-type-display-weight); }
-#nd-page h1 { font-size: var(--hig-type-title-size); line-height: var(--hig-type-title-line); font-weight: var(--hig-type-title-weight); }
+#nd-page h1 { font-size: var(--hig-type-title-size); line-height: var(--hig-type-title-line-height); font-weight: var(--hig-type-title-weight); }
 @media (pointer: coarse) {
-  .docs-app-link, #nd-page .edit-on-github { min-height: var(--hig-control-comfortable); }
+  .docs-app-link, #nd-page .edit-on-github { min-height: var(--hig-density-comfortable-control); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; scroll-behavior: auto !important; }
