@@ -33,10 +33,11 @@ The presentation follows the Bloxwap HIG and consumes it as packages, not copies
   pinned, unpublished candidate tarballs in [`vendor/bloxwap-hig/`](../../vendor/bloxwap-hig/README.md).
   `app/global.css` imports `@bloxwap/hig-tokens/css` and `@bloxwap/hig-react/css` and maps HIG roles
   onto Fumadocs; it does not declare palette values.
-- `styles/hig-roles.generated.css` is generated from the package manifest by
-  `scripts/hig-tokens.mjs --write` (radius, type, motion and density roles the CSS distribution does not
-  emit yet). `npm run lint` fails on drift, tarball hash changes, copied palettes, `.btn`-style primitive
-  copies or font binaries in the docs source.
+- Radius, type, motion and density roles (`--hig-radius-*`, `--hig-type-*`, `--hig-motion-*`,
+  `--hig-density-*`) come straight from `@bloxwap/hig-tokens/css` (bloxwap/hig#66); there is no local
+  role file. `npm run lint` (`scripts/hig-tokens.mjs --check`) fails if those roles go missing, on tarball
+  hash changes, copied palettes, `.btn`-style primitive copies, a local `styles/` role layer or font
+  binaries in the docs source.
 - Buttons, install tabs/copy, code-window copy, callouts, search error/empty states and the playground
   loading status use HIG components (`Button`, `IconButton`, `Tabs`, `Surface`, `Callout`, `Alert`,
   `EmptyState`, `Spinner`). The embedded demo keeps the SDK's own controls, themed from HIG roles.
@@ -94,7 +95,7 @@ chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
 `theme.fontFamily` to Bloxwap Sans and `monoFamily`/`scaleFontFamily` (status
 line, drawing labels and scales) to Bloxwap Mono. The standalone playground and
 SDK presets retain their existing font defaults.
-Social cards use the static Bloxwap Sans faces shipped in `@bloxwap/hig-tokens/fonts` (OFL).
+Social cards use the static Bloxwap Sans faces shipped in `@bloxwap/hig-native-fonts` (OFL), a build-time-only dependency; the web `@bloxwap/hig-tokens` tarball no longer carries font binaries (bloxwap/hig#64).
 
 HIG presentation, pinned candidate provenance, validation, exceptions and upgrade/rollback
 instructions are recorded in [the adoption report](../../docs/hig-adoption/README.md).

@@ -16,9 +16,10 @@
   "dependencies": {
     "@bloxwap/chart": "0.3.0",
     "@bloxwap/font": "0.1.2",
-    "@bloxwap/hig-contracts": "file:../../vendor/bloxwap-hig/bloxwap-hig-contracts-0.1.0-candidate.sha7c67a07c.tgz",
-    "@bloxwap/hig-react": "file:../../vendor/bloxwap-hig/bloxwap-hig-react-0.1.0-candidate.sha7c67a07c.tgz",
-    "@bloxwap/hig-tokens": "file:../../vendor/bloxwap-hig/bloxwap-hig-tokens-0.1.0-candidate.sha7c67a07c.tgz",
+    "@bloxwap/hig-contracts": "file:../../vendor/bloxwap-hig/bloxwap-hig-contracts-0.1.0-candidate.shad7ff4780.tgz",
+    "@bloxwap/hig-native-fonts": "file:../../vendor/bloxwap-hig/bloxwap-hig-native-fonts-0.1.0-candidate.shad7ff4780.tgz",
+    "@bloxwap/hig-react": "file:../../vendor/bloxwap-hig/bloxwap-hig-react-0.1.0-candidate.shad7ff4780.tgz",
+    "@bloxwap/hig-tokens": "file:../../vendor/bloxwap-hig/bloxwap-hig-tokens-0.1.0-candidate.shad7ff4780.tgz",
     "fumadocs-core": "16.15.14",
     "fumadocs-mdx": "15.4.5",
     "fumadocs-ui": "16.15.14",
