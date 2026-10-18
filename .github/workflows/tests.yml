@@ -18,10 +18,11 @@ jobs:
   test:
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
-    env:
-      TMPDIR: ${{ runner.temp }}
 
     steps:
+      # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
+      - name: Point TMPDIR at runner temp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
