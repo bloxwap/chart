@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "2c952f6ac1f1d1993761b7314302b1871fb0dfd3",
+  "ogPngs": {
+    "og/home.png": "3057dd39d2a7da5946dd839a455a6b5943637db010239f689fbe3f3d1484049d",
+    "og/docs/index.png": "36431f96dff595227fd7178abdccda56d00df0d5d6536823bc024063289e9cb5",
+    "og/docs/playground.png": "fec95868edccf18af5693dff9c514d4caf04d5008391f5da557536e02cb2208d",
+    "og/docs/development.png": "5b3ab8f06ff863e4079f56a86d88cd97d992a5988481f6b3d1251c882f05f41b",
+    "og/docs/getting-started.png": "15a641466b8c8d64bccd325999032ed24740b256226ce3a3a52374d580d84312",
+    "og/docs/guides/snapshots-countdown.png": "69ee49a8c74b317bad06a2701c4c81d2f24f62b49c978650b1ddebf190f6556c",
+    "og/docs/guides/theming-presets.png": "0f9e1e0bf5d3be6146f093801f67f95eaad8d2d9c419d7d0ecdf44d52e035e27",
+    "og/docs/guides/series.png": "c4a5edeeff1741266e3f830ed6f380e4e909b5779467159818ea1fdceda79413",
+    "og/docs/guides/time-scale.png": "7616a76c2da6dcda6d2a0a470a16d04a276d5f3e64a9e69112c7177434c580a7",
+    "og/docs/guides/touch.png": "cdaf87e8adff6ddc4c1bbc48b051c8f958017199216c49089bbf236718cb4b71",
+    "og/docs/guides/price-lines-markers.png": "94d85b44f24a32935361443b67cd297f601b8775ba3929b13d2c910747621382",
+    "og/docs/guides/drawings.png": "08ba0479db5a4e8f3205fb506040ec66494ff5390433a71cff544a95311075cf",
+    "og/docs/guides/events.png": "832a436a81c57d59337fc986933dcdbf63439b4fb6d642a8cdc7d4204c37a859",
+    "og/docs/guides/header.png": "bd0a70233f43d870180e091c12b14250e9154def114bf703a56fdbf9e216439d",
+    "og/docs/guides/data.png": "dd32d87240ab7840959a401cd0137d5e16343a539e0e3583079b4390331f7c74",
+    "og/docs/guides/toolbar-settings.png": "9360a60479a0cecd929b3d8fbf2c6072e8a06d0f0ef5758fa04535b7d81cca1e",
+    "og/docs/guides/react.png": "96ab3fe622e1cf20cada55f7cb2b1599b526ba8872cde9f9b1207b82628d6d3e",
+    "og/docs/guides/indicators.png": "0db95af14d94504e2151f4b321890f109af9e47e956aca5e0b7487c063cd128a",
+    "og/docs/guides/performance.png": "1ba2e21ba65f780f78d101fdfb0363b12d3af2e28686ca448ed79efcdd5ceb48",
+    "og/docs/guides/datafeed.png": "9d0f2c94d0cc9514314febd1a9ff1df50a6eadd30d8f4ec608b5a5952169372c",
+    "og/docs/guides/tradingview-migration.png": "fe196b3417a4f3f2c2ccfc51aec732f088319593cd755675f2d20341db0d8161",
+    "og/docs/api/scale.png": "749851be25246e374ba1b4c41e8b3e39dbb0a36648a13dbbacda1e084b3341a0",
+    "og/docs/api/exports.png": "6f773918c340cdd33b525b622c05b3adfa1171e33223db569d02c17a5d5ec71b",
+    "og/docs/api/chart.png": "d63ec7f381c0fe979e670986a5230fc261baa8cd5a9913d2eacdcb1df11586f0",
+    "og/docs/api/configuration.png": "ae46bc892cfe68725fbd97218241b7c878ddd477c9e71a9a35c081dae852fd9a"
+  },
+  "assets": {
+    "js": {
+      "files": 29,
+      "raw": 1285999,
+      "gzip": 411773
+    },
+    "css": {
+      "files": 2,
+      "raw": 155625,
+      "gzip": 24819
+    },
+    "woff2": {
+      "files": 22,
+      "raw": 12965628,
+      "gzip": 12917152
+    }
+  },
+  "vendorBytes": 4454889
+}
