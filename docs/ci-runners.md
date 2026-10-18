@@ -28,19 +28,19 @@ Install these on the machine (or confirm they are already present). Do not rely 
 | Xcode Command Line Tools | Provides `git` and the compiler toolchain `actions/checkout` and native npm packages expect |
 | `bash` and `/bin/sh` | Workflow `run:` steps (macOS ships both) |
 | GNU tar as `gtar` | `actions/upload-pages-artifact` archives with `gtar` on macOS (`brew install gnu-tar`) |
-| Outbound HTTPS | `github.com`, `npmjs.com` / the npm registry, Codecov, and GitHub Pages APIs |
+| Outbound HTTPS | `github.com`, `npmjs.com` / the npm registry, `cdn.playwright.dev` (Chrome for Testing), Codecov, and GitHub Pages APIs |
 
 Node.js 24 is **not** a machine prerequisite. `actions/setup-node` downloads the `darwin-arm64` distribution into the runner tool cache.
 
 ### Playwright (docs job)
 
-`npm run docs:test` launches Chrome through `playwright-core` (`channel: 'chrome'`). The docs workflow installs Chrome for Testing with:
+`npm run docs:test` launches Playwright's hermetic Chrome for Testing (the `chromium` browser, which is Google Chrome for Testing on macOS). The docs workflow installs it with:
 
 ```sh
-npx playwright-core install chrome
+npx playwright-core install chrome-for-testing --no-shell
 ```
 
-Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There is no `--with-deps` and no `apt`/`sudo`. A system Google Chrome is optional; if present, Playwright may use it instead of Chrome for Testing.
+Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There is no `--with-deps` and no `apt`/`sudo`. Do not use `npx playwright-core install chrome`: that installs system Google Chrome via a sudo script (`reinstall_chrome_stable_mac.sh`) and fails on a passwordless Mac mini.
 
 ### Not required
 
@@ -49,6 +49,7 @@ Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There 
 - GNU `sed` / GNU `grep`
 - PulseAudio, `xvfb`, or other Linux desktop packages
 - Preinstalled npm dependencies (each job runs `npm ci`)
+- System Google Chrome or passwordless `sudo` (the docs job downloads Chrome for Testing)
 
 ## Operator notes
 

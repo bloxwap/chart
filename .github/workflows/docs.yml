@@ -36,9 +36,10 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      # Chrome for Testing; no --with-deps (that flag installs apt packages on Linux).
-      - name: Install Playwright Chrome
-        run: npx playwright-core install chrome
+      # Hermetic Chrome for Testing into $PLAYWRIGHT_BROWSERS_PATH. `install chrome`
+      # is the system Google Chrome channel and needs sudo on macOS.
+      - name: Install Playwright Chrome for Testing
+        run: npx playwright-core install chrome-for-testing --no-shell
       - run: npm run docs:build
       - run: npm run docs:check
       - run: npm run lint
