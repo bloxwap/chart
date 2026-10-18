@@ -1,22 +1,24 @@
 # CI runners
 
-Every GitHub Actions job in this repository targets the org Mac mini fleet:
+Tests, coverage, and documentation jobs target the org Mac mini fleet:
 
 ```yaml
 runs-on: [self-hosted, macOS, ARM64]
 ```
 
-Jobs stay queued until a runner with all three labels is online. Workflows do not call `apt`, `sudo`, or `playwright install --with-deps` (that flag installs Linux packages). Shell used by CI is POSIX / BSD-portable and writes scratch files under `$RUNNER_TEMP` (`TMPDIR` and Playwright's browser path are exported from `$RUNNER_TEMP` in a setup step; GitHub Actions does not allow the `runner` context in job-level `env`).
+These jobs stay queued until a runner with all three labels is online. Workflows do not call `apt`, `sudo`, or `playwright install --with-deps` (that flag installs Linux packages). Shell used by CI is POSIX / BSD-portable, and Mac jobs write scratch files under `$RUNNER_TEMP` (`TMPDIR` and Playwright's browser path are exported from `$RUNNER_TEMP` in a setup step; GitHub Actions does not allow the `runner` context in job-level `env`).
+
+The npm publish job uses `ubuntu-latest` because [npm trusted publishing requires a GitHub-hosted runner](https://docs.npmjs.com/trusted-publishers/). Self-hosted runners cannot authenticate with the existing tokenless OIDC release flow.
 
 ## Jobs
 
-| Workflow | Job | What it runs |
-| --- | --- | --- |
-| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | `test` | Library coverage gate and package `exports` imports |
-| [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | LCOV report and Codecov upload |
-| [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `build` | Docs export, typecheck, lint, Playwright Chrome checks, Pages artifact |
-| [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `deploy` | `configure-pages` + `deploy-pages` on `main` |
-| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | Version/tag check and `npm publish` of `@bloxwap/chart` |
+| Workflow | Job | Runner | What it runs |
+| --- | --- | --- | --- |
+| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | `test` | Mac mini | Library coverage gate and package `exports` imports |
+| [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | Mac mini | LCOV report and Codecov upload |
+| [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `build` | Mac mini | Docs export, typecheck, lint, Playwright Chrome checks, Pages artifact |
+| [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `deploy` | Mac mini | `configure-pages` + `deploy-pages` on `main` |
+| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | GitHub-hosted Ubuntu | Version/tag check and `npm publish` of `@bloxwap/chart` |
 
 ## Prerequisites on each Mac mini
 
