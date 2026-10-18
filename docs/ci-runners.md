@@ -34,7 +34,7 @@ Node.js 24 is **not** a machine prerequisite. `actions/setup-node` downloads the
 
 ### Playwright (docs job)
 
-`npm run docs:test` launches Playwright's hermetic Chrome for Testing (the `chromium` browser, which is Google Chrome for Testing on macOS). The docs workflow installs it with:
+`npm run docs:test` launches Playwright's hermetic Chrome for Testing (`channel: 'chromium'`, which is Google Chrome for Testing on macOS — not `chrome-headless-shell`). The docs workflow installs it with:
 
 ```sh
 npx playwright-core install chrome-for-testing --no-shell

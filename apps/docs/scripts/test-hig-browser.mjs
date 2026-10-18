@@ -15,7 +15,7 @@ const sameColor = (target, actual, expected) => target.evaluate(([a, b]) => {
 }, [actual, expected]);
 function record(check) { checks.push(check); console.log(check); }
 try {
-  browser = await chromium.launch({ args: ['--no-sandbox'] });
+  browser = await chromium.launch({ channel: 'chromium', args: ['--no-sandbox'] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
