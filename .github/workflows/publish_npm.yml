@@ -1,8 +1,12 @@
 name: Publish to npm
 
-# npm trusted publishing requires a GitHub-hosted runner. See docs/ci-runners.md.
 # Publishing a GitHub release publishes @bloxwap/chart at the version in packages/chart/package.json.
 # Release flow: bump the version in a PR, merge it, then create a release tagged v<version>.
+#
+# npm trusted publishing does not support self-hosted runners
+# (https://docs.npmjs.com/trusted-publishers/). This job authenticates with the
+# NPM_TOKEN secret instead. That drops OIDC trusted publishing and
+# automatic provenance. See docs/ci-runners.md.
 on:
   release:
     types: [published]
@@ -17,18 +21,22 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
+      # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
+      - name: Point TMPDIR at runner temp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
-      # npm publishes via OIDC trusted publishing (no token here), which needs npm >= 11.5.1.
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -61,12 +69,12 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Check npm supports trusted publishing
+      - name: Check npm CLI
         run: |
           npm --version
           npx --yes semver -r '>=11.5.1' "$(npm --version)" > /dev/null || npm install -g npm@latest
 
       # prepack builds and prepublishOnly runs the full test suite before anything is uploaded;
-      # publishConfig.access is public, and trusted publishing attaches provenance.
+      # publishConfig.access is public. Token publish does not attach provenance.
       - name: Publish @bloxwap/chart@${{ steps.tag.outputs.version }}
         run: npm publish --workspace @bloxwap/chart --tag ${{ steps.tag.outputs.value }}
