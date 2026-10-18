@@ -60,7 +60,7 @@ The preview server reads the exported base path, so this build opens at `http://
 
 ## Release to npm
 
-Publishing a GitHub release publishes `@bloxwap/chart` from CI (`.github/workflows/publish_npm.yml`) through npm trusted publishing, so no npm token is stored in the repository.
+Publishing a GitHub release publishes `@bloxwap/chart` from CI (`.github/workflows/publish_npm.yml`) on the org Mac mini runners. Authentication uses the org `NPM_TOKEN` secret (`NODE_AUTH_TOKEN`). npm trusted publishing and automatic provenance are unavailable on self-hosted runners.
 
 1. In a pull request, bump `version` in `packages/chart/package.json` (and the `version` export in `packages/chart/src/index.ts`), then merge it. A test fails if the two disagree.
 2. Create a GitHub release tagged `v<version>`, for example `v0.0.2`. The workflow fails if the tag and the package version disagree.
