@@ -15,7 +15,7 @@ const sameColor = (target, actual, expected) => target.evaluate(([a, b]) => {
 }, [actual, expected]);
 function record(check) { checks.push(check); console.log(check); }
 try {
-  browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
+  browser = await chromium.launch({ channel: 'chromium', args: ['--no-sandbox'] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
@@ -183,6 +183,6 @@ try {
   record('Touch emulation: 48px copy target, narrow layout and mobile navigation');
   if (evidence) await phone.screenshot({ path: `${evidence}/after-mobile.png`, fullPage: true });
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ browser: await browser.version(), checks, demo, limitations: ['Automated Chrome (Playwright) with touch emulation only; no physical touch/haptics, iOS, Android, VoiceOver or TalkBack certification'] }, null, 2));
+  console.log(JSON.stringify({ browser: await browser.version(), checks, demo, limitations: ['Automated Chrome for Testing (Playwright) with touch emulation only; no physical touch/haptics, iOS, Android, VoiceOver or TalkBack certification'] }, null, 2));
   if (evidence) await writeFile(`${evidence}/browser.json`, JSON.stringify({ browser: await browser.version(), checks, demo }, null, 2) + '\n');
 } finally { await browser?.close(); server.kill(); }

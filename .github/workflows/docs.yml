@@ -1,5 +1,6 @@
 name: Documentation
 
+# Runs on the org Mac mini self-hosted runners. See docs/ci-runners.md.
 on:
   push:
     branches: [main]
@@ -17,12 +18,17 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     env:
       NEXT_PUBLIC_BASE_PATH: /chart
       NEXT_PUBLIC_SITE_URL: https://bloxwap.github.io
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
+      # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
+      - name: Point temp paths at runner temp
+        run: |
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
@@ -30,10 +36,20 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      # Hermetic Chrome for Testing into $PLAYWRIGHT_BROWSERS_PATH. `install chrome`
+      # is the system Google Chrome channel and needs sudo on macOS.
+      - name: Install Playwright Chrome for Testing
+        run: npx playwright-core install chrome-for-testing --no-shell
       - run: npm run docs:build
       - run: npm run docs:check
       - run: npm run lint
       - run: npm run docs:test
+      - name: Check GNU tar
+        run: |
+          if ! command -v gtar >/dev/null 2>&1; then
+            echo '::error::gtar (GNU tar) is required for actions/upload-pages-artifact on macOS. Install with: brew install gnu-tar'
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/docs/out
@@ -41,7 +57,7 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     permissions:
       pages: write
       id-token: write

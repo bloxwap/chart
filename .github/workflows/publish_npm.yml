@@ -1,5 +1,6 @@
 name: Publish to npm
 
+# npm trusted publishing requires a GitHub-hosted runner. See docs/ci-runners.md.
 # Publishing a GitHub release publishes @bloxwap/chart at the version in packages/chart/package.json.
 # Release flow: bump the version in a PR, merge it, then create a release tagged v<version>.
 on:
@@ -38,22 +39,27 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          # POSIX / BSD-portable: no jq, no GNU sed, no bashisms.
+          VERSION=$(node -p "require('./packages/chart/package.json').version")
           # The private workspace root has no release version; the chart package owns it.
-          VERSION=$(jq -r .version packages/chart/package.json)
           # A release must be tagged for the version it publishes, or npm and GitHub disagree.
-          if [[ -n "$RELEASE_TAG" && "$RELEASE_TAG" != "v$VERSION" ]]; then
+          if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "v$VERSION" ]; then
             echo "::error::Release tag $RELEASE_TAG does not match packages/chart/package.json version v$VERSION"
             exit 1
           fi
-          # Extract tag (alpha, beta, rc) from the version if present
-          TAG=$(echo "$VERSION" | sed -n 's/.*-\(alpha\|beta\|rc\).*/\1/p')
-          # If no known tag but the version has a prerelease part, use "prerelease"
-          if [[ -z "$TAG" && "$VERSION" == *-* ]]; then
-            TAG="prerelease"
+          PRE=${VERSION#*-}
+          if [ "$PRE" = "$VERSION" ]; then
+            TAG=latest
+          else
+            case "$PRE" in
+              alpha*) TAG=alpha ;;
+              beta*) TAG=beta ;;
+              rc*) TAG=rc ;;
+              *) TAG=prerelease ;;
+            esac
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          # Default to "latest" if no tag was determined
-          echo "value=${TAG:-latest}" >> "$GITHUB_OUTPUT"
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check npm supports trusted publishing
         run: |
