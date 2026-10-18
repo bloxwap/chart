@@ -1,5 +1,6 @@
 name: Coverage
 
+# Runs on the org Mac mini self-hosted runners. See docs/ci-runners.md.
 on:
   push:
     branches: [main]
@@ -15,8 +16,10 @@ concurrency:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
+    env:
+      TMPDIR: ${{ runner.temp }}
 
     steps:
       - uses: actions/checkout@v7

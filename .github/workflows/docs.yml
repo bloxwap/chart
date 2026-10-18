@@ -1,5 +1,6 @@
 name: Documentation
 
+# Runs on the org Mac mini self-hosted runners. See docs/ci-runners.md.
 on:
   push:
     branches: [main]
@@ -17,11 +18,13 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     env:
       NEXT_PUBLIC_BASE_PATH: /chart
       NEXT_PUBLIC_SITE_URL: https://bloxwap.github.io
       NEXT_TELEMETRY_DISABLED: '1'
+      TMPDIR: ${{ runner.temp }}
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -30,10 +33,19 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      # Chrome for Testing; no --with-deps (that flag installs apt packages on Linux).
+      - name: Install Playwright Chrome
+        run: npx playwright-core install chrome
       - run: npm run docs:build
       - run: npm run docs:check
       - run: npm run lint
       - run: npm run docs:test
+      - name: Check GNU tar
+        run: |
+          if ! command -v gtar >/dev/null 2>&1; then
+            echo '::error::gtar (GNU tar) is required for actions/upload-pages-artifact on macOS. Install with: brew install gnu-tar'
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/docs/out
@@ -41,7 +53,7 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     permissions:
       pages: write
       id-token: write

@@ -1,5 +1,6 @@
 name: Tests
 
+# Runs on the org Mac mini self-hosted runners. See docs/ci-runners.md.
 # Gates every pull request on the same checks contributors run locally. Runs on all PRs (no path
 # filter) so it can be made a required status check without blocking docs-only changes.
 on:
@@ -15,8 +16,10 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
+    env:
+      TMPDIR: ${{ runner.temp }}
 
     steps:
       - uses: actions/checkout@v7
