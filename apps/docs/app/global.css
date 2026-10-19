@@ -2,6 +2,7 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import '@bloxwap/hig-tokens/css';
+@import '@bloxwap/hig-react/css/base';
 @import '@bloxwap/hig-react/css';
 
 @theme inline {

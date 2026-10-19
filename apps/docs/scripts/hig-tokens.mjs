@@ -26,9 +26,13 @@ if (process.argv.includes('--check')) {
   const vendor = new URL('../../../vendor/bloxwap-hig/', import.meta.url);
   const provenance = JSON.parse(await readFile(new URL('provenance.json', vendor), 'utf8'));
   for (const [file, hash] of Object.entries(provenance.sha256)) assert.equal(createHash('sha256').update(await readFile(new URL(file, vendor))).digest('hex'), hash, `Vendored HIG tarball changed: ${file}`);
+  const reportBytes = await readFile(new URL('../../../docs/hig-adoption/issue-115/candidate-report.json', import.meta.url));
+  assert.equal(createHash('sha256').update(reportBytes).digest('hex'), provenance.releaseReportSha256, 'Candidate report changed');
+  const report = JSON.parse(reportBytes);
+  assert.equal(report.sourceCommit, provenance.commit); assert.equal(report.artifactVersion, provenance.version); assert.equal(report.sourceTreeDirty, false);
   const docsPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  for (const name of ['tokens', 'contracts', 'react', 'native-fonts']) {
-    const field = name === 'native-fonts' ? 'devDependencies' : 'dependencies';
+  for (const name of ['tokens', 'contracts', 'react', 'og-fonts']) {
+    const field = name === 'og-fonts' ? 'devDependencies' : 'dependencies';
     const spec = docsPackage[field][`@bloxwap/hig-${name}`];
     assert.ok(spec?.startsWith('file:../../vendor/bloxwap-hig/') && spec.includes(provenance.version), `@bloxwap/hig-${name} must come from the pinned vendored tarball`);
     assert.equal(JSON.parse(await readFile(new URL(`../../../node_modules/@bloxwap/hig-${name}/package.json`, import.meta.url), 'utf8')).version, provenance.version, `Installed @bloxwap/hig-${name} is not ${provenance.version}; run npm ci`);
