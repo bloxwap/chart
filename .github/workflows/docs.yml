@@ -18,6 +18,8 @@ concurrency:
 
 jobs:
   build:
+    # Security: never run fork PR code on the self-hosted runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, macOS, ARM64]
     env:
       NEXT_PUBLIC_BASE_PATH: /chart
@@ -55,7 +57,8 @@ jobs:
           path: apps/docs/out
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Security: never run fork PR code on the self-hosted runner.
+    if: (github.ref == 'refs/heads/main' && github.event_name != 'pull_request') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: build
     runs-on: [self-hosted, macOS, ARM64]
     permissions:
