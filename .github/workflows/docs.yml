@@ -32,11 +32,11 @@ jobs:
           echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
           echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+      # Minis persist ~/.npm on disk. GitHub's remote cache is 0.4–1 MB/s for ~1.4 GB.
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: package-lock.json
+          package-manager-cache: false
       - run: npm ci
       # Hermetic Chrome for Testing into $PLAYWRIGHT_BROWSERS_PATH. `install chrome`
       # is the system Google Chrome channel and needs sudo on macOS.
@@ -46,13 +46,16 @@ jobs:
       - run: npm run docs:check
       - run: npm run lint
       - run: npm run docs:test
+      # Deploy only runs on main; skip the Pages artifact on PRs after validating the export.
       - name: Check GNU tar
+        if: github.event_name != 'pull_request'
         run: |
           if ! command -v gtar >/dev/null 2>&1; then
             echo '::error::gtar (GNU tar) is required for actions/upload-pages-artifact on macOS. Install with: brew install gnu-tar'
             exit 1
           fi
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
           path: apps/docs/out
 
