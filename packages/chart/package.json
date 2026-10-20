@@ -82,7 +82,8 @@
     "bench": "npm run build && node bench/indicators.bench.mjs && node bench/rolling.bench.mjs && node bench/render.bench.mjs && node bench/workloads.bench.mjs && node bench/webgl.bench.mjs",
     "prepublishOnly": "npm test",
     "prepack": "npm run build",
-    "bench:browser": "npm run build && node bench/run-browser.mjs"
+    "bench:browser": "npm run build && node bench/run-browser.mjs",
+    "bench:suite": "node bench/suite/run.mjs"
   },
   "keywords": [
     "chart",
