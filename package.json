@@ -20,10 +20,12 @@
     "docs:dev": "npm --workspace @bloxwap/chart-docs run dev",
     "docs:build": "npm --workspace @bloxwap/chart-docs run build",
     "docs:check": "npm --workspace @bloxwap/chart-docs run check",
+    "docs:check:tsc": "npm --workspace @bloxwap/chart-docs run check:tsc",
     "docs:preview": "npm --workspace @bloxwap/chart-docs run preview",
     "pack:chart": "npm pack --workspace @bloxwap/chart --pack-destination packages/chart",
     "lint": "npm --workspace @bloxwap/chart run lint:icons && node apps/docs/scripts/hig-tokens.mjs --check",
     "typecheck": "npm run build:ts && npm run docs:check",
+    "typecheck:tsc": "npm --workspace @bloxwap/chart run build:ts:tsc && npm run docs:check:tsc",
     "docs:test": "node apps/docs/scripts/test-hig-browser.mjs"
   },
   "engines": {

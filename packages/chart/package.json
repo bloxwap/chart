@@ -72,6 +72,9 @@
     "build": "npm run build:icons && npm run build:wasm && npm run build:ts",
     "build:ts": "tsrs -p tsconfig.json",
     "build:ts-test": "tsrs -p tsconfig.test.json",
+    "typecheck": "tsrs -p tsconfig.test.json --noEmit",
+    "typecheck:tsc": "tsc -p tsconfig.test.json --noEmit",
+    "build:ts:tsc": "tsc -p tsconfig.json",
     "build:wasm": "node scripts/build-wasm.mjs",
     "build:icons": "npm run lint:icons && node scripts/build-icons.mjs",
     "lint:icons": "node scripts/lint-icons.mjs",
@@ -113,6 +116,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
+    "typescript": "^6.0.3",
     "wabt": "^1.0.39"
   }
 }
