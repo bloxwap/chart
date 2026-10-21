@@ -86,12 +86,13 @@
   ;; ---------------------------------------------------------------------------
   ;; sma_f32(src, dst, len, period)
   ;; Simple moving average. dst[i] = NaN for i < period - 1.
-  ;; Sliding-window update: O(len) additions total.
+  ;; Sliding-window update: O(len) additions total. Accumulate in f64 to
+  ;; avoid drift; only round to f32 when storing the output.
   ;; ---------------------------------------------------------------------------
   (func $sma_f32 (export "sma_f32") (param $src i32) (param $dst i32) (param $len i32) (param $period i32)
     (local $i i32)
-    (local $sum f32)
-    (local $pinv f32)
+    (local $sum f64)
+    (local $pinv f64)
     ;; NaN-fill dst[0 .. min(period-1, len))
     (local.set $i (i32.const 0))
     (block $fdone
@@ -103,34 +104,34 @@
         (br $floop)))
     ;; nothing more to do when len < period
     (if (i32.lt_u (local.get $len) (local.get $period)) (then return))
-    (local.set $pinv (f32.div (f32.const 1) (f32.convert_i32_u (local.get $period))))
+    (local.set $pinv (f64.div (f64.const 1) (f64.convert_i32_u (local.get $period))))
     ;; seed: sum of src[0 .. period)
-    (local.set $sum (f32.const 0))
+    (local.set $sum (f64.const 0))
     (local.set $i (i32.const 0))
     (block $sdone
       (loop $sloop
         (br_if $sdone (i32.ge_u (local.get $i) (local.get $period)))
         (local.set $sum
-          (f32.add (local.get $sum)
-            (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))))
+          (f64.add (local.get $sum)
+            (f64.promote_f32 (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $sloop)))
     (f32.store
       (i32.add (local.get $dst) (i32.shl (i32.sub (local.get $period) (i32.const 1)) (i32.const 2)))
-      (f32.mul (local.get $sum) (local.get $pinv)))
+      (f32.demote_f64 (f64.mul (local.get $sum) (local.get $pinv))))
     ;; slide: dst[i] = dst[i-1] + (src[i] - src[i-period]) / period
     (local.set $i (local.get $period))
     (block $mdone
       (loop $mloop
         (br_if $mdone (i32.ge_u (local.get $i) (local.get $len)))
         (local.set $sum
-          (f32.add (local.get $sum)
-            (f32.sub
-              (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))
-              (f32.load (i32.add (local.get $src)
-                (i32.shl (i32.sub (local.get $i) (local.get $period)) (i32.const 2)))))))
+          (f64.add (local.get $sum)
+            (f64.sub
+              (f64.promote_f32 (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
+              (f64.promote_f32 (f32.load (i32.add (local.get $src)
+                (i32.shl (i32.sub (local.get $i) (local.get $period)) (i32.const 2))))))))
         (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2)))
-          (f32.mul (local.get $sum) (local.get $pinv)))
+          (f32.demote_f64 (f64.mul (local.get $sum) (local.get $pinv))))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $mloop))))
 
@@ -138,12 +139,13 @@
   ;; ema_f32(src, dst, len, period)
   ;; Exponential moving average, k = 2 / (period + 1), seeded with the SMA of
   ;; the first `period` values at index period - 1; NaN before that.
+  ;; Keep the seed and recurrence in f64; round only the stored f32 output.
   ;; ---------------------------------------------------------------------------
   (func $ema_f32 (export "ema_f32") (param $src i32) (param $dst i32) (param $len i32) (param $period i32)
     (local $i i32)
-    (local $sum f32)
-    (local $k f32)
-    (local $prev f32)
+    (local $sum f64)
+    (local $k f64)
+    (local $prev f64)
     ;; NaN-fill dst[0 .. min(period-1, len))
     (local.set $i (i32.const 0))
     (block $fdone
@@ -155,34 +157,34 @@
         (br $floop)))
     (if (i32.lt_u (local.get $len) (local.get $period)) (then return))
     (local.set $k
-      (f32.div (f32.const 2) (f32.convert_i32_u (i32.add (local.get $period) (i32.const 1)))))
+      (f64.div (f64.const 2) (f64.convert_i32_u (i32.add (local.get $period) (i32.const 1)))))
     ;; seed: SMA of src[0 .. period)
-    (local.set $sum (f32.const 0))
+    (local.set $sum (f64.const 0))
     (local.set $i (i32.const 0))
     (block $sdone
       (loop $sloop
         (br_if $sdone (i32.ge_u (local.get $i) (local.get $period)))
         (local.set $sum
-          (f32.add (local.get $sum)
-            (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))))
+          (f64.add (local.get $sum)
+            (f64.promote_f32 (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $sloop)))
-    (local.set $prev (f32.div (local.get $sum) (f32.convert_i32_u (local.get $period))))
+    (local.set $prev (f64.div (local.get $sum) (f64.convert_i32_u (local.get $period))))
     (f32.store
       (i32.add (local.get $dst) (i32.shl (i32.sub (local.get $period) (i32.const 1)) (i32.const 2)))
-      (local.get $prev))
+      (f32.demote_f64 (local.get $prev)))
     ;; ema[i] = src[i] * k + prev * (1 - k)
     (local.set $i (local.get $period))
     (block $mdone
       (loop $mloop
         (br_if $mdone (i32.ge_u (local.get $i) (local.get $len)))
         (local.set $prev
-          (f32.add
-            (f32.mul
-              (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))
+          (f64.add
+            (f64.mul
+              (f64.promote_f32 (f32.load (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2)))))
               (local.get $k))
-            (f32.mul (local.get $prev) (f32.sub (f32.const 1) (local.get $k)))))
-        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (local.get $prev))
+            (f64.mul (local.get $prev) (f64.sub (f64.const 1) (local.get $k)))))
+        (f32.store (i32.add (local.get $dst) (i32.shl (local.get $i) (i32.const 2))) (f32.demote_f64 (local.get $prev)))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $mloop))))
 
