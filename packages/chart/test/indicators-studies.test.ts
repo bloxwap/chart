@@ -617,7 +617,7 @@ describe('ma-ribbon', () => {
 
   it('stays in f64 with WASM kernels loaded, so BTC-scale averages keep their cents', async () => {
     const kernels = (await initWasm()) as WasmKernels;
-    // A BTC-like walk: at ~130k an f32 holds prices to 1/64, and a sliding f32 sum drifts further.
+    // A BTC-like walk: at ~130k f32 input/output quantization still loses precision.
     const btc = walk(3000, 83).map((c) => ({ ...c, open: c.open + 130_000, high: c.high + 130_000, low: c.low + 130_000, close: c.close + 130_000 }));
     const btcCloses = btc.map((c) => c.close);
     for (const type of [0, 1]) {
@@ -625,10 +625,10 @@ describe('ma-ribbon', () => {
       const withKernels = maRibbonIndicator.compute(btc, params, [], kernels);
       assert.deepEqual(withKernels, maRibbonIndicator.compute(btc, params, [], null));
       assert.deepEqual(withKernels.lines.map((l) => l.values), [20, 50, 100, 200, 7].map((length) => (type ? emaValues : smaValues)(btcCloses, length)));
-      // What the f32 kernels would have shown: off by more than a displayed cent.
+      // Even with f64 kernel state, f32 inputs/outputs differ from the full f64 ribbon.
       const f32 = (type ? emaWasm : smaWasm)(Float32Array.from(btcCloses), 200, kernels);
       const drift = Math.max(...f32.map((v, i) => (v === null ? 0 : Math.abs(v - (withKernels.lines[3]!.values[i] as number)))));
-      assert.ok(drift > 0.01, `f32 drift ${drift}`);
+      assert.ok(drift > 0.001, `f32 quantization difference ${drift}`);
     }
   });
 });
