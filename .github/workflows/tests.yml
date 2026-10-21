@@ -26,11 +26,11 @@ jobs:
       - name: Point TMPDIR at runner temp
         run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+      # Minis persist ~/.npm on disk. GitHub's remote cache is 0.4–1 MB/s for ~1.4 GB.
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: package-lock.json
+          package-manager-cache: false
 
       - run: npm ci
 
