@@ -27,6 +27,24 @@ export function emaValues(values: readonly number[], period: number): (number | 
   return out;
 }
 
+/** Full compute directly from candle closes, retaining recurrence checkpoints. */
+export function emaCandleValues(candles: readonly Candle[], period: number): (number | null)[] {
+  if (Number.isNaN(period)) return emaValues(candles.map(c => c.close), period);
+  const out: (number | null)[] = new Array<number | null>(candles.length);
+  if (period <= 0 || candles.length < period) return out.fill(null);
+  out.fill(null, 0, period - 1);
+  const k = 2 / (period + 1);
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += candles[i].close;
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < candles.length; i++) {
+    prev = candles[i].close * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
 /** EMA's previous output is the complete recurrence state after seeding. */
 export function updateEma(out: (number | null)[], candles: readonly Candle[], from: number, period: number): boolean {
   if (!Number.isFinite(period) || from < period || out[from - 1] === undefined) return false;
@@ -105,7 +123,7 @@ export const emaIndicator: IndicatorDef = {
       values = emaWasm(closes, period, kernels);
       wasmStates.set(values, state);
     } else {
-      values = emaValues(candles.map((c) => c.close), period);
+      values = emaCandleValues(candles, period);
     }
     return {
       pane: 'main',

@@ -10,7 +10,7 @@
 
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
-import { rollingMaxValues, rollingMinValues } from './rolling.js';
+import { rollingCandleExtremes } from './rolling.js';
 import { windowMid } from './donchian.js';
 import { lengthParam } from './params.js';
 
@@ -23,17 +23,6 @@ export interface IchimokuValues {
   chikou: (number | null)[];
 }
 
-function midline(highs: readonly number[], lows: readonly number[], period: number): (number | null)[] {
-  const high = rollingMaxValues(highs, period);
-  const low = rollingMinValues(lows, period);
-  const out = new Array<number | null>(highs.length);
-  for (let i = 0; i < highs.length; i++) {
-    const mid = (high[i] + low[i]) / 2;
-    out[i] = Number.isNaN(mid) ? null : mid;
-  }
-  return out;
-}
-
 /**
  * Computes the five Ichimoku lines in f64 JS (exact channel prices; the
  * f32 WASM kernels would round them). Values are indexed by source bar.
@@ -44,13 +33,24 @@ export function ichimokuValues(
   base: number,
   span: number,
 ): IchimokuValues {
-  const highs = candles.map((c) => c.high);
-  const lows = candles.map((c) => c.low);
-  const tenkan = midline(highs, lows, conversion);
-  const kijun = midline(highs, lows, base);
-  const senkouB = midline(highs, lows, span);
-  const senkouA = tenkan.map((t, i) => (t === null || kijun[i] === null ? null : (t + (kijun[i] as number)) / 2));
-  const chikou = candles.map((c) => c.close);
+  const t = rollingCandleExtremes(candles, conversion);
+  const k = rollingCandleExtremes(candles, base);
+  const b = rollingCandleExtremes(candles, span);
+  const tenkan = new Array<number | null>(candles.length);
+  const kijun = new Array<number | null>(candles.length);
+  const senkouA = new Array<number | null>(candles.length);
+  const senkouB = new Array<number | null>(candles.length);
+  const chikou = new Array<number | null>(candles.length);
+  for (let i = 0; i < candles.length; i++) {
+    const tm = (t.max[i] + t.min[i]) / 2;
+    const km = (k.max[i] + k.min[i]) / 2;
+    const bm = (b.max[i] + b.min[i]) / 2;
+    tenkan[i] = Number.isNaN(tm) ? null : tm;
+    kijun[i] = Number.isNaN(km) ? null : km;
+    senkouA[i] = Number.isNaN(tm) || Number.isNaN(km) ? null : (tm + km) / 2;
+    senkouB[i] = Number.isNaN(bm) ? null : bm;
+    chikou[i] = candles[i].close;
+  }
   return { tenkan, kijun, senkouA, senkouB, chikou };
 }
 

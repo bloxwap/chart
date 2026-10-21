@@ -8,7 +8,7 @@
 
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
-import { rollingMaxValues, rollingMinValues } from './rolling.js';
+import { rollingCandleExtremes } from './rolling.js';
 import { lengthParam } from './params.js';
 
 /**
@@ -20,8 +20,7 @@ export function donchianValues(
   candles: readonly Candle[],
   period: number,
 ): { upper: (number | null)[]; lower: (number | null)[]; basis: (number | null)[] } {
-  const highs = rollingMaxValues(candles.map((c) => c.high), period);
-  const lows = rollingMinValues(candles.map((c) => c.low), period);
+  const { max: highs, min: lows } = rollingCandleExtremes(candles, period);
   const upper = new Array<number | null>(candles.length);
   const lower = new Array<number | null>(candles.length);
   const basis = new Array<number | null>(candles.length);

@@ -6,30 +6,9 @@
  * @module
  */
 
+import type { Candle } from '../core/data.js';
 import { TailState } from './tail.js';
 import type { WasmKernels } from '../wasm/loader.js';
-
-function rolling(values: ArrayLike<number>, period: number, pick: (a: number, b: number) => number): Float64Array {
-  const length = values.length;
-  const out = new Float64Array(length).fill(NaN);
-  const window = Math.floor(period);
-  if (!(window >= 1 && window <= length)) return out;
-  // van Herk/Gil-Werman, as in the kernel: block prefix extremes in `out`,
-  // block suffix extremes in `suffix`, then one combine per window.
-  const suffix = new Float64Array(length);
-  let acc = 0;
-  for (let i = 0; i < length; i++) {
-    acc = i % window === 0 ? values[i] : pick(acc, values[i]);
-    out[i] = acc;
-  }
-  for (let i = length - 1; i >= 0; i--) {
-    acc = i === length - 1 || i % window === window - 1 ? values[i] : pick(acc, values[i]);
-    suffix[i] = acc;
-  }
-  for (let i = window - 1; i < length; i++) out[i] = pick(suffix[i - window + 1], out[i]);
-  out.fill(NaN, 0, window - 1);
-  return out;
-}
 
 /**
  * Sliding-window maximum of the last `period` values (floored). NaN before
@@ -38,12 +17,100 @@ function rolling(values: ArrayLike<number>, period: number, pick: (a: number, b:
  * WASM `rollingMax` kernel on f32 inputs.
  */
 export function rollingMaxValues(values: ArrayLike<number>, period: number): Float64Array {
-  return rolling(values, period, Math.max);
+  const length = values.length;
+  const out = new Float64Array(length);
+  const window = Math.floor(period);
+  if (!(window >= 1 && window <= length)) return out.fill(NaN);
+  // Block prefix/suffix extremes, with the same operand order as the
+  // kernels. Block boundaries avoid a remainder and callback per value.
+  const suffix = new Float64Array(length);
+  for (let start = 0; start < length; start += window) {
+    const end = Math.min(start + window, length);
+    let acc = values[start];
+    out[start] = acc;
+    for (let i = start + 1; i < end; i++) {
+      acc = Math.max(acc, values[i]);
+      out[i] = acc;
+    }
+    acc = values[end - 1];
+    suffix[end - 1] = acc;
+    for (let i = end - 2; i >= start; i--) {
+      acc = Math.max(acc, values[i]);
+      suffix[i] = acc;
+    }
+  }
+  for (let i = window - 1; i < length; i++) out[i] = Math.max(suffix[i - window + 1], out[i]);
+  out.fill(NaN, 0, window - 1);
+  return out;
 }
 
 /** Sliding-window minimum; semantics as {@link rollingMaxValues}. */
 export function rollingMinValues(values: ArrayLike<number>, period: number): Float64Array {
-  return rolling(values, period, Math.min);
+  const length = values.length;
+  const out = new Float64Array(length);
+  const window = Math.floor(period);
+  if (!(window >= 1 && window <= length)) return out.fill(NaN);
+  // Block prefix/suffix extremes, with the same operand order as the
+  // kernels. Block boundaries avoid a remainder and callback per value.
+  const suffix = new Float64Array(length);
+  for (let start = 0; start < length; start += window) {
+    const end = Math.min(start + window, length);
+    let acc = values[start];
+    out[start] = acc;
+    for (let i = start + 1; i < end; i++) {
+      acc = Math.min(acc, values[i]);
+      out[i] = acc;
+    }
+    acc = values[end - 1];
+    suffix[end - 1] = acc;
+    for (let i = end - 2; i >= start; i--) {
+      acc = Math.min(acc, values[i]);
+      suffix[i] = acc;
+    }
+  }
+  for (let i = window - 1; i < length; i++) out[i] = Math.min(suffix[i - window + 1], out[i]);
+  out.fill(NaN, 0, window - 1);
+  return out;
+}
+
+/** Exact price extremes without materializing high/low columns. */
+export function rollingCandleExtremes(candles: readonly Candle[], period: number): { max: Float64Array; min: Float64Array } {
+  const length = candles.length;
+  const max = new Float64Array(length);
+  const min = new Float64Array(length);
+  const window = Math.floor(period);
+  if (!(window >= 1 && window <= length)) return { max: max.fill(NaN), min: min.fill(NaN) };
+  const suffixMax = new Float64Array(length);
+  const suffixMin = new Float64Array(length);
+  for (let start = 0; start < length; start += window) {
+    const end = Math.min(start + window, length);
+    let hi = candles[start].high, lo = candles[start].low;
+    max[start] = hi;
+    min[start] = lo;
+    for (let i = start + 1; i < end; i++) {
+      hi = Math.max(hi, candles[i].high);
+      lo = Math.min(lo, candles[i].low);
+      max[i] = hi;
+      min[i] = lo;
+    }
+    hi = candles[end - 1].high;
+    lo = candles[end - 1].low;
+    suffixMax[end - 1] = hi;
+    suffixMin[end - 1] = lo;
+    for (let i = end - 2; i >= start; i--) {
+      hi = Math.max(hi, candles[i].high);
+      lo = Math.min(lo, candles[i].low);
+      suffixMax[i] = hi;
+      suffixMin[i] = lo;
+    }
+  }
+  for (let i = window - 1; i < length; i++) {
+    max[i] = Math.max(suffixMax[i - window + 1], max[i]);
+    min[i] = Math.min(suffixMin[i - window + 1], min[i]);
+  }
+  max.fill(NaN, 0, window - 1);
+  min.fill(NaN, 0, window - 1);
+  return { max, min };
 }
 
 /**
@@ -72,9 +139,9 @@ const sparseStates = new WeakMap<readonly (number | null)[], TailState<number[]>
  */
 export function smaSparseValues(values: readonly (number | null)[], period: number): (number | null)[] {
   const length = values.length;
-  const out = new Array<number | null>(length).fill(null);
+  const out = new Array<number | null>(length);
   const window = Math.floor(period);
-  if (!(window >= 1)) return out;
+  if (!(window >= 1)) return out.fill(null);
   const state = new TailState<number[]>(value => value.slice());
   sparseStates.set(out, state);
   let sum = 0;
@@ -94,7 +161,7 @@ export function smaSparseValues(values: readonly (number | null)[], period: numb
     }
     // A full window means every value in it (including v) is present. A
     // one-bar window passes v through exactly instead of the running sum.
-    if (valid === window) out[i] = window === 1 ? v : sum / window;
+    out[i] = valid === window ? window === 1 ? v : sum / window : null;
     if (i >= length - 2) state.save(i, length, [sum, valid]);
   }
   return out;
