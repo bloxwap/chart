@@ -45,6 +45,26 @@ export function applyTick(bar: Candle, price: number, bucketMs: number): Candle 
  * with the last row winning, and sorts ascending. Returns fresh candles.
  */
 export function normalizeCandles(candles: readonly Candle[]): Candle[] {
+  let increasing = true;
+  let prev = -Infinity;
+  for (const candle of candles) {
+    if (!(candle.time > prev)) {
+      increasing = false;
+      break;
+    }
+    prev = candle.time;
+  }
+  if (increasing) {
+    const rows: Candle[] = [];
+    for (const candle of candles) {
+      const { time, open, high, low, close } = candle;
+      if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
+      if (!Number.isFinite(time) || time <= 0) continue;
+      const volume = candle.volume ?? 0;
+      rows.push({ time, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 });
+    }
+    return rows;
+  }
   const byTime = new Map<number, Candle>();
   for (const candle of candles) {
     const { time, open, high, low, close } = candle;

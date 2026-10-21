@@ -13,6 +13,8 @@ import {
   type FetchBarsRequest,
 } from '../dist/datafeed/index.js';
 
+import { pageHistory } from '../dist/datafeed/pagination.js';
+
 const MIN = 60_000;
 const M15 = 15 * MIN;
 const NOW = 1_700_000_123_456; // mid-bucket on purpose
@@ -289,5 +291,29 @@ describe('loadHistory', () => {
     // A signal without a reason still rejects.
     const bare = { aborted: true, reason: undefined } as unknown as AbortSignal;
     await assert.rejects(loadHistory({ fetchBars: src.fetchBars, symbol: 'BTC', intervalMs: M15, toMs: NOW, countBack: 10, signal: bare }), /history read aborted/);
+  });
+});
+
+describe('pageHistory assembly', () => {
+  for (const read of [pageHistory, async (options: Parameters<typeof pageHistory>[0]) => ({ bars: await loadHistory(options) })]) {
+    it('assembles pages across a gap and trims excess older rows', async () => {
+      const pages = [[candleAt(9_000)], [], [candleAt(4_000), candleAt(4_500), candleAt(5_000)]];
+      const requests: FetchBarsRequest[] = [];
+      const result = await read({
+        fetchBars: async (req) => { requests.push(req); return pages[requests.length - 1]!; },
+        symbol: 'X', intervalMs: 1_000, toMs: 9_000, countBack: 3, pageSize: 3,
+      });
+      assert.deepEqual(result.bars, [candleAt(4_500), candleAt(5_000), candleAt(9_000)]);
+      assert.deepEqual(requests.map((r) => r.countBack), [3, 2, 3]);
+      if ('exhausted' in result) assert.equal(result.exhausted, false);
+    });
+  }
+
+  it('reports exhaustion for a single clamped page and empty history', async () => {
+    const options = { symbol: 'X', intervalMs: 1_000, fromMs: 1_000, toMs: 2_000, countBack: 2 };
+    assert.deepEqual(await pageHistory({ ...options, fetchBars: async () => [candleAt(2_000), candleAt(1_000)] }), {
+      bars: [candleAt(1_000), candleAt(2_000)], exhausted: true,
+    });
+    assert.deepEqual(await pageHistory({ ...options, fetchBars: async () => [] }), { bars: [], exhausted: true });
   });
 });
