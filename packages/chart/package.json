@@ -70,8 +70,8 @@
   ],
   "scripts": {
     "build": "npm run build:icons && npm run build:wasm && npm run build:ts",
-    "build:ts": "tsc -p tsconfig.json",
-    "build:ts-test": "tsc -p tsconfig.test.json",
+    "build:ts": "tsrs -p tsconfig.json",
+    "build:ts-test": "tsrs -p tsconfig.test.json",
     "build:wasm": "node scripts/build-wasm.mjs",
     "build:icons": "npm run lint:icons && node scripts/build-icons.mjs",
     "lint:icons": "node scripts/lint-icons.mjs",
@@ -112,7 +112,7 @@
     "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "typescript": "^6.0.3",
+    "tsrs": "0.18.0-ts7.1.0-dev.20260929",
     "wabt": "^1.0.39"
   }
 }
