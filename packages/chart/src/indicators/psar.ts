@@ -5,8 +5,11 @@
  */
 
 import type { Candle } from '../core/data.js';
+import { TailState, smallTail } from './tail.js';
 import type { IndicatorDef } from './types.js';
 import { numberParam } from './params.js';
+
+const states = new WeakMap<readonly (number | null)[], TailState<number[]>>();
 
 /**
  * Wilder's Parabolic SAR, transcribed from TradingView's `ta.sar`: the
@@ -22,11 +25,17 @@ export function psarValues(
   maximum: number,
 ): (number | null)[] {
   const out = new Array<number | null>(candles.length).fill(null);
-  let result = 0;
-  let extreme = 0;
-  let acceleration = start;
-  let rising = false;
-  for (let i = 1; i < candles.length; i++) {
+  const checkpoints = new TailState<number[]>(value => value.slice());
+  states.set(out, checkpoints);
+  runPsar(candles, start, increment, maximum, out, 1, [0, 0, start, 0], checkpoints);
+  return out;
+}
+
+function runPsar(candles: readonly Candle[], start: number, increment: number, maximum: number,
+  out: (number | null)[], from: number, state: number[], checkpoints: TailState<number[]>): void {
+  let [result, extreme, acceleration] = state;
+  let rising = state[3] === 1;
+  for (let i = from; i < candles.length; i++) {
     const c = candles[i];
     const prev = candles[i - 1];
     let firstTrendBar = false;
@@ -57,8 +66,9 @@ export function psarValues(
       if (i > 1) result = Math.max(result, candles[i - 2].high);
     }
     out[i] = result;
+    if (i >= candles.length - 2) checkpoints.save(i, candles.length, [result, extreme, acceleration, rising ? 1 : 0]);
   }
-  return out;
+  checkpoints.prune(candles.length);
 }
 
 /** Parabolic SAR definition (params `start` = 0.02, `increment` = 0.02, `max` = 0.2; main pane, dots). */
@@ -75,6 +85,15 @@ export const psarIndicator: IndicatorDef = {
     { key: 'max', label: 'Max value', min: 0, step: 0.01 },
   ],
   styles: [{ key: 'value', label: 'SAR', colorIndex: 0, kind: 'dots' }],
+  update(output, candles, from, params) {
+    const out = output.lines[0].values as (number | null)[];
+    const checkpoints = states.get(out);
+    const state = checkpoints?.get(from - 1);
+    if (!smallTail(candles.length, from) || state === undefined) return undefined;
+    runPsar(candles, numberParam(params, 'start', 0.02), numberParam(params, 'increment', 0.02),
+      numberParam(params, 'max', 0.2), out, from, state, checkpoints!);
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const values = psarValues(
       candles,

@@ -6,7 +6,8 @@
 
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
-import { smaValues } from './sma.js';
+import { smallTail } from './tail.js';
+import { smaValues, updateSma } from './sma.js';
 
 /**
  * Population standard deviation in O(length) time and O(period) scratch space.
@@ -76,6 +77,24 @@ export const bollIndicator: IndicatorDef = {
     { key: 'upper', label: 'Upper', colorIndex: 1 },
     { key: 'lower', label: 'Lower', colorIndex: 2 },
   ],
+  update(output, candles, from, params) {
+    const period = Math.max(1, Math.floor(params['period'] ?? 20));
+    if (!Number.isFinite(period) || !smallTail(candles.length, from, period)) return undefined;
+    const [mid, upper, lower] = output.lines.map(line => line.values as (number | null)[]);
+    if (!updateSma(mid, candles, from, period)) return undefined;
+    // stddev's moments reset at index-determined block boundaries. Include
+    // the preceding complete block so suffix/prefix arithmetic is identical.
+    const start = Math.max(0, (Math.floor(from / period) - 1) * period);
+    const std = stddevValues(candles.slice(start).map(c => c.close), period);
+    const mult = params['mult'] ?? 2;
+    for (let i = from; i < candles.length; i++) {
+      // A saved SMA sum implies its warmup has completed at this tail.
+      const m = mid[i] as number;
+      upper[i] = m + mult * (std[i - start] as number);
+      lower[i] = m - mult * (std[i - start] as number);
+    }
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = Math.max(1, Math.floor(params['period'] ?? 20));
     const mult = params['mult'] ?? 2;

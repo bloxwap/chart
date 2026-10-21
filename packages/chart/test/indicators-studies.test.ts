@@ -815,7 +815,7 @@ describe('studies inside a chart', () => {
     const next = { ...last, time: last.time + 3600, volume: 42 };
     live.push(next);
     chart.appendData(next);
-    assert.equal(updates, 10);
+    assert.equal(updates, 12);
     assert.equal(chart.dataLength, 121);
     for (const def of studies) {
       assert.deepEqual(outputs.get(def.name), def.compute(live, paramsOf(def), colorsOf.get(def.name)!, null), def.name);

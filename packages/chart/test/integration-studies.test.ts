@@ -63,7 +63,7 @@ function history(n: number, lastMs: number, seed = 5): Candle[] {
   return out;
 }
 
-/** Studies with a tail updater; MA Ribbon (no updater) always recomputes. */
+/** Studies exercised through the live bar folder. */
 const INCREMENTAL = [vwapIndicator, adxIndicator, cciIndicator, mfiIndicator, obvIndicator];
 const STUDIES = [...INCREMENTAL, maRibbonIndicator];
 const PARAMS: Record<string, Record<string, number>> = {
