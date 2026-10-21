@@ -1,8 +1,8 @@
 name: Tests
 
 # Runs on the org Mac mini self-hosted runners. See docs/ci-runners.md.
-# Gates every pull request on the same checks contributors run locally. Runs on all PRs (no path
-# filter) so it can be made a required status check without blocking docs-only changes.
+# Gates pull requests on the same checks contributors run locally. Job-level filtering lets
+# docs-only PRs skip tests successfully, so the test job can remain a required status check.
 on:
   pull_request:
   workflow_dispatch:
@@ -15,9 +15,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  changes:
     # Security: never run fork PR code on the self-hosted runner.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.code == 'true' && 'true' || steps.filter.outputs.docs_markdown }}
+    steps:
+      # Only PRs skip prose-only changes; all other events run the full test job.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!LICENSE'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/pull_request_template.md'
+              - '!CODEOWNERS'
+            # npm ci runs fumadocs-mdx postinstall, so docs content is a build input.
+            docs_markdown:
+              - 'apps/docs/content/docs/**/*.md'
+
+  test:
+    needs: changes
+    # Security: never run fork PR code on the self-hosted runner.
+    if: needs.changes.outputs.code == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
 
