@@ -11,7 +11,7 @@ import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
 import type { WasmKernels } from '../wasm/loader.js';
 import { smallTail, TailSeries, TAIL_HISTORY_MARGIN } from './tail.js';
-import { rsiValues, updateRsi, retainRsi } from './rsi.js';
+import { rsiValues, rsiCandleValues, updateRsi, retainRsi } from './rsi.js';
 import { smaSparseValues, updateSparse } from './rolling.js';
 import { stochBands, stochValues, updateStoch } from './stoch.js';
 import { lengthParam } from './params.js';
@@ -34,10 +34,16 @@ export function stochRsiValues(
   kernels: WasmKernels | null = null,
 ): { k: (number | null)[]; d: (number | null)[] } {
   const rsiValuesOut = rsiValues(closes, Math.floor(rsiPeriod));
-  const rsi = Float64Array.from(rsiValuesOut, (v) => v ?? NaN);
+  return smoothRsi(rsiValuesOut, stochPeriod, smoothK, smoothD, kernels);
+}
+
+function smoothRsi(rsiValuesOut: (number | null)[], stochPeriod: number, smoothK: number, smoothD: number,
+  kernels: WasmKernels | null): { k: (number | null)[]; d: (number | null)[] } {
+  const rsi = new Float64Array(rsiValuesOut.length);
+  for (let i = 0; i < rsi.length; i++) rsi[i] = rsiValuesOut[i] ?? NaN;
   const raw = stochValues(rsi, rsi, rsi, stochPeriod, kernels);
   const k = smaSparseValues(raw, smoothK);
-  if (stochPeriod >= 1 && stochPeriod <= closes.length && smoothK >= 1 && smoothK <= closes.length) {
+  if (stochPeriod >= 1 && stochPeriod <= rsiValuesOut.length && smoothK >= 1 && smoothK <= rsiValuesOut.length) {
     states.set(k, { rsi: retainRsi(rsiValuesOut, Math.floor(stochPeriod) + TAIL_HISTORY_MARGIN),
       raw: new TailSeries(raw, Math.floor(smoothK) + TAIL_HISTORY_MARGIN) });
   }
@@ -81,9 +87,8 @@ export const stochRsiIndicator: IndicatorDef = {
     return output;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[], kernels: WasmKernels | null) {
-    const { k, d } = stochRsiValues(
-      candles.map((c) => c.close),
-      lengthParam(params, 'rsi', 14), lengthParam(params, 'stoch', 14),
+    const { k, d } = smoothRsi(
+      rsiCandleValues(candles, lengthParam(params, 'rsi', 14)), lengthParam(params, 'stoch', 14),
       lengthParam(params, 'k', 3), lengthParam(params, 'd', 3), kernels,
     );
     return {

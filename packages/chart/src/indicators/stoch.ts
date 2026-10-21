@@ -11,7 +11,7 @@ import type { Candle } from '../core/data.js';
 import type { IndicatorDef, IndicatorLevel } from './types.js';
 import type { WasmKernels } from '../wasm/loader.js';
 import { smallTail, TailSeries, TAIL_HISTORY_MARGIN, setSeriesValue, type MutableSeries } from './tail.js';
-import { rollingExtremes, smaSparseValues, updateSparse } from './rolling.js';
+import { rollingCandleExtremes, rollingExtremes, smaSparseValues, updateSparse } from './rolling.js';
 import { lengthParam } from './params.js';
 
 const rawStates = new WeakMap<readonly (number | null)[], TailSeries>();
@@ -32,10 +32,10 @@ export function stochValues(
   kernels: WasmKernels | null = null,
 ): (number | null)[] {
   const { max, min } = rollingExtremes(high, low, period, kernels);
-  const out = new Array<number | null>(source.length).fill(null);
+  const out = new Array<number | null>(source.length);
   for (let i = 0; i < source.length; i++) {
     const range = max[i] - min[i];
-    if (Number.isNaN(range) || range === 0) continue;
+    if (Number.isNaN(range) || range === 0) { out[i] = null; continue; }
     const value = kernels === null ? source[i] : Math.fround(source[i]);
     out[i] = 100 * (value - min[i]) / range;
   }
@@ -95,10 +95,12 @@ export const stochIndicator: IndicatorDef = {
     return output;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
-    const raw = stochValues(
-      candles.map((c) => c.close), candles.map((c) => c.high), candles.map((c) => c.low),
-      lengthParam(params, 'period', 14),
-    );
+    const { max, min } = rollingCandleExtremes(candles, lengthParam(params, 'period', 14));
+    const raw = new Array<number | null>(candles.length);
+    for (let i = 0; i < candles.length; i++) {
+      const range = max[i] - min[i];
+      raw[i] = Number.isNaN(range) || range === 0 ? null : 100 * (candles[i].close - min[i]) / range;
+    }
     const k = smaSparseValues(raw, lengthParam(params, 'smoothK', 1));
     const d = smaSparseValues(k, lengthParam(params, 'smoothD', 3));
     const smoothK = lengthParam(params, 'smoothK', 1);

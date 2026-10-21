@@ -29,6 +29,24 @@ export function smaValues(values: readonly number[], period: number): (number | 
   return out;
 }
 
+/** Full compute directly from candle closes, retaining recurrence checkpoints. */
+export function smaCandleValues(candles: readonly Candle[], period: number): (number | null)[] {
+  if (Number.isNaN(period)) return smaValues(candles.map(c => c.close), period);
+  const out: (number | null)[] = new Array<number | null>(candles.length);
+  if (period <= 0 || candles.length < period) return out.fill(null);
+  out.fill(null, 0, period - 1);
+  const state = new TailState<number>(value => value);
+  sums.set(out, state);
+  let sum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    sum += candles[i].close;
+    if (i >= period) sum -= candles[i - period].close;
+    if (i >= period - 1) out[i] = sum / period;
+    if (i >= candles.length - 2) state.save(i, candles.length, sum);
+  }
+  return out;
+}
+
 /** Resume the exact running sum, including its accumulated rounding error. */
 export function updateSma(out: (number | null)[], candles: readonly Candle[], from: number, period: number): boolean {
   const state = sums.get(out);
@@ -107,7 +125,7 @@ export const smaIndicator: IndicatorDef = {
       values = smaWasm(closes, period, kernels);
       wasmStates.set(values, state);
     } else {
-      values = smaValues(candles.map((c) => c.close), period);
+      values = smaCandleValues(candles, period);
     }
     return {
       pane: 'main',

@@ -49,7 +49,20 @@ export function rmaValues(values: readonly number[], period: number): (number | 
 
 /** ATR over `period` bars (floored); null during the `period - 1` warmup bars. */
 export function atrValues(candles: readonly Candle[], period: number): (number | null)[] {
-  return rmaValues(trueRangeValues(candles), period);
+  const out = new Array<number | null>(candles.length);
+  const window = Math.floor(period);
+  if (!(window >= 1) || candles.length < window) return out.fill(null);
+  out.fill(null, 0, window - 1);
+  const alpha = 1 / window;
+  let sum = 0;
+  for (let i = 0; i < window; i++) sum += trueRange(candles, i);
+  let prev = sum / window;
+  out[window - 1] = prev;
+  for (let i = window; i < candles.length; i++) {
+    prev = alpha * trueRange(candles, i) + (1 - alpha) * prev;
+    out[i] = prev;
+  }
+  return out;
 }
 
 /** ATR indicator definition (name `'atr'`, param `period`, default 14; sub-pane). */
