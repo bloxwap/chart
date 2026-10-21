@@ -10,8 +10,11 @@
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef, IndicatorLevel } from './types.js';
 import type { WasmKernels } from '../wasm/loader.js';
-import { rollingExtremes, smaSparseValues } from './rolling.js';
+import { smallTail, TailSeries, TAIL_HISTORY_MARGIN, setSeriesValue, type MutableSeries } from './tail.js';
+import { rollingExtremes, smaSparseValues, updateSparse } from './rolling.js';
 import { lengthParam } from './params.js';
+
+const rawStates = new WeakMap<readonly (number | null)[], TailSeries>();
 
 /**
  * Raw stochastic (`ta.stoch`): `100 × (source − lowest(low)) / (highest(high)
@@ -37,6 +40,20 @@ export function stochValues(
     out[i] = 100 * (value - min[i]) / range;
   }
   return out;
+}
+
+/** Extremes are bounded windows; min/max preserve NaNs and signed zero. */
+export function updateStoch(raw: MutableSeries, length: number, from: number, period: number,
+  source: (i: number) => number, high: (i: number) => number, low: (i: number) => number): void {
+  for (let i = from; i < length; i++) {
+    let max = -Infinity, min = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      max = Math.max(max, high(j));
+      min = Math.min(min, low(j));
+    }
+    const range = max - min;
+    setSeriesValue(raw, i, Number.isNaN(range) || range === 0 ? null : 100 * (source(i) - min) / range);
+  }
 }
 
 /** The 80/20 overbought/oversold bands shared by Stoch and Stoch RSI. */
@@ -66,6 +83,17 @@ export const stochIndicator: IndicatorDef = {
     { key: 'upperBand', label: 'Upper band', colorIndex: 2, kind: 'level' },
     { key: 'lowerBand', label: 'Lower band', colorIndex: 3, kind: 'level' },
   ],
+  update(output, candles, from, params) {
+    const period = lengthParam(params, 'period', 14);
+    const k = output.lines[0].values as (number | null)[];
+    const d = output.lines[1].values as (number | null)[];
+    const raw = rawStates.get(k);
+    if (raw === undefined || from < period || !smallTail(candles.length, from, period)) return undefined;
+    updateStoch(raw, candles.length, from, period, i => candles[i].close, i => candles[i].high, i => candles[i].low);
+    if (!updateSparse(k, raw, from, lengthParam(params, 'smoothK', 1))) return undefined;
+    updateSparse(d, k, from, lengthParam(params, 'smoothD', 3));
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const raw = stochValues(
       candles.map((c) => c.close), candles.map((c) => c.high), candles.map((c) => c.low),
@@ -73,6 +101,8 @@ export const stochIndicator: IndicatorDef = {
     );
     const k = smaSparseValues(raw, lengthParam(params, 'smoothK', 1));
     const d = smaSparseValues(k, lengthParam(params, 'smoothD', 3));
+    const smoothK = lengthParam(params, 'smoothK', 1);
+    if (smoothK <= candles.length) rawStates.set(k, new TailSeries(raw, smoothK + TAIL_HISTORY_MARGIN));
     return {
       pane: 'sub',
       lines: [

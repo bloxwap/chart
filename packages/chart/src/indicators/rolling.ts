@@ -6,6 +6,7 @@
  * @module
  */
 
+import { TailState } from './tail.js';
 import type { WasmKernels } from '../wasm/loader.js';
 
 function rolling(values: ArrayLike<number>, period: number, pick: (a: number, b: number) => number): Float64Array {
@@ -63,6 +64,8 @@ export function rollingExtremes(
   };
 }
 
+const sparseStates = new WeakMap<readonly (number | null)[], TailState<number[]>>();
+
 /**
  * Simple moving average over a sparse series, TradingView style: any `null`
  * (or NaN) inside a window makes that window `null`. Null during warmup.
@@ -72,6 +75,8 @@ export function smaSparseValues(values: readonly (number | null)[], period: numb
   const out = new Array<number | null>(length).fill(null);
   const window = Math.floor(period);
   if (!(window >= 1)) return out;
+  const state = new TailState<number[]>(value => value.slice());
+  sparseStates.set(out, state);
   let sum = 0;
   let valid = 0;
   for (let i = 0; i < length; i++) {
@@ -90,6 +95,27 @@ export function smaSparseValues(values: readonly (number | null)[], period: numb
     // A full window means every value in it (including v) is present. A
     // one-bar window passes v through exactly instead of the running sum.
     if (valid === window) out[i] = window === 1 ? v : sum / window;
+    if (i >= length - 2) state.save(i, length, [sum, valid]);
   }
   return out;
+}
+
+/** Resume sparse smoothing with the original sum and valid-value count. */
+export function updateSparse(out: (number | null)[], input: { length: number; at(index: number): number | null | undefined }, from: number, period: number): boolean {
+  const state = sparseStates.get(out);
+  const previous = state?.get(from - 1);
+  if (previous === undefined) return false;
+  let [sum, valid] = previous;
+  for (let i = from; i < input.length; i++) {
+    const v = input.at(i) as number | null;
+    if (v !== null && !Number.isNaN(v)) { sum += v; valid++; }
+    if (i >= period) {
+      const old = input.at(i - period) as number | null;
+      if (old !== null && !Number.isNaN(old)) { sum -= old; valid--; }
+    }
+    out[i] = valid === period ? period === 1 ? v : sum / period : null;
+    state!.save(i, input.length, [sum, valid]);
+  }
+  state!.prune(input.length);
+  return true;
 }

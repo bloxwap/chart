@@ -10,10 +10,15 @@
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
 import type { WasmKernels } from '../wasm/loader.js';
-import { rsiValues } from './rsi.js';
-import { smaSparseValues } from './rolling.js';
-import { stochBands, stochValues } from './stoch.js';
+import { smallTail, TailSeries, TAIL_HISTORY_MARGIN } from './tail.js';
+import { rsiValues, updateRsi, retainRsi } from './rsi.js';
+import { smaSparseValues, updateSparse } from './rolling.js';
+import { stochBands, stochValues, updateStoch } from './stoch.js';
 import { lengthParam } from './params.js';
+
+const states = new WeakMap<readonly (number | null)[], {
+  rsi: TailSeries; raw: TailSeries;
+}>();
 
 /**
  * %K and %D of the Stochastic RSI. Null until RSI and both smoothing
@@ -28,8 +33,14 @@ export function stochRsiValues(
   smoothD: number,
   kernels: WasmKernels | null = null,
 ): { k: (number | null)[]; d: (number | null)[] } {
-  const rsi = Float64Array.from(rsiValues(closes, Math.floor(rsiPeriod)), (v) => v ?? NaN);
-  const k = smaSparseValues(stochValues(rsi, rsi, rsi, stochPeriod, kernels), smoothK);
+  const rsiValuesOut = rsiValues(closes, Math.floor(rsiPeriod));
+  const rsi = Float64Array.from(rsiValuesOut, (v) => v ?? NaN);
+  const raw = stochValues(rsi, rsi, rsi, stochPeriod, kernels);
+  const k = smaSparseValues(raw, smoothK);
+  if (stochPeriod >= 1 && stochPeriod <= closes.length && smoothK >= 1 && smoothK <= closes.length) {
+    states.set(k, { rsi: retainRsi(rsiValuesOut, Math.floor(stochPeriod) + TAIL_HISTORY_MARGIN),
+      raw: new TailSeries(raw, Math.floor(smoothK) + TAIL_HISTORY_MARGIN) });
+  }
   return { k, d: smaSparseValues(k, smoothD) };
 }
 
@@ -53,6 +64,22 @@ export const stochRsiIndicator: IndicatorDef = {
     { key: 'upperBand', label: 'Upper band', colorIndex: 2, kind: 'level' },
     { key: 'lowerBand', label: 'Lower band', colorIndex: 3, kind: 'level' },
   ],
+  update(output, candles, from, params, _colors, kernels) {
+    const k = output.lines[0].values as (number | null)[];
+    const d = output.lines[1].values as (number | null)[];
+    const state = states.get(k);
+    const period = lengthParam(params, 'stoch', 14);
+    if (state === undefined || from < period || !smallTail(candles.length, from, period)) return undefined;
+    if (!updateRsi(state.rsi, candles, from, lengthParam(params, 'rsi', 14))) return undefined;
+    const value = kernels === null
+      ? (i: number): number => state.rsi.at(i) ?? NaN
+      : (i: number): number => Math.fround(state.rsi.at(i) ?? NaN);
+    updateStoch(state.raw, candles.length, from, period, value, value, value);
+    // The RSI checkpoint also guarantees both smoothing checkpoints exist.
+    updateSparse(k, state.raw, from, lengthParam(params, 'k', 3));
+    updateSparse(d, k, from, lengthParam(params, 'd', 3));
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[], kernels: WasmKernels | null) {
     const { k, d } = stochRsiValues(
       candles.map((c) => c.close),

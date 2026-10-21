@@ -8,8 +8,9 @@
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef, IndicatorLine } from './types.js';
 import type { StudyMeta } from './study-meta.js';
-import { smaValues } from './sma.js';
-import { emaValues } from './ema.js';
+import { smallTail } from './tail.js';
+import { smaValues, updateSma } from './sma.js';
+import { emaValues, updateEma } from './ema.js';
 
 const DEFAULT_LENGTHS = [20, 50, 100, 200, 0, 0, 0, 0];
 
@@ -49,6 +50,16 @@ export const maRibbonIndicator: IndicatorDef = {
   defaultParams: { type: 1, len1: 20, len2: 50, len3: 100, len4: 200, len5: 0, len6: 0, len7: 0, len8: 0 },
   defaultColors: [...DEFAULT_COLORS],
   defaultPane: 'main',
+  update(output, candles, from, params) {
+    if (!smallTail(candles.length, from)) return undefined;
+    const update = Math.floor(params['type'] ?? 1) !== 0 ? updateEma : updateSma;
+    for (const line of output.lines) {
+      const slot = Number(line.key.slice(2)) - 1;
+      const length = Math.floor(params[`len${slot + 1}`] ?? DEFAULT_LENGTHS[slot]);
+      if (!update(line.values as (number | null)[], candles, from, length)) return undefined;
+    }
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const average = Math.floor(params['type'] ?? 1) !== 0 ? emaValues : smaValues;
     const closes = candles.map((c) => c.close);

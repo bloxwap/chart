@@ -5,8 +5,11 @@
  */
 
 import type { Candle } from '../core/data.js';
-import { DOWN_COLOR, UP_COLOR, type IndicatorDef } from './types.js';
+import { DOWN_COLOR, UP_COLOR, type IndicatorDef, type IndicatorOutput } from './types.js';
+import { TailState, smallTail } from './tail.js';
 import { emaValues } from './ema.js';
+
+const states = new WeakMap<IndicatorOutput, TailState<number[]>>();
 
 /** MACD indicator definition (params `fast` = 12, `slow` = 26, `signal` = 9). */
 export const macdIndicator: IndicatorDef = {
@@ -27,6 +30,34 @@ export const macdIndicator: IndicatorDef = {
     { key: 'hist', label: 'Histogram positive', colorIndex: 2, kind: 'histogram' },
     { key: 'hist', label: 'Histogram negative', colorIndex: 3, kind: 'histogram' },
   ],
+  update(output, candles, from, params) {
+    const state = states.get(output);
+    const fast = Math.max(1, Math.floor(params['fast'] ?? 12));
+    const slow = Math.max(fast + 1, Math.floor(params['slow'] ?? 26));
+    const signal = Math.max(1, Math.floor(params['signal'] ?? 9));
+    const snapshot = state?.get(from - 1);
+    if (!smallTail(candles.length, from) || snapshot === undefined || !Number.isFinite(signal)) return undefined;
+    let [previousFast, previousSlow, previous] = snapshot;
+    const fastWeight = 2 / (fast + 1), slowWeight = 2 / (slow + 1);
+    const [dif, dea] = output.lines.map(line => line.values as (number | null)[]);
+    const hist = output.bars!.values as (number | null)[];
+    const up = output.bars!.up as boolean[];
+    const weight = 2 / (signal + 1);
+    for (let i = from; i < candles.length; i++) {
+      previousFast = candles[i].close * fastWeight + previousFast * (1 - fastWeight);
+      previousSlow = candles[i].close * slowWeight + previousSlow * (1 - slowWeight);
+      const value = previousFast - previousSlow;
+      previous = value * weight + previous * (1 - weight);
+      dif[i] = value;
+      dea[i] = previous;
+      const bar = value - previous;
+      hist[i] = bar;
+      up[i] = bar >= 0;
+      state!.save(i, candles.length, [previousFast, previousSlow, previous]);
+    }
+    state!.prune(candles.length);
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const fast = Math.max(1, Math.floor(params['fast'] ?? 12));
     const slow = Math.max(fast + 1, Math.floor(params['slow'] ?? 26));
@@ -40,6 +71,7 @@ export const macdIndicator: IndicatorDef = {
     const hist = new Array<number | null>(closes.length).fill(null);
     const up = new Array<boolean>(closes.length).fill(true);
     const weight = 2 / (signal + 1);
+    const state = new TailState<number[]>(value => value.slice());
     let signalSum = 0;
     let previous = 0;
     // Fuse DIF, the SMA-seeded signal EMA and histogram in one pass. No
@@ -55,9 +87,10 @@ export const macdIndicator: IndicatorDef = {
       const bar = value - previous;
       hist[i] = bar;
       up[i] = bar >= 0;
+      if (i >= closes.length - 2) state.save(i, closes.length, [emaFast[i] as number, emaSlow[i] as number, previous]);
     }
 
-    return {
+    const output: IndicatorOutput = {
       pane: 'sub',
       bars: {
         key: 'hist',
@@ -71,5 +104,7 @@ export const macdIndicator: IndicatorDef = {
         { key: 'dea', values: dea, color: colors[1] ?? '#ff6d00' },
       ],
     };
+    states.set(output, state);
+    return output;
   },
 };

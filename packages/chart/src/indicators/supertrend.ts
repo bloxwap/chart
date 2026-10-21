@@ -5,10 +5,13 @@
  * @module
  */
 
+import { TailState, smallTail } from './tail.js';
 import type { Candle } from '../core/data.js';
 import { DOWN_COLOR, UP_COLOR, type IndicatorDef } from './types.js';
 import { atrValues } from './atr.js';
 import { lengthParam, numberParam } from './params.js';
+
+const states = new WeakMap<readonly (number | null)[], TailState<number[]>>();
 
 /**
  * Supertrend line and direction per bar (`up[i]` true in an uptrend, when the
@@ -26,10 +29,18 @@ export function supertrendValues(
   const values = new Array<number | null>(candles.length).fill(null);
   const up = new Array<boolean>(candles.length).fill(false);
   const atr = atrValues(candles, period);
-  let started = false;
-  let prevUpper = 0, prevLower = 0, prevTrend = 0;
-  for (let i = 0; i < candles.length; i++) {
-    const range = atr[i];
+  const checkpoints = new TailState<number[]>(value => value.slice());
+  states.set(values, checkpoints);
+  runSupertrend(candles, factor, i => atr[i], values, (i, rising) => { up[i] = rising; }, 0, [0, 0, 0, 0], checkpoints);
+  return { values, up };
+}
+
+function runSupertrend(candles: readonly Candle[], factor: number, rangeAt: (i: number) => number | null,
+  values: (number | null)[], setUp: (i: number, rising: boolean) => void, from: number, state: number[], checkpoints: TailState<number[]>): void {
+  let [prevUpper, prevLower, prevTrend] = state;
+  let started = state[3] === 1;
+  for (let i = from; i < candles.length; i++) {
+    const range = rangeAt(i);
     if (range === null) continue;
     const c = candles[i];
     const mid = (c.high + c.low) / 2;
@@ -42,13 +53,14 @@ export function supertrendValues(
     const uptrend = started && (prevTrend === prevUpper ? c.close > upper : !(c.close < lower));
     const trend = uptrend ? lower : upper;
     if (i > 0) values[i] = trend;
-    up[i] = uptrend;
+    setUp(i, uptrend);
     prevUpper = upper;
     prevLower = lower;
     prevTrend = trend;
     started = true;
+    if (i >= candles.length - 2) checkpoints.save(i, candles.length, [prevUpper, prevLower, prevTrend, 1, range]);
   }
-  return { values, up };
+  checkpoints.prune(candles.length);
 }
 
 /** Supertrend indicator definition (params `period` = 10, `multiplier` = 3; main pane). */
@@ -67,6 +79,26 @@ export const supertrendIndicator: IndicatorDef = {
     { key: 'supertrend', label: 'Up trend', colorIndex: 0 },
     { key: 'supertrend', label: 'Down trend', colorIndex: 1 },
   ],
+  update(output, candles, from, params, colors) {
+    const values = output.lines[0].values as (number | null)[];
+    const checkpoints = states.get(values);
+    const state = checkpoints?.get(from - 1);
+    if (!smallTail(candles.length, from) || state === undefined) return undefined;
+    const period = lengthParam(params, 'period', 10);
+    const alpha = 1 / period;
+    let previousAtr = state[4];
+    const rangeAt = (i: number): number => {
+      const c = candles[i], prev = candles[i - 1].close;
+      const range = Math.max(c.high - c.low, Math.abs(c.high - prev), Math.abs(c.low - prev));
+      previousAtr = alpha * range + (1 - alpha) * previousAtr;
+      return previousAtr;
+    };
+    const lineColors = output.lines[0].colors as (string | null)[];
+    runSupertrend(candles, numberParam(params, 'multiplier', 3), rangeAt, values,
+      (i, rising) => { lineColors[i] = rising ? colors[0] ?? '#26a69a' : colors[1] ?? '#ef5350'; },
+      from, state, checkpoints!);
+    return output;
+  },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
     const period = lengthParam(params, 'period', 10);
     const factor = numberParam(params, 'multiplier', 3);
