@@ -6,10 +6,11 @@
   "scripts": {
     "predev": "npm --workspace @bloxwap/chart run build && node scripts/prepare-demo.mjs",
     "dev": "next dev --port 3902",
-    "prebuild": "npm --workspace @bloxwap/chart run build && node scripts/prepare-demo.mjs",
+    "prebuild": "npm --workspace @bloxwap/chart run build && node scripts/prepare-demo.mjs && npm run check",
     "build": "next build",
     "postbuild": "node scripts/check-export.mjs",
-    "check": "next typegen && tsc --noEmit",
+    "check": "next typegen && tsrs --noEmit",
+    "check:tsc": "next typegen && tsc --noEmit",
     "preview": "node scripts/preview.mjs",
     "postinstall": "fumadocs-mdx"
   },
@@ -28,14 +29,15 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@bloxwap/hig-og-fonts": "file:../../vendor/bloxwap-hig/bloxwap-hig-og-fonts-0.1.0-candidate.shae3390bbd.tgz",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/mdx": "^2.0.13",
     "@types/node": "^24.13.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "tailwindcss": "^4.2.0",
-    "typescript": "^6.0.3",
-    "@bloxwap/hig-og-fonts": "file:../../vendor/bloxwap-hig/bloxwap-hig-og-fonts-0.1.0-candidate.shae3390bbd.tgz"
+    "tsrs": "0.18.0-ts7.1.0-dev.20260929",
+    "typescript": "^6.0.3"
   },
   "engines": {
     "node": ">=24"
