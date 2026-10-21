@@ -157,13 +157,14 @@ export async function pageHistory(options: LoadHistoryOptions): Promise<HistoryR
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`chart-ts: ${name} must be a positive integer, got ${value}`);
   }
   const wanted = Math.min(Math.floor(options.countBack), barsInWindow(intervalMs, fromMs, toMs));
-  let rows: Candle[] = [];
+  const pages: Candle[][] = [];
+  let total = 0;
   let endMs = toMs;
   let empty = 0;
   let exhausted = false;
-  while (rows.length < wanted) {
+  while (total < wanted) {
     // Past an empty page, whole-page windows step over the hole in as few reads as the source allows.
-    const size = empty > 0 ? pageSize : Math.min(pageSize, wanted - rows.length);
+    const size = empty > 0 ? pageSize : Math.min(pageSize, wanted - total);
     const span = pageWindow(intervalMs, fromMs, endMs, size);
     const countBack = barsInWindow(intervalMs, span.fromMs, span.toMs);
     throwIfAborted(signal);
@@ -174,7 +175,8 @@ export async function pageHistory(options: LoadHistoryOptions): Promise<HistoryR
       const t = candleTimeMs(c);
       return t >= span.fromMs && t <= span.toMs;
     });
-    rows = page.concat(rows);
+    pages.push(page);
+    total += page.length;
     // A short page is a gap in the source, not its start: only fromMs or a run of empty pages ends the read.
     empty = page.length === 0 ? empty + 1 : 0;
     if (span.fromMs <= fromMs || empty >= maxEmptyPages) {
@@ -184,5 +186,11 @@ export async function pageHistory(options: LoadHistoryOptions): Promise<HistoryR
     // Past an empty page the next window ends before this one; otherwise before the earliest bar.
     endMs = (page.length === 0 ? span.fromMs : candleTimeMs(page[0]!)) - 1;
   }
-  return { bars: rows.length > wanted ? rows.slice(rows.length - wanted) : rows, exhausted };
+  // Pages arrive newest first; copy each once into chronological order.
+  const rows = new Array<Candle>(total);
+  let offset = 0;
+  for (let i = pages.length - 1; i >= 0; i--) {
+    for (const candle of pages[i]!) rows[offset++] = candle;
+  }
+  return { bars: total > wanted ? rows.slice(total - wanted) : rows, exhausted };
 }

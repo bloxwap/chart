@@ -129,3 +129,47 @@ describe('normalizeCandles', () => {
     assert.deepEqual(normalizeCandles([]), []);
   });
 });
+
+// Reference implementation retained here to compare both normalization paths.
+function slowNormalize(candles: readonly Candle[]): Candle[] {
+  const byTime = new Map<number, Candle>();
+  for (const candle of candles) {
+    const { time, open, high, low, close } = candle;
+    if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
+    if (!Number.isFinite(time) || time <= 0) continue;
+    const volume = candle.volume ?? 0;
+    byTime.set(time, { time, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 });
+  }
+  return [...byTime.values()].sort((a, b) => a.time - b.time);
+}
+
+describe('normalization path equivalence', () => {
+  const row = (time: number): Candle => ({ time, open: 1, high: 3, low: 0, close: 2, volume: 4 });
+  const invalid = [
+    row(-1), row(0),
+    { ...row(1), open: NaN },
+    { ...row(2), high: Infinity },
+    { ...row(3), low: -Infinity },
+    { ...row(4), close: NaN },
+    { time: 5, open: 1, high: 3, low: 0, close: 2 },
+    { ...row(6), volume: NaN },
+    row(7), row(Infinity),
+  ];
+  for (const [name, input] of [
+    ['sorted', [row(1), row(2), row(3)]],
+    ['sorted with invalid rows', invalid],
+    ['NaN time', [row(1), row(NaN), row(2)]],
+    ['duplicate times', [row(1), row(2), { ...row(2), close: 9 }]],
+    ['unsorted', [row(3), row(1), row(2)]],
+  ] as const) {
+    it(`matches Map + sort for ${name}`, () => {
+      const expected = slowNormalize(input);
+      const actual = normalizeCandles(input);
+      assert.deepEqual(actual, expected);
+      assert.deepEqual(actual.map(Object.keys), expected.map(Object.keys));
+      for (const candle of actual) assert.ok(!input.includes(candle));
+      // A duplicate forces the fallback without changing last-row-wins output.
+      assert.deepEqual(normalizeCandles([...input, ...input]), actual);
+    });
+  }
+});
