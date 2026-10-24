@@ -25,17 +25,17 @@ path from the built artifact. It does not run Next.js or a search backend.
 
 Edit MDX in `content/docs/` and sidebar order in each `meta.json`. The build
 checks local HTML links and assets, and emits a browser-searchable index at
-`search.json`. Fonts come from the installed `@bloxwap/font` package (and `@bloxwap/hig-native-fonts` for social cards), so builds do not fetch Google Fonts.
+`search.json`. Fonts come from the installed `@bloxwap/font` package (and `@bloxwap/hig-og-fonts` for social cards), so builds do not fetch Google Fonts.
 
 The presentation follows the Bloxwap HIG and consumes it as packages, not copies:
 
 - `@bloxwap/hig-tokens`, `@bloxwap/hig-contracts` and `@bloxwap/hig-react` (plus the build-time
-  `@bloxwap/hig-native-fonts`) are installed from the pinned, unpublished candidate tarballs in [`vendor/bloxwap-hig/`](../../vendor/bloxwap-hig/README.md).
+  `@bloxwap/hig-og-fonts`) are pinned to published npm version `0.1.0`; the lockfile and [release record](../../docs/hig-adoption/registry-release.json) retain their registry integrity hashes.
   `app/global.css` imports `@bloxwap/hig-tokens/css` and `@bloxwap/hig-react/css` and maps HIG roles
   onto Fumadocs; it does not declare palette values.
 - Radius, type, motion and density roles (`--hig-radius-*`, `--hig-type-*`, `--hig-motion-*`,
   `--hig-density-*`) and the font roles come from `@bloxwap/hig-tokens/css`; the docs declare none.
-  `npm run lint` (`scripts/hig-tokens.mjs --check`) fails on tarball hash changes, local role declarations
+  `npm run lint` (`scripts/hig-tokens.mjs --check`) fails on registry version or integrity changes, local role declarations
   or retired role names, copied palettes, `.btn`-style primitive copies or font binaries in the docs source.
 - Buttons, install tabs/copy, code-window copy, callouts, search error/empty states and the playground
   loading status use HIG components (`Button`, `IconButton`, `Tabs`, `Surface`, `Callout`, `Alert`,
@@ -94,8 +94,8 @@ chrome's `--cts-font`/`--cts-mono` at Bloxwap Sans/Mono, and sets the canvas
 `theme.fontFamily` to Bloxwap Sans and `monoFamily`/`scaleFontFamily` (status
 line, drawing labels and scales) to Bloxwap Mono. The standalone playground and
 SDK presets retain their existing font defaults.
-Social cards use the static Bloxwap Sans faces shipped in `@bloxwap/hig-native-fonts/fonts` (OFL), a
+Social cards use the static Bloxwap Sans faces shipped in `@bloxwap/hig-og-fonts/fonts` (OFL), a
 build-time devDependency; Satori cannot read the variable WOFF2 in `@bloxwap/font`.
 
-HIG presentation, pinned candidate provenance, validation, exceptions and upgrade/rollback
+HIG presentation, registry integrity, validation, exceptions and upgrade/rollback
 instructions are recorded in [the adoption report](../../docs/hig-adoption/README.md).

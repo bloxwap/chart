@@ -1,0 +1,25 @@
+{
+  "repository": "bloxwap/hig",
+  "commit": "bdf8d07014fea5e69ea51a061b82707661a9d701",
+  "version": "0.1.0",
+  "release": "https://github.com/bloxwap/hig/releases/tag/v0.1.0",
+  "distribution": "npm registry; integrity checked by npm ci; this token-published release has no npm provenance attestation",
+  "packages": {
+    "@bloxwap/hig-tokens": {
+      "resolved": "https://registry.npmjs.org/@bloxwap/hig-tokens/-/hig-tokens-0.1.0.tgz",
+      "integrity": "sha512-udpntFJd+V056S9CtBYQWFKY++me1h7fTTXfwq+ivyfDIveZrUW4tE10fghAtmDPz2m6jzOzMRCm/Cg5lw09GA=="
+    },
+    "@bloxwap/hig-contracts": {
+      "resolved": "https://registry.npmjs.org/@bloxwap/hig-contracts/-/hig-contracts-0.1.0.tgz",
+      "integrity": "sha512-FshDRNoR8/qMySeQHzJE4VWN4X1W8XVoKH7Cx3bVD8e0Tw+eq9qU9KGVPzTbiHRa/Axp6xwNxrS81TPU90xzUA=="
+    },
+    "@bloxwap/hig-react": {
+      "resolved": "https://registry.npmjs.org/@bloxwap/hig-react/-/hig-react-0.1.0.tgz",
+      "integrity": "sha512-0LdFe1i79CHWi6wjZnC+Khj+2wyQgH6RHhu1EGSL0eL1W+jQhEAXr7GmMS7eulJJeijlW6a1wbQgA7FkczvyZw=="
+    },
+    "@bloxwap/hig-og-fonts": {
+      "resolved": "https://registry.npmjs.org/@bloxwap/hig-og-fonts/-/hig-og-fonts-0.1.0.tgz",
+      "integrity": "sha512-Mu2bBjXL+SkswkTAS1m66M4x8r1qRFi6SM6LwJ3ehh99bJp2CBzVpLGVZWvIzR+lJ5nzl5kyE12+Pitq/HW5FA=="
+    }
+  }
+}
