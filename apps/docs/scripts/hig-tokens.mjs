@@ -1,10 +1,9 @@
-// HIG adoption guard for the docs site. Tokens, roles, CSS and components come from the vendored
-// @bloxwap/hig-* candidate tarballs (vendor/bloxwap-hig). @bloxwap/hig-tokens/css emits the radius, type,
+// HIG adoption guard for the docs site. Tokens, roles, CSS and components come from published
+// @bloxwap/hig-* registry packages. @bloxwap/hig-tokens/css emits the radius, type,
 // motion and density roles, so this script only derives the canvas-compatible sRGB chart theme from the
 // typed manifest, and its --check fails CI when copies of HIG sources or role declarations creep back in.
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { tokens } from '@bloxwap/hig-tokens';
@@ -23,19 +22,19 @@ export const chartTheme = {
 };
 
 if (process.argv.includes('--check')) {
-  const vendor = new URL('../../../vendor/bloxwap-hig/', import.meta.url);
-  const provenance = JSON.parse(await readFile(new URL('provenance.json', vendor), 'utf8'));
-  for (const [file, hash] of Object.entries(provenance.sha256)) assert.equal(createHash('sha256').update(await readFile(new URL(file, vendor))).digest('hex'), hash, `Vendored HIG tarball changed: ${file}`);
-  const reportBytes = await readFile(new URL('../../../docs/hig-adoption/issue-115/candidate-report.json', import.meta.url));
-  assert.equal(createHash('sha256').update(reportBytes).digest('hex'), provenance.releaseReportSha256, 'Candidate report changed');
-  const report = JSON.parse(reportBytes);
-  assert.equal(report.sourceCommit, provenance.commit); assert.equal(report.artifactVersion, provenance.version); assert.equal(report.sourceTreeDirty, false);
+  const release = JSON.parse(await readFile(new URL('../../../docs/hig-adoption/registry-release.json', import.meta.url), 'utf8'));
+  const lock = JSON.parse(await readFile(new URL('../../../package-lock.json', import.meta.url), 'utf8'));
   const docsPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   for (const name of ['tokens', 'contracts', 'react', 'og-fonts']) {
+    const packageName = `@bloxwap/hig-${name}`;
     const field = name === 'og-fonts' ? 'devDependencies' : 'dependencies';
-    const spec = docsPackage[field][`@bloxwap/hig-${name}`];
-    assert.ok(spec?.startsWith('file:../../vendor/bloxwap-hig/') && spec.includes(provenance.version), `@bloxwap/hig-${name} must come from the pinned vendored tarball`);
-    assert.equal(JSON.parse(await readFile(new URL(`../../../node_modules/@bloxwap/hig-${name}/package.json`, import.meta.url), 'utf8')).version, provenance.version, `Installed @bloxwap/hig-${name} is not ${provenance.version}; run npm ci`);
+    assert.equal(docsPackage[field][packageName], release.version, `${packageName} must use the coordinated registry version`);
+    const locked = lock.packages[`node_modules/${packageName}`];
+    assert.equal(locked.version, release.version, `${packageName} lockfile version drifted`);
+    assert.equal(locked.resolved, `https://registry.npmjs.org/${packageName}/-/hig-${name}-${release.version}.tgz`, `${packageName} must resolve from npm`);
+    assert.equal(locked.resolved, release.packages[packageName].resolved);
+    assert.equal(locked.integrity, release.packages[packageName].integrity, `${packageName} registry integrity drifted`);
+    assert.equal(JSON.parse(await readFile(new URL(`../../../node_modules/${packageName}/package.json`, import.meta.url), 'utf8')).version, release.version, `Installed ${packageName} is not ${release.version}; run npm ci`);
   }
   assert.ok(!existsSync(new URL('../styles/', import.meta.url)), 'styles/ is gone: radius/type/motion/density roles come from @bloxwap/hig-tokens/css');
   // No copied palettes, role declarations, token snapshots, primitive classes or font binaries in the docs shell.
@@ -58,5 +57,5 @@ if (process.argv.includes('--check')) {
     }
   }
   for (const dir of ['app/', 'components/', 'lib/']) await checkSurface(new URL(`../${dir}`, import.meta.url));
-  console.log(`HIG ${provenance.version} tarball provenance, installed versions, package-owned roles and copy drift checks passed.`);
+  console.log(`HIG ${release.version} registry integrity, installed versions, package-owned roles and copy drift checks passed.`);
 }

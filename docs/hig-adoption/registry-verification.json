@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-23",
+  "baselineCommit": "8875b2d58f07bc49a428754934c40d788b7771da",
+  "higVersion": "0.1.0",
+  "node": "v24.6.0",
+  "npm": "11.5.1",
+  "validation": {
+    "cleanNpmCi": "pass; zero audit vulnerabilities",
+    "npmLs": "pass; @bloxwap/chart resolves to ./packages/chart",
+    "lint": "pass; registry integrity, installed versions and copy drift",
+    "test": {
+      "passed": 1897,
+      "failed": 0
+    },
+    "docsBuild": {
+      "result": "pass including docs types",
+      "htmlPages": 30,
+      "localLinksAndAssets": 1525,
+      "socialCards": 25,
+      "basePath": "/chart"
+    },
+    "guardNegativeControls": [
+      "registry integrity mutation rejected",
+      "vendored file dependency rejected"
+    ],
+    "browser": {
+      "browser": "156.0.8078.4",
+      "checks": [
+        "Install tabs: arrows/Home/End, selected state and focus; one tab stop per install command",
+        "Copy: pending suppresses repeat activation, success status, visible denial and recovery",
+        "@bloxwap/hig-tokens palette, HIG controls in Bloxwap typography, no legacy aliases, reduced motion",
+        "Distinctive demo: canvas/worker assets, offline synthetic bars, HIG chrome, locked dark theme, settings/Escape, pointer/wheel",
+        "Static search index, results and keyboard dismissal",
+        "HIG callout (not announced), keyboard focus ring, search shortcut and empty results",
+        "Search index failure shows the HIG error alert with recovery text",
+        "Representative docs: RTL and 200% root text without page overflow",
+        "Touch emulation: 48px copy target, narrow layout and mobile navigation"
+      ],
+      "demo": {
+        "stats": {
+          "symbol": "Random walk",
+          "intervalMs": 900000,
+          "bars": 500,
+          "duplicates": 0,
+          "missingBuckets": 0,
+          "exhausted": false,
+          "loading": false,
+          "renderBackend": "webgl2",
+          "bookLevels": {
+            "bids": 50,
+            "asks": 50
+          },
+          "error": null,
+          "firstTime": 1792368900,
+          "lastTime": 1792818000
+        },
+        "light": false,
+        "font": "\"Bloxwap Sans\", system-ui, sans-serif",
+        "panel": "oklch(0.205 0 0)",
+        "themeButtons": 0
+      },
+      "limitations": [
+        "Automated Chrome for Testing (Playwright) with touch emulation only; no physical touch/haptics, iOS, Android, VoiceOver or TalkBack certification"
+      ]
+    }
+  },
+  "removedVendoredArchives": 4,
+  "removedVendoredBytes": 881378,
+  "limitations": [
+    "No physical-device or assistive-technology certification is claimed.",
+    "HIG 0.1.0 was token-published and has no npm provenance attestation."
+  ]
+}

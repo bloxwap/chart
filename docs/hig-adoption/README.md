@@ -1,6 +1,6 @@
-# Chart docs adoption · HIG 0.1.0 candidate
+# Chart docs adoption · HIG 0.1.0
 
-Owner: Chart maintainers. Updated 2026-10-15; exceptions reviewed by 2026-11-13.
+Owner: Chart maintainers. Updated 2026-10-23; exceptions reviewed by 2026-11-13.
 
 This repository owns the Chart row of [hig#34](https://github.com/bloxwap/hig/issues/34) and its
 repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36).
@@ -8,8 +8,27 @@ repository-level evidence for [hig#36](https://github.com/bloxwap/hig/issues/36)
 | Step | PR | HIG source | How HIG is consumed |
 | --- | --- | --- | --- |
 | 1 | [#52](https://github.com/bloxwap/chart/pull/52) ([evidence](https://github.com/bloxwap/chart/tree/c4dff80/docs/hig-adoption)) | [1a776b9](https://github.com/bloxwap/hig/tree/1a776b9326c6ba03702894943b3edbfd178c4b40) | Copied plain-CSS snapshot + manifest, alias adapter, local `.btn`/copy/install primitives |
-| 2 | [#53](https://github.com/bloxwap/chart/pull/53) | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs ([vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md)) |
-| 3 | candidate refresh (this change) | [872906a](https://github.com/bloxwap/hig/tree/872906a9071469af8714b3b6fb5cc7bd64d2d6f3) | Same packages plus build-time `@bloxwap/hig-native-fonts`; upstream fixes replace the step 2 workarounds |
+| 2 | [#53](https://github.com/bloxwap/chart/pull/53) | [7c67a07](https://github.com/bloxwap/hig/tree/7c67a07ce20c02264b0fdc57e5f27d020cfd6fdc) | Packed `@bloxwap/hig-tokens`, `-contracts`, `-react` tarballs (historical archives retained in Git history) |
+| 3 | [#56](https://github.com/bloxwap/chart/pull/56) | [872906a](https://github.com/bloxwap/hig/tree/872906a9071469af8714b3b6fb5cc7bd64d2d6f3) | Same packages plus build-time `@bloxwap/hig-native-fonts`; upstream fixes replace the step 2 workarounds |
+| 4 | [#58](https://github.com/bloxwap/chart/pull/58) | [e3390bbd](https://github.com/bloxwap/hig/tree/e3390bbd0ac12b9d4b371175bd250d01ea866abe) | Scoped OG-font candidate; normal npm workspace resolution |
+| 5 | Registry adoption | [v0.1.0](https://github.com/bloxwap/hig/releases/tag/v0.1.0) | Exact npm `0.1.0` for tokens, contracts, React and build-time OG fonts |
+
+## Current registry installation
+
+The docs install four coordinated HIG packages directly from npm. Vendored candidate archives
+are removed. `package-lock.json` and [`registry-release.json`](registry-release.json) record the
+registry URLs and integrity hashes; `npm ci` verifies downloaded package bytes and `npm run lint`
+checks the coordinated declarations, lockfile and installed versions. This release used token
+publishing and has no npm provenance attestation. Earlier candidate evidence below remains historical.
+The current install, test, export and browser results are in [`registry-verification.json`](registry-verification.json).
+
+`@bloxwap/hig-react` has no chart peer, so ordinary peer resolution preserves the repository's
+`@bloxwap/chart` workspace. OG cards use only `@bloxwap/hig-og-fonts/node`; no native-font package
+is installed. Whole-page docs retain the explicit `@bloxwap/hig-react/css/base` import.
+
+For upgrades, update all four exact versions, regenerate the lockfile and registry record, then run
+`npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `NEXT_PUBLIC_BASE_PATH=/chart npm run docs:build`
+and `NEXT_PUBLIC_BASE_PATH=/chart npm run docs:test`. Roll back by reverting the dependency migration.
 
 ## What changed in step 2
 
@@ -109,26 +128,23 @@ blocked so both playground captures use the offline synthetic market; timestamps
 
 See [`hig-7c67a07/validation.txt`](hig-7c67a07/validation.txt) and
 [`hig-7c67a07/browser.json`](hig-7c67a07/browser.json). CI (`.github/workflows/docs.yml`) runs
-`npm ci`, the `/chart` production export with link/asset checks, `docs:check`, `lint` (HIG provenance and
+`npm ci`, the `/chart` production export with link/asset checks, `docs:check`, `lint` (HIG registry integrity and
 copy guards) and `docs:test` (browser checks).
 
 ## Matrix row, exceptions and rollback
 
 | Repository/surface | Applicability | Version | Owner | Status | Residual work / review date |
 | --- | --- | --- | --- | --- | --- |
-| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0-candidate.sha872906a9 (tokens, contracts, react; native-fonts build-time); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; stable HIG publication; 2026-11-13 |
-| chart / published SDK | Engine and optional DOM UI | SDK 0.3.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
+| chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.1.0 from npm (tokens, contracts, react; og-fonts build-time); Font 0.1.2 | Chart maintainers | Migrated to HIG packages; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; 2026-11-13 |
+| chart / published SDK | Engine and optional DOM UI | SDK 0.4.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
 
 Exceptions (Chart maintainers, review 2026-11-13):
 
 - Resolved in step 3: `.npmrc` `legacy-peer-deps=true`, primitive-composed `InstallCommand`/`CodeWindow`,
   generated role CSS, the button font bridge and local Callout edges.
-- Regenerating `package-lock.json` from scratch without `--legacy-peer-deps` drops the `packages/chart` workspace
-  (npm 11.6; `@bloxwap/hig-react`'s optional `@bloxwap/chart` peer). `npm ci` and normal installs are unaffected;
-  see [vendor/bloxwap-hig](../../vendor/bloxwap-hig/README.md#notes).
-- `@bloxwap/hig-native-fonts` (4.4 MB tarball) is vendored only for two static OG faces.
+- Resolved in step 4: normal lockfile regeneration keeps the Chart workspace; scoped OG fonts replace the native-font archive.
+- Resolved in step 5: all HIG dependencies use the published npm release, with no vendored tarballs.
 - Decorative OG brand-spectrum colors (purple/pink/yellow) are illustration assets, not a control palette.
-- HIG tokens are unpublished candidates, vendored as packed tarballs with SHA-256 provenance.
 
 The canonical org matrix lives in `bloxwap/hig/planning/adoption.json`; HIG maintainers copy this row,
 PR link and version there. This repository does not close or declare hig#34 complete; the other four

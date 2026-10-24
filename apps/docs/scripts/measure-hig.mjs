@@ -35,14 +35,14 @@ const lockPackages = (text) => Object.keys(JSON.parse(text).packages).filter(Boo
 const beforeLock = lockPackages(git('show', `${baselineCommit}:package-lock.json`));
 const afterLock = lockPackages(await readFile('package-lock.json', 'utf8'));
 const docsDeps = (text) => Object.keys({ ...JSON.parse(text).dependencies, ...JSON.parse(text).devDependencies });
-const provenance = JSON.parse(await readFile('vendor/bloxwap-hig/provenance.json', 'utf8'));
+const release = JSON.parse(await readFile('docs/hig-adoption/registry-release.json', 'utf8'));
 // Generated token adapters: hig.generated.css (copied snapshot, step 1), hig-roles.generated.css (step 2), none since
 // @bloxwap/hig-tokens/css emits the roles itself.
 const generated = (ref) => ['hig.generated.css', 'hig-roles.generated.css'].reduce((sum, file) => { try { return sum + Buffer.byteLength(git('show', `${ref}:apps/docs/styles/${file}`)); } catch { return sum; } }, 0);
 
 console.log(JSON.stringify({
   baselineCommit,
-  hig: { commit: provenance.commit, version: provenance.version },
+  hig: { commit: release.commit, version: release.version },
   toolchain: { node: process.version, next: JSON.parse(await readFile('node_modules/next/package.json', 'utf8')).version, basePath: JSON.parse(await readFile('apps/docs/out/_docs-config.json', 'utf8')).basePath },
   measurement: 'uncompressed bytes of the complete static export (not transfer size or per-route bundles)',
   export: { before, after, delta: delta(before, after) },
