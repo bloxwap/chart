@@ -20,7 +20,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  security:
+    # Single-job publish: adds the scan serially.
+    uses: bloxwap/.github/.github/workflows/security-scan.yml@90c5e7f20cef611a83ea7db51f9b85478d714fa6 # v1
+    permissions:
+      contents: read
+    with:
+      runs-on: '["self-hosted","macOS","ARM64"]'
+      profile: release
+      secrets-days: "7"
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+
   publish:
+    needs: security
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
     permissions:
