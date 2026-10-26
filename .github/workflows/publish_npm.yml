@@ -22,7 +22,7 @@ concurrency:
 jobs:
   security:
     # Single-job publish: adds the scan serially.
-    uses: bloxwap/.github/.github/workflows/security-scan.yml@90c5e7f20cef611a83ea7db51f9b85478d714fa6 # v1
+    uses: bloxwap/.github/.github/workflows/security-scan.yml@0387d86d796b5a80509a9862b35991a160ff13b4 # v1.0.1
     permissions:
       contents: read
     with:
