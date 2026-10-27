@@ -1,0 +1,68 @@
+name: TEMPORARY Ubuntu publish dry-run
+
+# Remove before merge. Exercises the publish lifecycle without uploading a package.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-dryrun:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
+      - name: Point TMPDIR at runner temp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Do not restore dependency caches in the release job.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install npm with trusted publishing support
+        # Bootstrap a fixed OIDC-capable npm CLI outside the project dependency lockfile.
+        run: npm install --global npm@11.6.1 # zizmor: ignore[adhoc-packages]
+
+      - run: npm ci
+
+      - name: Determine version and npm tag
+        id: tag
+        env:
+          RELEASE_TAG: '' # Pull requests have no release tag; use the package version.
+        run: |
+          # POSIX / BSD-portable: no jq, no GNU sed, no bashisms.
+          VERSION=$(node -p "require('./packages/chart/package.json').version")
+          # The private workspace root has no release version; the chart package owns it.
+          # A release must be tagged for the version it publishes, or npm and GitHub disagree.
+          if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "v$VERSION" ]; then
+            echo "::error::Release tag $RELEASE_TAG does not match packages/chart/package.json version v$VERSION"
+            exit 1
+          fi
+          PRE=${VERSION#*-}
+          if [ "$PRE" = "$VERSION" ]; then
+            TAG=latest
+          else
+            case "$PRE" in
+              alpha*) TAG=alpha ;;
+              beta*) TAG=beta ;;
+              rc*) TAG=rc ;;
+              *) TAG=prerelease ;;
+            esac
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+
+      # prepack builds and prepublishOnly runs the full Node/Happy DOM test suite;
+      # no browser download is needed. publishConfig.access is public.
+      - name: Dry-run @bloxwap/chart@${{ steps.tag.outputs.version }}
+        env:
+          NPM_TAG: ${{ steps.tag.outputs.value }}
+        # The version may already exist: force skips registry version checks only for this dry-run.
+        run: npm publish --workspace @bloxwap/chart --tag "$NPM_TAG" --provenance --dry-run --force
