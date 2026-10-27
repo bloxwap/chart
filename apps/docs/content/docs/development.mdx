@@ -60,7 +60,9 @@ The preview server reads the exported base path, so this build opens at `http://
 
 ## Release to npm
 
-Publishing a GitHub release publishes `@bloxwap/chart` from CI (`.github/workflows/publish_npm.yml`) on the org Mac mini runners. Authentication uses the org `NPM_TOKEN` secret (`NODE_AUTH_TOKEN`). npm trusted publishing and automatic provenance are unavailable on self-hosted runners.
+Publishing a GitHub release publishes `@bloxwap/chart` from CI (`.github/workflows/publish_npm.yml`). Only the publish job runs on GitHub-hosted `ubuntu-24.04`, as required by npm trusted publishing; the prerequisite security scan and all other jobs remain on the Mac minis. Node 24 and npm 11.6.1 build and test the package on that runner, with dependency caching disabled. Publishing requests npm provenance, including during token fallback.
+
+Configure the GitHub `npm-release` environment with required reviewers before releasing; the workflow names this environment, but approval rules must be set in GitHub settings. The publish step keeps `NPM_TOKEN` as `NODE_AUTH_TOKEN` only as a transitional fallback, so releases work before npmjs.com setup. Configure the npm Trusted Publisher for organization `bloxwap`, repository `chart`, workflow filename `publish_npm.yml`, environment `npm-release`, allowing direct publishing. Once trusted publishing is verified, remove the fallback and delete this repository's token secret/access. See [CI runner setup](https://github.com/bloxwap/chart/blob/main/docs/ci-runners.md) for details.
 
 1. In a pull request, bump `version` in `packages/chart/package.json` (and the `version` export in `packages/chart/src/index.ts`), then merge it. A test fails if the two disagree.
 2. Create a GitHub release tagged `v<version>`, for example `v0.0.2`. The workflow fails if the tag and the package version disagree.
