@@ -1,18 +1,22 @@
 # CI runners
 
-Every GitHub Actions job in this repository runs on self-hosted Apple Silicon Mac minis (runner group JWS):
+Except for the npm publish job in `.github/workflows/publish_npm.yml`, every GitHub Actions job in this repository runs on self-hosted Apple Silicon Mac minis (runner group JWS):
 
 ```yaml
 runs-on: [self-hosted, macOS, ARM64]
 ```
 
-These jobs stay queued until a runner with all three labels is online. Workflows do not call `apt`, `sudo`, or `playwright install --with-deps` (that flag installs Linux packages). Shell used by CI is POSIX / BSD-portable, and Mac jobs write scratch files under `$RUNNER_TEMP` (`TMPDIR` and Playwright's browser path are exported from `$RUNNER_TEMP` in a setup step; GitHub Actions does not allow the `runner` context in job-level `env`).
+These jobs stay queued until a runner with all three labels is online. Mac mini jobs do not call `apt`, `sudo`, or `playwright install --with-deps` (that flag installs Linux packages). Shell used by CI is POSIX / BSD-portable, and Mac jobs write scratch files under `$RUNNER_TEMP` (`TMPDIR` and Playwright's browser path are exported from `$RUNNER_TEMP` in a setup step; GitHub Actions does not allow the `runner` context in job-level `env`).
 
 `actions/setup-node` sets `package-manager-cache: false` and does not set `cache:`. The minis already keep `~/.npm` on disk across jobs, so GitHub's remote dependency cache is extra upload/download (a ~1.4 GB archive at 0.4–1 MB/s) with no install-time benefit.
 
-## Trusted publishing is unavailable
+## npm release exception and setup
 
-[npm trusted publishing does not support self-hosted runners](https://docs.npmjs.com/trusted-publishers/). The publish job therefore authenticates with a long-lived `NPM_TOKEN` secret (`NODE_AUTH_TOKEN`). That **drops OIDC trusted publishing and automatic provenance**. The org-level `NPM_TOKEN` (publish rights for `@bloxwap` packages) must be shared with this repository.
+Only `publish` in `.github/workflows/publish_npm.yml` runs on GitHub-hosted `ubuntu-24.04`: [npm trusted publishing requires GitHub-hosted runners](https://docs.npmjs.com/trusted-publishers/). Its existing prerequisite security scan stays on the minis. The job uses Node 24, pinned npm 11.6.1, only `contents: read` and `id-token: write` permissions, and the `npm-release` environment. It builds locally on that runner and runs the full Node/Happy DOM suite through npm's publish lifecycle; no browser or Python installation is needed. Dependency caching is disabled for releases.
+
+Before releasing, configure GitHub **Settings → Environments → npm-release** with required reviewers. Merely naming the environment in YAML does not configure an approval gate. Keep the existing org/repository `NPM_TOKEN` available during the transition; it is exposed as `NODE_AUTH_TOKEN` only on the publish step. npm tries OIDC first and falls back to this token while no trusted publisher is configured, so releases do not require npmjs.com setup first. `npm publish --provenance` attaches provenance even during token fallback.
+
+In the npmjs.com settings for `@bloxwap/chart`, add a GitHub Actions Trusted Publisher with organization `bloxwap`, repository `chart`, workflow filename `publish_npm.yml` (not its path), and environment `npm-release`, allowing direct publishing. Keep that workflow filename unchanged. Verify a release uses trusted publishing, then remove the fallback `NODE_AUTH_TOKEN` entry and delete this repository's `NPM_TOKEN` secret/access (do not revoke a shared org token still used by other repositories). OIDC does not authorize commands such as `npm whoami`, `npm access`, or `npm deprecate`; do not add token-only auth preflights to this publish path.
 
 ## Jobs
 
@@ -22,7 +26,7 @@ These jobs stay queued until a runner with all three labels is online. Workflows
 | [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | Mac mini | LCOV report and Codecov upload |
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `build` | Mac mini | Docs export, typecheck, lint, Playwright Chrome checks; Pages artifact on `main` only (PRs still build and validate) |
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `deploy` | Mac mini | `configure-pages` + `deploy-pages` on `main` |
-| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | Mac mini | Version/tag check and `npm publish` of `@bloxwap/chart` (`NPM_TOKEN`; no provenance) |
+| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | GitHub-hosted Ubuntu 24.04 | Approved `npm-release`; version/tag check and publish with provenance (OIDC; transitional token fallback) |
 
 ## Prerequisites on each Mac mini
 
@@ -61,5 +65,5 @@ Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There 
 
 - Give the runner enough free disk for `npm ci` (and a persistent `~/.npm`), the Next.js static export, and a Chrome for Testing download.
 - Headless Chrome on macOS does not need the Accessibility TCC prompt that headed browsers do.
-- npm publish (`Publish to npm`) uses the `NPM_TOKEN` secret, not OIDC. GitHub Pages deploy still uses `pages: write` and `id-token: write`.
+- npm publish (`Publish to npm`) uses the Ubuntu exception and approval setup above. GitHub Pages deploy still uses `pages: write` and `id-token: write`.
 - Fork pull requests on a public repository should stay on GitHub-hosted runners or a dedicated untrusted pool if org policy forbids self-hosted runners on forks. This repo's workflows themselves do not special-case forks.

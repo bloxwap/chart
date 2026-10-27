@@ -3,10 +3,8 @@ name: Publish to npm
 # Publishing a GitHub release publishes @bloxwap/chart at the version in packages/chart/package.json.
 # Release flow: bump the version in a PR, merge it, then create a release tagged v<version>.
 #
-# npm trusted publishing does not support self-hosted runners
-# (https://docs.npmjs.com/trusted-publishers/). This job authenticates with the
-# NPM_TOKEN secret instead. That drops OIDC trusted publishing and
-# automatic provenance. See docs/ci-runners.md.
+# Only the publish job uses GitHub-hosted Ubuntu: npm trusted publishing and
+# provenance require it. See docs/ci-runners.md for the transition and approval gate.
 on:
   release:
     types: [published]
@@ -34,12 +32,12 @@ jobs:
 
   publish:
     needs: security
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-24.04
+    environment: npm-release
     timeout-minutes: 20
     permissions:
       contents: read
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      id-token: write
 
     steps:
       # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
@@ -48,12 +46,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Minis persist ~/.npm on disk. GitHub's remote cache is 0.4–1 MB/s for ~1.4 GB.
+      # Do not restore dependency caches in the release job.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
+
+      - name: Install npm with trusted publishing support
+        # Bootstrap a fixed OIDC-capable npm CLI outside the project dependency lockfile.
+        run: npm install --global npm@11.6.1 # zizmor: ignore[adhoc-packages]
 
       - run: npm ci
 
@@ -84,12 +86,11 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Check npm CLI
-        run: |
-          npm --version
-          npx --yes semver -r '>=11.5.1' "$(npm --version)" > /dev/null || npm install -g npm@latest
-
-      # prepack builds and prepublishOnly runs the full test suite before anything is uploaded;
-      # publishConfig.access is public. Token publish does not attach provenance.
+      # prepack builds and prepublishOnly runs the full Node/Happy DOM test suite;
+      # no browser download is needed. publishConfig.access is public.
       - name: Publish @bloxwap/chart@${{ steps.tag.outputs.version }}
-        run: npm publish --workspace @bloxwap/chart --tag ${{ steps.tag.outputs.value }}
+        env:
+          NPM_TAG: ${{ steps.tag.outputs.value }}
+          # Transitional fallback: delete once the npm Trusted Publisher is verified.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace @bloxwap/chart --tag "$NPM_TAG" --provenance
