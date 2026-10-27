@@ -20,7 +20,7 @@ jobs:
   security:
     # Release scan, parallel with build. Skipped on PRs.
     if: github.event_name != 'pull_request'
-    uses: bloxwap/.github/.github/workflows/security-scan.yml@6755bcc6a591531ae95a5babfa389c329f71ba0b # v1.0.2
+    uses: bloxwap/.github/.github/workflows/security-scan.yml@2a70724cd0d803abef5f5a7c64c46065f4fda19b # v1.1.0
     permissions:
       contents: read
     with:
