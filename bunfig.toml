@@ -1,0 +1,3 @@
+[install]
+# Existing scripts resolve dependencies from the root node_modules, as npm does.
+linker = "hoisted"
