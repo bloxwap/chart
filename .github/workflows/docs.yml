@@ -4,9 +4,9 @@ name: Documentation
 on:
   push:
     branches: [main]
-    paths: ['apps/**', 'packages/**', 'vendor/**', '.npmrc', 'package.json', 'package-lock.json', '.github/workflows/docs.yml']
+    paths: ['apps/**', 'packages/**', 'vendor/**', '.npmrc', 'package.json', 'package-lock.json', 'bun.lock', 'bunfig.toml', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['apps/**', 'packages/**', 'vendor/**', '.npmrc', 'package.json', 'package-lock.json', '.github/workflows/docs.yml']
+    paths: ['apps/**', 'packages/**', 'vendor/**', '.npmrc', 'package.json', 'package-lock.json', 'bun.lock', 'bunfig.toml', '.github/workflows/docs.yml']
   workflow_dispatch:
 
 permissions:
@@ -47,20 +47,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Minis persist ~/.npm on disk. GitHub's remote cache is 0.4–1 MB/s for ~1.4 GB.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: npm ci
+      # Bun's download cache stays on disk on the minis; no remote cache.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
       # Hermetic Chrome for Testing into $PLAYWRIGHT_BROWSERS_PATH. `install chrome`
       # is the system Google Chrome channel and needs sudo on macOS.
       - name: Install Playwright Chrome for Testing
-        run: npx playwright-core install chrome-for-testing --no-shell
-      - run: npm run docs:build
-      - run: npm run docs:check
-      - run: npm run lint
-      - run: npm run docs:test
+        run: bunx playwright-core install chrome-for-testing --no-shell
+      - run: bun run docs:build
+      - run: bun run docs:check
+      - run: bun run lint
+      - run: bun run docs:test
       # Deploy only runs on main; skip the Pages artifact on PRs after validating the export.
       - name: Check GNU tar
         if: github.event_name != 'pull_request'
