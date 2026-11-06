@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react';
-import { Button } from '@bloxwap/hig-react/button';
-import { Spinner } from '@bloxwap/hig-react/status';
+import { Button } from '@bloxwap/hig/react/button';
+import { Spinner } from '@bloxwap/hig/react/status';
 import { assetUrl } from '@/lib/site';
 
 /**

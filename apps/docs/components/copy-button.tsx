@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
-import { IconButton } from '@bloxwap/hig-react/button';
+import { IconButton } from '@bloxwap/hig/react/button';
 import { useClipboard } from '@/lib/clipboard';
 
 /** HIG icon button that copies `text`, with a check mark, a screen-reader status and visible failure recovery. */
