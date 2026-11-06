@@ -1,7 +1,7 @@
 'use client';
 
-import { Tabs } from '@bloxwap/hig-react/navigation';
-import { InstallCommand as HigInstallCommand } from '@bloxwap/hig-react/recipes/install-command';
+import { Tabs } from '@bloxwap/hig/react/navigation';
+import { InstallCommand as HigInstallCommand } from '@bloxwap/hig/react/recipes/install-command';
 import { useClipboard } from '@/lib/clipboard';
 
 const managers = [

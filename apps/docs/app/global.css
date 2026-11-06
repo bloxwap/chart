@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
-@import '@bloxwap/hig-tokens/css';
-@import '@bloxwap/hig-react/css/base';
-@import '@bloxwap/hig-react/css';
+@import '@bloxwap/hig/tokens/css';
+@import '@bloxwap/hig/react/css/base';
+@import '@bloxwap/hig/react/css';
 
 @theme inline {
   --font-sans: var(--font-bloxwap-sans), ui-rounded, system-ui, sans-serif;
@@ -151,7 +151,7 @@ html > body[data-scroll-locked] {
 }
 
 /*
- * HIG controls (@bloxwap/hig-react/css) in the docs shell. HIG reads --hig-font-sans/--hig-font-mono, which
+ * HIG controls (@bloxwap/hig/react/css) in the docs shell. HIG reads --hig-font-sans/--hig-font-mono, which
  * resolve to the @bloxwap/font Next loader variables, so no family bridge is needed. Links and icons share the
  * button. Dense docs regions opt into HIG compact density on fine pointers; coarse pointers keep 48px targets.
  */

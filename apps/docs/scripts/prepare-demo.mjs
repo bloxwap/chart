@@ -12,7 +12,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(new URL('demo/', output), { recursive: true });
 await Promise.all([
   cp(new URL('apps/playground/index.html', repository), new URL('demo/index.html', output)),
-  cp(tokensCssPath, new URL('assets/hig-tokens.css', output)), // @bloxwap/hig-tokens/css, unmodified
+  cp(tokensCssPath, new URL('assets/hig-tokens.css', output)), // @bloxwap/hig/tokens/css, unmodified
   cp(new URL('packages/chart/dist/', repository), new URL('dist/', output), { recursive: true }),
 ]);
 

@@ -101,7 +101,7 @@ try {
   assert.deepEqual(presentation.legacy, []);
   assert.match(presentation.motion, /^0(m?s)$/);
   assert.equal(presentation.transform, 'none');
-  record('@bloxwap/hig-tokens palette, HIG controls in Bloxwap typography, no legacy aliases, reduced motion');
+  record('@bloxwap/hig/tokens palette, HIG controls in Bloxwap typography, no legacy aliases, reduced motion');
   await page.getByRole('tab', { name: 'npm', exact: true }).click();
   await page.getByRole('tab', { name: 'bun', exact: true }).click();
   if (evidence) { await mkdir(evidence, { recursive: true }); await page.screenshot({ path: `${evidence}/after-home.png`, fullPage: true }); }

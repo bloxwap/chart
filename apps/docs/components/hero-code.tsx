@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReactNode } from 'react';
-import { CodeWindow } from '@bloxwap/hig-react/recipes/code-window';
+import { CodeWindow } from '@bloxwap/hig/react/recipes/code-window';
 import { CopyButton } from './copy-button';
 
 /*

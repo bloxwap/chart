@@ -17,9 +17,7 @@
   "dependencies": {
     "@bloxwap/chart": "0.4.0",
     "@bloxwap/font": "0.1.2",
-    "@bloxwap/hig-contracts": "0.1.0",
-    "@bloxwap/hig-react": "0.1.0",
-    "@bloxwap/hig-tokens": "0.1.0",
+    "@bloxwap/hig": "0.2.0",
     "fumadocs-core": "16.17.7",
     "fumadocs-mdx": "15.4.9",
     "fumadocs-ui": "16.17.7",
@@ -29,7 +27,6 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@bloxwap/hig-og-fonts": "0.1.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/mdx": "^2.0.14",
     "@types/node": "^24.19.2",

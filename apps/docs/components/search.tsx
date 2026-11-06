@@ -7,7 +7,7 @@ import {
   SearchDialogIcon, SearchDialogInput, SearchDialogList, SearchDialogOverlay,
   type SharedProps,
 } from 'fumadocs-ui/components/dialog/search';
-import { Alert, EmptyState } from '@bloxwap/hig-react/status';
+import { Alert, EmptyState } from '@bloxwap/hig/react/status';
 import { assetUrl } from '@/lib/site';
 
 function NoResults() {
