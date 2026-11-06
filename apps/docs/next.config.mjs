@@ -11,7 +11,8 @@ export default withMDX({
   reactStrictMode: true,
   // Resolve both this app and the local chart package from the workspace root.
   turbopack: { root: new URL('../..', import.meta.url).pathname },
-  transpilePackages: ['@bloxwap/chart'],
+  // Unified HIG package. Subpath imports replace the retired @bloxwap/hig-* names.
+  transpilePackages: ['@bloxwap/chart', '@bloxwap/hig'],
   // Type checking runs through tsrs in `npm run check` (prebuild), so Next skips its own tsc pass.
   typescript: { ignoreBuildErrors: true },
 });
