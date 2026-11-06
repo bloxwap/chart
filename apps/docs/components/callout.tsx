@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Callout as HigCallout } from '@bloxwap/hig-react/status';
+import { Callout as HigCallout } from '@bloxwap/hig/react/status';
 
 type FumadocsType = 'info' | 'note' | 'idea' | 'success' | 'warn' | 'warning' | 'error';
 const severity = { info: 'info', note: 'note', idea: 'tip', success: 'success', warn: 'warning', warning: 'warning', error: 'error' } as const;

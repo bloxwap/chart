@@ -1,5 +1,5 @@
-import { readOgFont } from '@bloxwap/hig-og-fonts/node';
-import { tokens as hig } from '@bloxwap/hig-tokens';
+import { readOgFont } from '@bloxwap/hig/og-fonts/node';
+import { tokens as hig } from '@bloxwap/hig/tokens';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
