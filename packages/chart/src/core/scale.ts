@@ -182,21 +182,24 @@ export class TimeScale {
     return true;
   }
 
-  /** Scrolls by `bars` (slots in continuous mode; positive moves toward history). */
+  /** Scrolls by `bars` (slots in continuous mode; positive moves toward history). Non-finite distances are ignored. */
   scroll(bars: number, dataLength: number): void {
+    if (!Number.isFinite(bars)) return;
     this.scrollOffset += bars;
     this.clampScroll(dataLength);
   }
 
-  /** Scrolls so that bar `index` becomes the rightmost visible bar. */
+  /** Scrolls so that bar `index` becomes the rightmost visible bar. A non-finite index is ignored. */
   scrollTo(index: number, dataLength: number): void {
+    if (!Number.isFinite(index)) return;
     const slots = this.slotsFor(dataLength);
     this.scrollOffset = slots === null ? dataLength - 1 - index : slots[dataLength - 1] - slotOf(slots, index);
     this.clampScroll(dataLength);
   }
 
-  /** Fits bars `[from, to]` (any order) edge to edge in the viewport. */
+  /** Fits bars `[from, to]` (any order) edge to edge in the viewport. Non-finite bounds are ignored. */
   fitRange(from: number, to: number, dataLength: number): void {
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return;
     const slots = this.slotsFor(dataLength);
     const lo = slots === null ? Math.min(from, to) : slotOf(slots, Math.min(from, to));
     const hi = slots === null ? Math.max(from, to) : slotOf(slots, Math.max(from, to));
@@ -209,6 +212,7 @@ export class TimeScale {
   }
 
   private clampScroll(dataLength: number): void {
+    if (!Number.isFinite(this.scrollOffset)) this.scrollOffset = 0;
     const slots = this.slotsFor(dataLength);
     const maxOffset = Math.max(0, slots === null ? dataLength - 1 : slots[dataLength - 1] - slots[0]);
     const minOffset = -Math.ceil(this.width / this.barSpacing);

@@ -505,8 +505,18 @@ export function mergeDeep<T>(base: T, override: unknown): T {
  *
  * @param partial - Any subset of the consolidated schema.
  */
+/** A CSS length used for layout: finite and `>= 0`. */
+export function assertLayoutLength(value: number, label: string): void {
+  if (!(Number.isFinite(value) && value >= 0)) throw new Error(`chart-ts: invalid ${label} ${value}`);
+}
+
 export function resolveConfig(partial?: DeepPartial<ChartConfig>): ChartConfig {
-  return mergeDeep(DEFAULT_CONFIG, partial ?? {});
+  const config = mergeDeep(DEFAULT_CONFIG, partial ?? {});
+  assertLayoutLength(config.width, 'width');
+  assertLayoutLength(config.height, 'height');
+  assertLayoutLength(config.priceAxis.width, 'priceAxis.width');
+  assertLayoutLength(config.timeAxis.height, 'timeAxis.height');
+  return config;
 }
 
 /**
