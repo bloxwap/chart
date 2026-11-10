@@ -26,7 +26,13 @@
     "lint": "npm --workspace @bloxwap/chart run lint:icons && node apps/docs/scripts/hig-tokens.mjs --check",
     "typecheck": "npm run build:ts && npm run docs:check",
     "typecheck:tsc": "npm --workspace @bloxwap/chart run build:ts:tsc && npm run docs:check:tsc",
-    "docs:test": "node apps/docs/scripts/test-hig-browser.mjs"
+    "docs:test": "node apps/docs/scripts/test-hig-browser.mjs",
+    "check:invariants": "node scripts/check-invariants.mjs && npm run test:invariants",
+    "check:dependencies": "node scripts/check-invariants.mjs dependencies",
+    "check:tree-shaking": "node scripts/check-invariants.mjs tree-shaking",
+    "check:tsrs": "node scripts/check-invariants.mjs tsrs",
+    "check:lockfiles": "node scripts/check-invariants.mjs lockfiles",
+    "test:invariants": "node --test scripts/invariants/*.test.mjs"
   },
   "engines": {
     "node": ">=24"
