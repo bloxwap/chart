@@ -150,11 +150,16 @@ export class DataStore {
   /**
    * Replaces the whole dataset. Non-finite rows are dropped, duplicate times
    * keep the last row, `high`/`low` expand to cover `open` and `close`, and a
-   * negative or non-finite volume becomes 0. Already-clean input keeps the
-   * same candle objects.
+   * negative or non-finite volume becomes 0. An array that is already finite,
+   * strictly increasing, unique and OHLC-consistent is stored as-is: no copy.
+   * Callers must not mutate that array.
    */
   setData(candles: readonly Candle[]): void {
-    this.candles = firstDirty(candles) === candles.length ? candles.slice() : sanitizeCandles(candles);
+    if (firstDirty(candles) === candles.length) {
+      this.candles = candles as Candle[];
+      return;
+    }
+    this.candles = sanitizeCandles(candles);
   }
 
   /**

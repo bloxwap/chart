@@ -16,13 +16,17 @@ describe('DataStore', () => {
     assert.equal(s.last(), undefined);
     assert.deepEqual(s.all(), []);
   });
-  it('setData sorts defensively and copies', () => {
+  it('setData sorts defensively and copies only when a row is dirty', () => {
     const s = new DataStore();
     const input = [candle(3), candle(1), candle(2)];
     s.setData(input);
     assert.deepEqual(s.all().map((c) => c.time), [1, 2, 3]);
     input.push(candle(9));
     assert.equal(s.length, 3);
+    const clean = [candle(1), candle(2), candle(3)];
+    s.setData(clean);
+    assert.equal(s.raw(), clean);
+    assert.equal(s.at(0), clean[0]);
   });
   it('append inserts in order and out of order', () => {
     const s = new DataStore();
