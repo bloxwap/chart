@@ -445,17 +445,20 @@ describe('linear rolling indicator accuracy', () => {
 });
 
 describe('bounded data and histogram work', () => {
-  it('preserves duplicate-time first replacement and isolates sorted input arrays', () => {
+  it('keeps the last duplicate time and isolates sorted input arrays', () => {
     const store = new DataStore();
-    const input = [data(1)[0]!, data(1)[0]!];
+    const input = [data(1)[0]!, { ...data(1)[0]!, close: 7 }];
     store.setData(input);
-    store.append({ ...input[0]!, close: 42 });
-    assert.equal(store.at(0)!.close, 42);
-    assert.equal(store.at(1)!.close, 100.5);
+    assert.equal(store.length, 1);
+    assert.equal(store.at(0)!.close, 7);
     assert.equal(input[0]!.close, 100.5);
+    assert.equal(input[1]!.close, 7);
+    store.append({ ...input[0]!, close: 42 });
+    assert.equal(store.length, 1);
+    assert.equal(store.at(0)!.close, 42);
     store.append({ ...input[0]!, time: 1 });
     store.append({ ...input[0]!, time: 1, close: 43 });
-    assert.equal(store.length, 3);
+    assert.equal(store.length, 2);
     assert.equal(store.last()!.close, 43);
   });
 

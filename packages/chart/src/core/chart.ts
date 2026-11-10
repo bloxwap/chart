@@ -20,7 +20,7 @@ import { scaleFont } from '../render/scale-font.js';
 import { attachInlineBook, type InlineBookApi } from '../render/inline-book.js';
 import { attachHeatmap, type HeatmapApi } from '../render/heatmap.js';
 import { parseColor } from '../color.js';
-import { DataStore, type Candle } from './data.js';
+import { DataStore, finiteCandle, type Candle } from './data.js';
 import type { DepthBook } from './depth.js';
 import { PriceScale, TimeScale, seriesMinMax, visibleMinMax, type VisibleRange } from './scale.js';
 import type { SlotRange } from './scale.js';
@@ -460,21 +460,23 @@ export class Chart {
   }
 
   /**
-   * Appends or replaces one candle (by time) and re-renders. A candle older
-   * than the first one goes in front like {@link prependData} (reported as
-   * `'prepend'`, with index-based drawings moving along); one between
-   * existing bars is inserted in place and reported as `'append'`.
+   * Appends or replaces one candle (by time) and re-renders. A non-finite time
+   * or OHLC price is ignored. `high`/`low` expand to cover `open` and `close`,
+   * and a negative or non-finite volume becomes 0. A candle older than the
+   * first one goes in front like {@link prependData} (reported as `'prepend'`,
+   * with index-based drawings moving along); one between existing bars is
+   * inserted in place and reported as `'append'`.
    */
   appendData(candle: Candle): void {
     const length = this.store.length;
-    if (length > 0 && candle.time < this.store.at(0)!.time) {
+    if (length > 0 && finiteCandle(candle) && candle.time < this.store.at(0)!.time) {
       this.insertHistory([candle]);
       return;
     }
     const last = this.store.last();
     const tail = last === undefined || candle.time > last.time ||
       (candle.time === last.time && this.store.at(length - 2)?.time !== candle.time);
-    this.store.append(candle);
+    if (!this.store.append(candle)) return;
     this.timeSlots.sync(this.store.raw(), this.config.timeScale, tail ? 'append' : 'data');
     this.events.dataLoaded(this.store.length > length ? 'append' : 'update', this.store.length - length);
     if (tail) {
@@ -488,7 +490,8 @@ export class Chart {
   /**
    * Inserts older history in front of the data and re-renders. Rows at or
    * after the first candle's time, or with a non-finite time or price, are
-   * ignored; the rest are deduped by time (last wins) and sorted. The viewport
+   * ignored; the rest are deduped by time (last wins), sorted, and repaired
+   * (`high`/`low` cover the body; a negative volume becomes 0). The viewport
    * stays on the same candles at the same pixels, index-based drawing points
    * (and the draft) move with their bars, and indicators recompute. Returns
    * the number of candles added.
