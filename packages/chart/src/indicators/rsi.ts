@@ -7,6 +7,7 @@
 import type { Candle } from '../core/data.js';
 import { TailState, TailSeries, smallTail, setSeriesValue, type MutableSeries } from './tail.js';
 import type { IndicatorDef } from './types.js';
+import { lengthParam } from './params.js';
 
 const averages = new WeakMap<MutableSeries, TailState<number[]>>();
 
@@ -112,10 +113,10 @@ export const rsiIndicator: IndicatorDef = {
   update(output, candles, from, params) {
     if (!smallTail(candles.length, from)) return undefined;
     return updateRsi(output.lines[0].values as (number | null)[], candles, from,
-      Math.max(1, Math.floor(params['period'] ?? 14))) ? output : undefined;
+      lengthParam(params, 'period', 14)) ? output : undefined;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 14));
+    const period = lengthParam(params, 'period', 14);
     return {
       pane: 'sub',
       lines: [{ key: 'value', values: rsiCandleValues(candles, period), color: colors[0] ?? '#7e57c2' }],

@@ -907,13 +907,20 @@ describe('indicators dialog: review hardening', () => {
     assert.equal(m.dialog.view, null);
   });
 
+  it('shows a definition default when the stored params omit that key', () => {
+    const m = mount();
+    m.chart.getConfig().indicators.push({ id: 'bare', name: 'sma', params: {}, pane: 'main', colors: [], visible: true, lineWidths: [], hiddenLines: [] });
+    m.dialog.openSettings('bare');
+    assert.equal(m.field('input-period').value, '20');
+  });
+
   it('Cancel reverts params that the config left to the defaults', () => {
     const m = mount({ config: { indicators: [{ id: 'bare', name: 'macd', params: {}, pane: 'sub', colors: [], visible: true }] } });
     const defaults = macdIndicator.compute(data, macdIndicator.defaultParams, macdIndicator.defaultColors, null).lines.map((l) => l.values);
     m.dialog.openSettings('bare');
     m.change('input-fast', '5');
     m.change('input-slow', '40');
-    assert.deepEqual(m.chart.getIndicator('bare')!.params, { fast: 5, slow: 40 });
+    assert.deepEqual(m.chart.getIndicator('bare')!.params, { fast: 5, slow: 40, signal: 9 });
     assert.notDeepEqual(m.outputs.get('macd')!.lines.map((l) => l.values), defaults);
     m.press('Cancel');
     assert.equal(m.dialog.view, null);

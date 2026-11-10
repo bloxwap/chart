@@ -8,6 +8,7 @@
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef, IndicatorOutput } from './types.js';
 import type { StudyMeta } from './study-meta.js';
+import { lengthParam } from './params.js';
 
 /** Running state after some prefix of candles. */
 interface AdxState {
@@ -94,7 +95,7 @@ function runAdx(
 }
 
 function lengths(params: Record<string, number>): [diLength: number, adxSmoothing: number] {
-  return [Math.max(1, Math.floor(params['diLength'] ?? 14)), Math.max(1, Math.floor(params['adxSmoothing'] ?? 14))];
+  return [lengthParam(params, 'diLength', 14), lengthParam(params, 'adxSmoothing', 14)];
 }
 
 /**

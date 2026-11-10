@@ -8,6 +8,7 @@ import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
 import { TailState, smallTail } from './tail.js';
 import type { WasmKernels } from '../wasm/loader.js';
+import { lengthParam } from './params.js';
 
 const wasmStates = new WeakMap<readonly (number | null)[], TailState<number>>();
 
@@ -55,7 +56,7 @@ export function updateSma(out: (number | null)[], candles: readonly Candle[], fr
   for (let i = from; i < candles.length; i++) {
     sum += candles[i].close;
     if (i >= period) sum -= candles[i - period].close;
-    out[i] = i >= period - 1 ? sum / period : null;
+    out[i] = sum / period;
     state!.save(i, candles.length, sum);
   }
   state!.prune(candles.length);
@@ -82,7 +83,7 @@ export const smaIndicator: IndicatorDef = {
   styles: [{ key: 'value', label: 'MA', colorIndex: 0 }],
   update(output, candles, from, params, _colors, kernels) {
     if (!smallTail(candles.length, from)) return undefined;
-    const period = Math.max(1, Math.floor(params['period'] ?? 20));
+    const period = lengthParam(params, 'period', 20);
     if (kernels !== null) {
       const out = output.lines[0].values as (number | null)[];
       const state = wasmStates.get(out);
@@ -106,7 +107,7 @@ export const smaIndicator: IndicatorDef = {
     colors: readonly string[],
     kernels: WasmKernels | null,
   ) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 20));
+    const period = lengthParam(params, 'period', 20);
     let values: (number | null)[];
     if (kernels !== null) {
       const closes = new Float32Array(candles.length);

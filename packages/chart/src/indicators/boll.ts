@@ -8,6 +8,7 @@ import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
 import { smallTail } from './tail.js';
 import { smaValues, updateSma } from './sma.js';
+import { lengthParam } from './params.js';
 
 /**
  * Population standard deviation in O(length) time and O(period) scratch space.
@@ -78,7 +79,7 @@ export const bollIndicator: IndicatorDef = {
     { key: 'lower', label: 'Lower', colorIndex: 2 },
   ],
   update(output, candles, from, params) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 20));
+    const period = lengthParam(params, 'period', 20);
     if (!Number.isFinite(period) || !smallTail(candles.length, from, period)) return undefined;
     const [mid, upper, lower] = output.lines.map(line => line.values as (number | null)[]);
     if (!updateSma(mid, candles, from, period)) return undefined;
@@ -96,7 +97,7 @@ export const bollIndicator: IndicatorDef = {
     return output;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 20));
+    const period = lengthParam(params, 'period', 20);
     const mult = params['mult'] ?? 2;
     const closes = candles.map((c) => c.close);
     const mid = smaValues(closes, period);
