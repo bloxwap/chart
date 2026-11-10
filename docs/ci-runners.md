@@ -22,7 +22,7 @@ In the npmjs.com settings for `@bloxwap/chart`, add a GitHub Actions Trusted Pub
 
 | Workflow | Job | Runner | What it runs |
 | --- | --- | --- | --- |
-| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | `test` | Mac mini | Library coverage gate and package `exports` imports |
+| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | `test` | Mac mini | Library coverage, package invariants, tsc fallback, and package `exports` imports |
 | [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | Mac mini | LCOV report and Codecov upload |
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `build` | Mac mini | Docs export, typecheck, lint, Playwright Chrome checks; Pages artifact on `main` only (PRs still build and validate) |
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `deploy` | Mac mini | `configure-pages` + `deploy-pages` on `main` |
@@ -67,3 +67,34 @@ Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There 
 - Headless Chrome on macOS does not need the Accessibility TCC prompt that headed browsers do.
 - npm publish (`Publish to npm`) uses the Ubuntu exception and approval setup above. GitHub Pages deploy still uses `pages: write` and `id-token: write`.
 - Fork pull requests on a public repository should stay on GitHub-hosted runners or a dedicated untrusted pool if org policy forbids self-hosted runners on forks. This repo's workflows themselves do not special-case forks.
+
+## Package invariant gates
+
+After the coverage build, the test job runs `bun run check:invariants` and
+`bun run typecheck:tsc`. Locally, run `npm run build` followed by
+`npm run check:invariants` (Node 24 and Bun required). The aggregate command also
+runs 19 gate regression tests using isolated broken fixtures; these do not change
+library coverage. Individual checks are available:
+
+- `npm run check:dependencies`: rejects runtime dependencies and non-relative
+  imports/re-exports in built JavaScript, except `react` and `react/jsx-runtime`
+  under `dist/react/`. React remains an optional peer and a development dependency
+  for adapter tests. Computed or escaped module specifiers require review and fail
+  the static gate.
+- `npm run check:tree-shaking`: bundles package-name fixtures with `bun build
+  --minify`, checks `sideEffects:false`, excludes the embedded WASM payload from
+  `parseColor` and `smaValues`, and requires it in `createChart`. Byte budgets are
+  2,400 / 800 / 240,000 respectively (measured baseline: 1,762 / 556 / 176,960 with
+  Bun 1.4.4; CI uses 1.4.2). Review intentional growth before adjusting budgets.
+  This is a bundle regression gate, not proof that every module has no side effects.
+- `npm run check:tsrs`: requires identical exact workspace compiler pins and
+  matching `tsrs` / `@tsrs/*` locked versions. Renovate groups those updates;
+  the separate `typecheck:tsc` CI step exercises the fallback compiler.
+- `npm run check:lockfiles`: compares package names and sets of resolved versions
+  in `bun.lock` and `package-lock.json`, excluding workspace links. Update both
+  lockfiles together. This compares versions, not hoisting layout or integrity hashes.
+
+To exercise a check against a fixture, use
+`node scripts/check-invariants.mjs <dependencies|tree-shaking|tsrs|lockfiles|all> <repo-root>`.
+Temporary bundle and test directories are created inside that root and removed
+on completion. No additional dependencies are needed.

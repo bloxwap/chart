@@ -70,7 +70,7 @@ Guides, API reference, and the complete chart controls: **https://bloxwap.github
 
 ## Development
 
-The repository uses npm workspaces with one root lockfile. Each workspace declares its own dependencies; the chart package has no runtime dependencies.
+The repository uses npm workspaces with two root lockfiles: `bun.lock` for CI and `package-lock.json` for npm releases. `npm run check:lockfiles` checks that their package versions agree. Each workspace declares its own dependencies; the chart package has no runtime dependencies.
 
 ```sh
 npm ci

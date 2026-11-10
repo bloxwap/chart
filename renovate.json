@@ -1,4 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>bloxwap/.github:renovate-config"]
+  "extends": [
+    "local>bloxwap/.github:renovate-config"
+  ],
+  "packageRules": [
+    {
+      "groupName": "tsrs compiler",
+      "matchPackageNames": [
+        "tsrs",
+        "@tsrs/*"
+      ]
+    }
+  ]
 }

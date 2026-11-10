@@ -74,6 +74,12 @@ jobs:
       - name: Tests and coverage gate
         run: bun run coverage
 
+      - name: Package invariants and gate regression tests
+        run: bun run check:invariants
+
+      - name: TypeScript compiler fallback
+        run: bun run typecheck:tsc
+
       # Tests import dist/ directly, so check the published entry points separately: every
       # "exports" subpath must import by package name in plain Node.
       - name: Package entry points
