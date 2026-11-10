@@ -390,7 +390,7 @@ export class Chart {
     } else {
       throw new Error('chart-ts: inject a container canvas or a ChartDocument');
     }
-    this.store.setData(this.config.data);
+    this.store.setData(this.config.data.slice());
     this.timeSlots.sync(this.store.raw(), this.config.timeScale, 'data');
     this.syncInlineBook();
     this.syncHeatmap();
@@ -452,7 +452,7 @@ export class Chart {
   setData(candles: readonly Candle[]): void {
     this.rangeAnimation?.clear();
     this.candleAnimation?.clear();
-    this.store.setData(candles);
+    this.store.setData(candles.slice());
     this.timeSlots.sync(this.store.raw(), this.config.timeScale, 'data');
     this.events.dataLoaded('set', this.store.length);
     this.indicatorCache.clear();
@@ -577,7 +577,7 @@ export class Chart {
     if (partial.data !== undefined) {
       this.rangeAnimation?.clear();
       this.candleAnimation?.clear();
-      this.store.setData(this.config.data);
+      this.store.setData(this.config.data.slice());
       this.events.dataLoaded('set', this.store.length);
       this.indicatorCache.clear();
     }
