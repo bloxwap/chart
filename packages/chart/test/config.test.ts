@@ -53,6 +53,17 @@ describe('resolveConfig', () => {
     assert.equal(cfg.crosshair.labelBackground, '#2962ff');
     assert.equal(cfg.crosshair.labelColor, 'auto');
   });
+  it('rejects a non-finite or negative layout length', () => {
+    assert.throws(() => resolveConfig({ width: Number.NaN }), /invalid width NaN/);
+    assert.throws(() => resolveConfig({ height: Number.POSITIVE_INFINITY }), /invalid height/);
+    assert.throws(() => resolveConfig({ priceAxis: { width: -1 } }), /invalid priceAxis\.width -1/);
+    assert.throws(() => resolveConfig({ timeAxis: { height: Number.NaN } }), /invalid timeAxis\.height/);
+    const zero = resolveConfig({ width: 0, height: 0, priceAxis: { width: 0 }, timeAxis: { height: 0 } });
+    assert.equal(zero.width, 0);
+    assert.equal(zero.height, 0);
+    assert.equal(zero.priceAxis.width, 0);
+    assert.equal(zero.timeAxis.height, 0);
+  });
   it('deep-merges typography and crosshair label overrides', () => {
     const cfg = resolveConfig({
       theme: { fontFamily: '"Geist", system-ui', monoFamily: '"Geist Mono", monospace', fontSize: 13 },

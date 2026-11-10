@@ -5,6 +5,7 @@
  */
 
 import {
+  assertLayoutLength,
   mergeDeep,
   resolveConfig,
   type ChartConfig,
@@ -377,7 +378,9 @@ export class Chart {
     this.indicators = options.registries?.indicators ?? createIndicatorRegistry();
     this.drawings = options.registries?.drawings ?? createDrawingRegistry();
     this.seriesRenderers = options.registries?.series ?? createSeriesRegistry();
-    this.pixelRatio = options.pixelRatio ?? 1;
+    const ratio = options.pixelRatio ?? 1;
+    if (!(ratio > 0 && Number.isFinite(ratio))) throw new Error(`chart-ts: invalid pixelRatio ${ratio}`);
+    this.pixelRatio = ratio;
     this.snapshotDocument = options.document;
     this.clock = options.now ?? (() => Date.now());
     if (options.container !== undefined) {
@@ -560,6 +563,10 @@ export class Chart {
 
   /** Deep-merges a partial over the current config and re-renders. */
   updateConfig(partial: DeepPartial<ChartConfig>): void {
+    if (partial.width !== undefined) assertLayoutLength(partial.width, 'width');
+    if (partial.height !== undefined) assertLayoutLength(partial.height, 'height');
+    if (partial.priceAxis?.width !== undefined) assertLayoutLength(partial.priceAxis.width, 'priceAxis.width');
+    if (partial.timeAxis?.height !== undefined) assertLayoutLength(partial.timeAxis.height, 'timeAxis.height');
     if (partial.priceAxis?.lockPriceToBarRatio === true && !this.config.priceAxis.lockPriceToBarRatio) {
       this.lockedRatio = this.scale.priceToBarRatio();
     }
@@ -1049,10 +1056,14 @@ export class Chart {
    * is scaled by `pixelRatio`, so text stays crisp on HiDPI displays.
    *
    * When `pixelRatio` is omitted the currently stored ratio is kept; passing
-   * it explicitly (including `1`) updates it.
+   * it explicitly (including `1`) updates it. A non-positive or non-finite
+   * ratio, or a non-finite or negative size, throws and leaves the canvas as it is.
    */
   resize(width: number, height: number, pixelRatio?: number): void {
     const ratio = pixelRatio ?? this.pixelRatio;
+    if (!(ratio > 0 && Number.isFinite(ratio))) throw new Error(`chart-ts: invalid pixelRatio ${ratio}`);
+    assertLayoutLength(width, 'chart width');
+    assertLayoutLength(height, 'chart height');
     const backingWidth = Math.round(width * ratio);
     const backingHeight = Math.round(height * ratio);
     if (this.pixelRatio === ratio && this.canvas.width === backingWidth && this.canvas.height === backingHeight) return;

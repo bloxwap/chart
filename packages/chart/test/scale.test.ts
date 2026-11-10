@@ -88,6 +88,24 @@ describe('TimeScale', () => {
     s.scrollTo(20, 50);
     assert.equal(s.visibleRange(50).to, 21);
   });
+  it('ignores non-finite scroll, scrollTo and fitRange, and recovers a NaN offset', () => {
+    const s = new TimeScale(10, 100);
+    s.scroll(4, 50);
+    const offset = s.scrollOffset;
+    const range = s.visibleRange(50);
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      s.scroll(bad, 50);
+      s.scrollTo(bad, 50);
+      s.fitRange(bad, 10, 50);
+      s.fitRange(3, bad, 50);
+    }
+    assert.equal(s.scrollOffset, offset);
+    assert.deepEqual(s.visibleRange(50), range);
+    s.scrollOffset = Number.NaN;
+    s.scroll(0, 50);
+    assert.ok(Number.isFinite(s.scrollOffset));
+    assert.ok(Number.isFinite(s.visibleRange(50).from) && Number.isFinite(s.visibleRange(50).to));
+  });
   it('setViewport rejects negative widths', () => {
     const s = new TimeScale(6, 100);
     s.setViewport(-50);
