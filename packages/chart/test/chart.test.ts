@@ -135,9 +135,9 @@ describe('Chart API', () => {
     assert.equal(chart.removeDrawing('nope'), false);
     chart.destroy();
   });
-  it('skips drawings with too few points or unregistered leftovers', () => {
+  it('rejects drawings with too few points and skips unregistered leftovers', () => {
     const chart = createChart({ document: new MockDocument(), config: { wasm: false, data: candles(10) } });
-    chart.addDrawing({ name: 'trendline', points: [{ index: 1, price: 100 }] });
+    assert.throws(() => chart.addDrawing({ name: 'trendline', points: [{ index: 1, price: 100 }] }), /at least 2 points/);
     chart.getConfig().drawings.push({ id: 'x', name: 'ghost', points: [], color: '#000', lineWidth: 1, lineStyle: 'solid', text: '', image: null, locked: false, visible: true });
     chart.render();
     chart.destroy();

@@ -284,6 +284,19 @@ export interface ScaleApi {
 /**
  * A chart instance. Create via {@link createChart}.
  */
+function assertFinitePoint(point: { index?: number; price?: number }): void {
+  if (!(Number.isFinite(point.index) && Number.isFinite(point.price))) {
+    throw new Error('chart-ts: drawing point index and price must be finite');
+  }
+}
+
+function assertDrawingPoints(name: string, minPoints: number, points: readonly { index?: number; price?: number }[]): void {
+  if (points.length < minPoints) {
+    throw new Error(`chart-ts: drawing "${name}" needs at least ${minPoints} point${minPoints === 1 ? '' : 's'}`);
+  }
+  for (const point of points) assertFinitePoint(point);
+}
+
 export class Chart {
   /** Indicator registry; register custom indicators here. */
   readonly indicators: IndicatorRegistry;
@@ -407,6 +420,7 @@ export class Chart {
     } else {
       this.ready = Promise.resolve(this);
     }
+    this.assertConfigIds();
     this.render();
     if (options.autoResize === true) this.startAutoResize();
   }
@@ -563,6 +577,8 @@ export class Chart {
 
   /** Deep-merges a partial over the current config and re-renders. */
   updateConfig(partial: DeepPartial<ChartConfig>): void {
+    if (partial.indicators !== undefined) this.assertIndicatorList(partial.indicators);
+    if (partial.drawings !== undefined) this.assertDrawingList(partial.drawings);
     if (partial.width !== undefined) assertLayoutLength(partial.width, 'width');
     if (partial.height !== undefined) assertLayoutLength(partial.height, 'height');
     if (partial.priceAxis?.width !== undefined) assertLayoutLength(partial.priceAxis.width, 'priceAxis.width');
@@ -672,6 +688,40 @@ export class Chart {
     if (this.batchDepth === 0) this.events.flush();
   }
 
+  /** Rejects duplicate ids and indicator ids that share the pane namespace. */
+  private assertConfigIds(): void {
+    this.assertIndicatorList(this.config.indicators);
+    this.assertDrawingList(this.config.drawings);
+  }
+
+  private assertNewIndicatorId(id: string): void {
+    if (id === 'main' || this.customPanes.has(id)) throw new Error(`chart-ts: indicator id "${id}" collides with a pane`);
+    if (this.config.indicators.some((ind) => ind.id === id)) throw new Error(`chart-ts: duplicate indicator "${id}"`);
+  }
+
+  private assertIndicatorList(indicators: readonly { id?: string }[]): void {
+    const seen = new Set<string>();
+    for (const ind of indicators) {
+      const id = ind.id ?? '';
+      if (id === 'main' || this.customPanes.has(id)) throw new Error(`chart-ts: indicator id "${id}" collides with a pane`);
+      if (seen.has(id)) throw new Error(`chart-ts: duplicate indicator "${id}"`);
+      seen.add(id);
+    }
+  }
+
+  private assertDrawingList(drawings: readonly { id?: string; name?: string; points?: readonly { index?: number; price?: number }[] }[]): void {
+    const seen = new Set<string>();
+    for (const drawing of drawings) {
+      const id = drawing.id ?? '';
+      if (seen.has(id)) throw new Error(`chart-ts: duplicate drawing "${id}"`);
+      seen.add(id);
+      const points = drawing.points ?? [];
+      const def = drawing.name === undefined ? undefined : this.drawings.get(drawing.name);
+      if (def !== undefined) assertDrawingPoints(def.name, def.minPoints, points);
+      else for (const point of points) assertFinitePoint(point);
+    }
+  }
+
   /**
    * Adds an indicator instance. Returns its id.
    *
@@ -680,8 +730,10 @@ export class Chart {
   addIndicator(input: AddIndicatorInput): string {
     const def = this.indicators.get(input.name);
     if (def === undefined) throw new Error(`chart-ts: unknown indicator "${input.name}"`);
+    const id = input.id ?? `ind-${++this.indicatorSeq}`;
+    this.assertNewIndicatorId(id);
     const cfg: IndicatorConfig = {
-      id: input.id ?? `ind-${++this.indicatorSeq}`,
+      id,
       name: def.name,
       params: { ...def.defaultParams, ...input.params },
       pane: input.pane ?? def.defaultPane,
@@ -754,6 +806,9 @@ export class Chart {
       autoscale: options.autoscale,
       primitives: [],
     };
+    if (state.id === 'main' || this.config.indicators.some((ind) => ind.id === state.id)) {
+      throw new Error(`chart-ts: pane id "${state.id}" collides with a pane`);
+    }
     if (this.customPanes.has(state.id)) throw new Error(`chart-ts: duplicate pane "${state.id}"`);
     this.customPanes.set(state.id, state);
     this.render();
@@ -838,8 +893,11 @@ export class Chart {
    */
   addDrawing(input: AddDrawingInput): string {
     const def = this.requireDrawing(input.name);
+    assertDrawingPoints(def.name, def.minPoints, input.points);
+    const id = input.id ?? `drw-${++this.drawingSeq}`;
+    if (this.config.drawings.some((drawing) => drawing.id === id)) throw new Error(`chart-ts: duplicate drawing "${id}"`);
     const cfg: DrawingConfig = {
-      id: input.id ?? `drw-${++this.drawingSeq}`,
+      id,
       name: def.name,
       points: def.normalize !== undefined ? def.normalize(input.points) : input.points,
       color: input.color ?? DEFAULT_DRAWING_COLOR,
@@ -865,6 +923,11 @@ export class Chart {
   updateDrawing(id: string, patch: DrawingPatch): boolean {
     const cfg = this.getDrawing(id);
     if (cfg === undefined) return false;
+    if (patch.points !== undefined) {
+      const def = this.drawings.get(cfg.name);
+      if (def !== undefined) assertDrawingPoints(def.name, def.minPoints, patch.points);
+      else for (const point of patch.points) assertFinitePoint(point);
+    }
     Object.assign(cfg, patch);
     this.events.configChanged('drawings');
     this.render();
@@ -1019,6 +1082,7 @@ export class Chart {
   moveDrawingPoint(id: string, pointIndex: number, point: DrawingPoint): boolean {
     const cfg = this.getDrawing(id);
     if (cfg === undefined || pointIndex < 0 || pointIndex >= cfg.points.length) return false;
+    assertFinitePoint(point);
     cfg.points = cfg.points.map((p, i) => (i === pointIndex ? point : p));
     this.events.configChanged('drawings');
     this.render();
