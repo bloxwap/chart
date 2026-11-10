@@ -9,6 +9,7 @@ import type { IndicatorDef, IndicatorLevel } from './types.js';
 import type { StudyMeta } from './study-meta.js';
 import { typicalPrice } from './candle-values.js';
 import { windowSums } from './window-sums.js';
+import { lengthParam } from './params.js';
 
 /**
  * CCI of the window of `prices` ending at `end` given its mean, or null on a
@@ -43,7 +44,7 @@ function fillCci(candles: readonly Candle[], period: number, values: (number | n
 }
 
 function periodParam(params: Record<string, number>): number {
-  return Math.max(1, Math.floor(params['period'] ?? 20));
+  return lengthParam(params, 'period', 20);
 }
 
 /**

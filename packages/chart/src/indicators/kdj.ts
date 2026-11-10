@@ -6,6 +6,7 @@
 
 import type { Candle } from '../core/data.js';
 import type { IndicatorDef } from './types.js';
+import { lengthParam } from './params.js';
 
 /**
  * Classic KDJ. RSV = (close − lowestLow(n)) / (highestHigh(n) − lowestLow(n)) × 100
@@ -71,7 +72,7 @@ export const kdjIndicator: IndicatorDef = {
     { key: 'j', label: 'J', colorIndex: 2 },
   ],
   update(output, candles, from, params) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 9));
+    const period = lengthParam(params, 'period', 9);
     // Large batches/periods are cheaper with the linear monotonic-queue pass.
     if (!Number.isFinite(period) || (candles.length - from) * period > candles.length * 2) return undefined;
     const [k, d, j] = output.lines.map(line => line.values as (number | null)[]);
@@ -92,7 +93,7 @@ export const kdjIndicator: IndicatorDef = {
     return output;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
-    const period = Math.max(1, Math.floor(params['period'] ?? 9));
+    const period = lengthParam(params, 'period', 9);
     const { k, d, j } = kdjValues(candles, period);
     return {
       pane: 'sub',

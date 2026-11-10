@@ -15,11 +15,15 @@ import { KERNELS_BASE64 } from './kernels.base64.js';
 export interface WasmKernels {
   /** True when the SIMD kernels are in use. */
   readonly usingSimd: boolean;
-  /** Min and max of a float array (NaN pair when empty). */
+  /**
+   * Min and max of a float array. A NaN anywhere makes both results NaN
+   * (SIMD min/max propagate it). An empty array is also a NaN pair.
+   * {@link visibleMinMax} uses the scalar path when a window is not finite.
+   */
   minmax(values: Float32Array): { min: number; max: number };
-  /** Simple moving average; NaN before `period - 1`. */
+  /** Simple moving average; NaN before `period - 1`, and for every index when `period` is below 1. */
   sma(src: Float32Array, period: number): Float32Array;
-  /** Exponential moving average, SMA-seeded; NaN before `period - 1`. */
+  /** Exponential moving average, SMA-seeded; NaN before `period - 1`, and for every index when `period` is below 1. */
   ema(src: Float32Array, period: number): Float32Array;
   /**
    * Sliding-window maximum over `period` values (floored); NaN before
@@ -143,17 +147,21 @@ function wrapExports(raw: RawKernelExports, usingSimd: boolean): WasmKernels {
       return { min, max };
     },
     sma(src: Float32Array, period: number): Float32Array {
+      const p = Math.floor(period);
+      if (!(p >= 1)) return new Float32Array(src.length).fill(NaN);
       const dstOffset = src.byteLength;
       ensureCapacity(dstOffset + src.byteLength);
       writeInput(src);
-      raw.sma_f32(0, dstOffset, src.length, period);
+      raw.sma_f32(0, dstOffset, src.length, p);
       return new Float32Array(raw.memory.buffer, dstOffset, src.length).slice();
     },
     ema(src: Float32Array, period: number): Float32Array {
+      const p = Math.floor(period);
+      if (!(p >= 1)) return new Float32Array(src.length).fill(NaN);
       const dstOffset = src.byteLength;
       ensureCapacity(dstOffset + src.byteLength);
       writeInput(src);
-      raw.ema_f32(0, dstOffset, src.length, period);
+      raw.ema_f32(0, dstOffset, src.length, p);
       return new Float32Array(raw.memory.buffer, dstOffset, src.length).slice();
     },
     rollingMax: (src, period) => rolling(raw.rolling_max_f32, src, period),

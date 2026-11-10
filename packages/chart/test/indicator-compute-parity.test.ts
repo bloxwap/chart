@@ -1042,13 +1042,16 @@ it('full compute matches frozen pre-optimization implementations with Object.is 
       for (const length of [0, 1, 6, 7, 8, 9, 13, 14, 19, 20, 25, 26, 51, 52, 1000]) for (const mode of [0, 1, 2, 3]) {
         const candles = walk(length, seed, mode);
         for (const params of variants) {
+          if (Object.values(params).some((value) => typeof value === 'number' && !Number.isFinite(value))) {
+            // Non-finite periods used to trap inside the WASM kernels. They now
+            // fall back to a finite length, so compute must not throw.
+            assert.doesNotThrow(() => current.compute(candles, params, [], kernels));
+            continue;
+          }
           let expected;
           try { expected = reference.compute(candles, params, [], kernels); }
           catch (error) {
-            // Existing WASM kernels reject some non-finite periods with a trap.
-            assert.throws(() => current.compute(candles, params, [], kernels), (actual: unknown) =>
-              actual instanceof Error && error instanceof Error && actual.constructor === error.constructor && actual.message === error.message);
-            continue;
+            assert.fail(`unexpected trap for ${reference.name}: ${error instanceof Error ? error.message : String(error)}`);
           }
           const actual = current.compute(candles, params, [], kernels);
           // strict deepEqual compares number leaves using Object.is and detects holes.

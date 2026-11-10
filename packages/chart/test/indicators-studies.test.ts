@@ -634,16 +634,16 @@ describe('ma-ribbon', () => {
 });
 
 describe('degenerate study params', () => {
-  it('yield empty lines instead of throwing for NaN or infinite lengths', () => {
+  it('falls back to the default length for NaN or infinite lengths', () => {
     const candles = walk(40, 97);
     for (const period of [NaN, Infinity]) {
       for (const def of [cciIndicator, mfiIndicator]) {
-        const output = def.compute(candles, { period }, [], null);
-        assert.ok(output.lines[0]!.values.every((v) => v === null), `${def.name}(${period})`);
-        assert.equal(output.lines[0]!.values.length, 40);
+        assert.deepEqual(def.compute(candles, { period }, [], null), def.compute(candles, def.defaultParams, [], null), def.name);
       }
-      const adx = adxIndicator.compute(candles, { diLength: period, adxSmoothing: 3 }, [], null);
-      assert.ok(adx.lines.every((line) => line.values.every((v) => v === null)), `adx(${period})`);
+      assert.deepEqual(
+        adxIndicator.compute(candles, { diLength: period, adxSmoothing: 3 }, [], null),
+        adxIndicator.compute(candles, { diLength: 14, adxSmoothing: 3 }, [], null),
+      );
       const ribbon = maRibbonIndicator.compute(candles, { len1: period, len2: 0, len3: 0, len4: 3 }, [], null);
       assert.deepEqual(ribbon.lines.map((l) => l.key), ['ma4']);
       assert.deepEqual(vwapIndicator.compute(candles, { anchor: period, bands: period }, [], null), vwapIndicator.compute(candles, {}, [], null));

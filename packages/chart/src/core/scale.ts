@@ -384,7 +384,9 @@ export function visibleMinMax(
   const start = Math.max(0, from);
   const end = Math.min(candles.length, to);
   if (end <= start) return { min: 0, max: 1 };
-  if (kernels !== null) {
+  // The SIMD kernel propagates NaN. Use it only when this window is finite;
+  // otherwise the scalar loop below skips non-finite highs and lows.
+  if (kernels !== null && windowIsFinite(candles, start, end)) {
     const n = end - start;
     const buf = new Float32Array(n * 2);
     for (let i = start; i < end; i++) {
@@ -404,6 +406,14 @@ export function visibleMinMax(
   return { min, max };
 }
 
+function windowIsFinite(candles: readonly Candle[], start: number, end: number): boolean {
+  for (let i = start; i < end; i++) {
+    const candle = candles[i]!;
+    if (!Number.isFinite(candle.low) || !Number.isFinite(candle.high)) return false;
+  }
+  return true;
+}
+
 /** Min/max over a sparse indicator value series within `[from, to)`. */
 export function seriesMinMax(
   values: readonly (number | null)[],
@@ -417,7 +427,7 @@ export function seriesMinMax(
   let seen = false;
   for (let i = start; i < end; i++) {
     const v = values[i];
-    if (v === null || Number.isNaN(v)) continue;
+    if (v === null || !Number.isFinite(v)) continue;
     seen = true;
     if (v < min) min = v;
     if (v > max) max = v;

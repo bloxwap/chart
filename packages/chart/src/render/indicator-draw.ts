@@ -58,6 +58,7 @@ export function indicatorMinMax(output: IndicatorOutput, from: number, to: numbe
   extendByLines(extent, output.lines, from, to);
   extendByLines(extent, output.fillLines ?? NO_LINES, from, to);
   for (const level of output.levels ?? []) {
+    if (!Number.isFinite(level.value)) continue;
     if (level.value < extent.min) extent.min = level.value;
     if (level.value > extent.max) extent.max = level.value;
   }
@@ -65,7 +66,7 @@ export function indicatorMinMax(output: IndicatorOutput, from: number, to: numbe
 }
 
 function isValue(value: number | null | undefined): value is number {
-  return value != null && !Number.isNaN(value);
+  return value != null && Number.isFinite(value);
 }
 
 /** The line a fill boundary `key` names: a stroked line, else a fill-only one. */

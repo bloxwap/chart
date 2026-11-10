@@ -34,6 +34,7 @@ import { createSeriesRegistry, SeriesRegistry } from '../series/registry.js';
 import type { SeriesDrawFn } from '../series/types.js';
 import { splitPrimitives, type PanePrimitive } from '../render/primitive.js';
 import { resolveIndicatorColors, type IndicatorDef, type IndicatorOutput } from '../indicators/types.js';
+import { normalizeIndicatorParams } from '../indicators/params.js';
 import { indicatorLineLabels } from '../indicators/labels.js';
 import {
   applyIndicatorPatch, normalizeIndicatorConfig, styleIndicatorOutput, type IndicatorPatch, type ResolvedIndicatorConfig,
@@ -421,6 +422,7 @@ export class Chart {
       this.ready = Promise.resolve(this);
     }
     this.assertConfigIds();
+    this.normalizeConfiguredIndicators();
     this.render();
     if (options.autoResize === true) this.startAutoResize();
   }
@@ -607,6 +609,7 @@ export class Chart {
     if (partial.data !== undefined || partial.timeScale !== undefined) {
       this.timeSlots.sync(this.store.raw(), this.config.timeScale, partial.data !== undefined ? 'data' : 'config');
     }
+    if (partial.indicators !== undefined) this.normalizeConfiguredIndicators();
     if (partial.inlineBook !== undefined) this.syncInlineBook();
     if (partial.heatmap !== undefined) this.syncHeatmap();
     this.render();
@@ -688,6 +691,14 @@ export class Chart {
     if (this.batchDepth === 0) this.events.flush();
   }
 
+  /** Clamps configured indicator params to each definition's declared inputs. */
+  private normalizeConfiguredIndicators(): void {
+    for (const ind of this.config.indicators) {
+      const def = this.indicators.get(ind.name);
+      if (def !== undefined) ind.params = normalizeIndicatorParams(def, ind.params);
+    }
+  }
+
   /** Rejects duplicate ids and indicator ids that share the pane namespace. */
   private assertConfigIds(): void {
     this.assertIndicatorList(this.config.indicators);
@@ -735,7 +746,7 @@ export class Chart {
     const cfg: IndicatorConfig = {
       id,
       name: def.name,
-      params: { ...def.defaultParams, ...input.params },
+      params: normalizeIndicatorParams(def, { ...def.defaultParams, ...input.params }),
       pane: input.pane ?? def.defaultPane,
       colors: input.colors ?? [...def.defaultColors],
       visible: input.visible ?? true,
@@ -763,6 +774,8 @@ export class Chart {
     const cfg = this.getIndicator(id);
     if (cfg === undefined) return false;
     applyIndicatorPatch(cfg, patch);
+    const def = this.indicators.get(cfg.name);
+    if (def !== undefined) cfg.params = normalizeIndicatorParams(def, cfg.params);
     this.events.configChanged('indicators');
     this.render();
     return true;

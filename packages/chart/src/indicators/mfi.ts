@@ -10,6 +10,7 @@ import type { IndicatorDef, IndicatorLevel } from './types.js';
 import type { StudyMeta } from './study-meta.js';
 import { candleVolume, typicalPrice } from './candle-values.js';
 import { windowSums } from './window-sums.js';
+import { lengthParam } from './params.js';
 
 /**
  * Writes MFI from index `from`. A flow is `volume · tp`, positive when tp
@@ -17,13 +18,9 @@ import { windowSums } from './window-sums.js';
  * the first candle (no previous tp) counts both ways and windows are partial
  * until `period` candles exist, so values start at 50 on the first candle. No
  * negative flow in the window gives 100 (TradingView's rsi), including a
- * window without any flow. Non-finite periods leave every value null.
+ * window without any flow.
  */
 function fillMfi(candles: readonly Candle[], period: number, values: (number | null)[], from: number): void {
-  if (!Number.isFinite(period)) {
-    for (let i = from; i < candles.length; i++) values[i] = null;
-    return;
-  }
   const base = Math.max(0, from - period + 1);
   const up = new Float64Array(candles.length - base);
   const down = new Float64Array(candles.length - base);
@@ -45,7 +42,7 @@ function fillMfi(candles: readonly Candle[], period: number, values: (number | n
 }
 
 function periodParam(params: Record<string, number>): number {
-  return Math.max(1, Math.floor(params['period'] ?? 14));
+  return lengthParam(params, 'period', 14);
 }
 
 /**

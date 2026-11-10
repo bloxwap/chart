@@ -8,6 +8,7 @@ import type { Candle } from '../core/data.js';
 import { DOWN_COLOR, UP_COLOR, type IndicatorDef, type IndicatorOutput } from './types.js';
 import { TailState, smallTail } from './tail.js';
 import { emaValues } from './ema.js';
+import { lengthParam } from './params.js';
 
 const states = new WeakMap<IndicatorOutput, TailState<number[]>>();
 
@@ -32,11 +33,11 @@ export const macdIndicator: IndicatorDef = {
   ],
   update(output, candles, from, params) {
     const state = states.get(output);
-    const fast = Math.max(1, Math.floor(params['fast'] ?? 12));
-    const slow = Math.max(fast + 1, Math.floor(params['slow'] ?? 26));
-    const signal = Math.max(1, Math.floor(params['signal'] ?? 9));
+    const fast = lengthParam(params, 'fast', 12);
+    const slow = Math.max(fast + 1, lengthParam(params, 'slow', 26));
+    const signal = lengthParam(params, 'signal', 9);
     const snapshot = state?.get(from - 1);
-    if (!smallTail(candles.length, from) || snapshot === undefined || !Number.isFinite(signal)) return undefined;
+    if (!smallTail(candles.length, from) || snapshot === undefined) return undefined;
     let [previousFast, previousSlow, previous] = snapshot;
     const fastWeight = 2 / (fast + 1), slowWeight = 2 / (slow + 1);
     const [dif, dea] = output.lines.map(line => line.values as (number | null)[]);
@@ -59,9 +60,9 @@ export const macdIndicator: IndicatorDef = {
     return output;
   },
   compute(candles: readonly Candle[], params: Record<string, number>, colors: readonly string[]) {
-    const fast = Math.max(1, Math.floor(params['fast'] ?? 12));
-    const slow = Math.max(fast + 1, Math.floor(params['slow'] ?? 26));
-    const signal = Math.max(1, Math.floor(params['signal'] ?? 9));
+    const fast = lengthParam(params, 'fast', 12);
+    const slow = Math.max(fast + 1, lengthParam(params, 'slow', 26));
+    const signal = lengthParam(params, 'signal', 9);
     const closes = candles.map((c) => c.close);
     const emaFast = emaValues(closes, fast);
     const emaSlow = emaValues(closes, slow);
