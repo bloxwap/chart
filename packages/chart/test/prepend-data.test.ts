@@ -23,7 +23,7 @@ const close = (a: number, b: number, eps = 1e-9) => assert.ok(Math.abs(a - b) < 
 /** Hourly bar `i` (negative for older history). */
 function bar(i: number): Candle {
   const base = 100 + Math.sin(i / 7) * 10 + i / 50;
-  return { time: T0 + i * HOUR, open: base, high: base + 2 + (i % 3), low: base - 2, close: base + 1, volume: 1000 + i };
+  return { time: T0 + i * HOUR, open: base, high: base + 2 + ((i % 3) + 3) % 3, low: base - 2, close: base + 1, volume: 1000 + i };
 }
 const bars = (from: number, to: number): Candle[] => Array.from({ length: to - from }, (_, k) => bar(from + k));
 
@@ -73,8 +73,9 @@ describe('DataStore.prepend and prepend helpers', () => {
 
   it('olderCandles keeps strictly older rows, deduped (last wins) and sorted', () => {
     const late = { ...bar(-2), close: 1 };
+    const repaired = { ...late, low: Math.min(late.low, late.open, late.close), high: Math.max(late.high, late.open, late.close) };
     const rows = [bar(-1), bar(0), bar(1), bar(-2), late, { ...bar(-3), time: NaN }, bar(-4)];
-    assert.deepEqual(olderCandles(rows, bar(0).time), [bar(-4), late, bar(-1)]);
+    assert.deepEqual(olderCandles(rows, bar(0).time), [bar(-4), repaired, bar(-1)]);
     assert.deepEqual(olderCandles([bar(1), bar(0)], undefined), [bar(0), bar(1)]);
     assert.deepEqual(olderCandles([], 5), []);
   });

@@ -120,9 +120,28 @@ describe('normalizeCandles', () => {
     assert.deepEqual(out, [good]);
   });
 
-  it('zeroes a missing or non-finite volume', () => {
-    const out = normalizeCandles([row(1, 1), row(2, 2, Number.NaN), row(3, 3, Number.POSITIVE_INFINITY), row(4, 4, 0), row(5, 5, 7)]);
-    assert.deepEqual(out.map((c) => c.volume), [0, 0, 0, 0, 7]);
+  it('zeroes a missing, non-finite or negative volume', () => {
+    const out = normalizeCandles([row(1, 1), row(2, 2, Number.NaN), row(3, 3, Number.POSITIVE_INFINITY), row(4, 4, 0), row(5, 5, 7), row(6, 6, -3)]);
+    assert.deepEqual(out.map((c) => c.volume), [0, 0, 0, 0, 7, 0]);
+  });
+
+  it('drops invalid rows that are already in time order', () => {
+    const row = (time: number, close: number, volume?: number): Candle =>
+      volume === undefined
+        ? { time, open: 100, high: 110, low: 95, close }
+        : { time, open: 100, high: 110, low: 95, close, volume };
+    const out = normalizeCandles([
+      { ...row(10, 1, 1), open: Number.NaN },
+      row(20, 2, 2),
+      { ...row(30, 3, 3), close: Number.NaN },
+      row(40, 4, -5),
+    ]);
+    assert.deepEqual(out.map((candle) => [candle.time, candle.volume]), [[20, 2], [40, 0]]);
+  });
+
+  it('expands high and low to cover open and close', () => {
+    const out = normalizeCandles([{ time: 1_700_000_000, open: 10, high: 8, low: 9, close: 12, volume: 1 }]);
+    assert.deepEqual(out, [{ time: 1_700_000_000, open: 10, high: 12, low: 9, close: 12, volume: 1 }]);
   });
 
   it('returns an empty array for empty input', () => {
@@ -138,7 +157,14 @@ function slowNormalize(candles: readonly Candle[]): Candle[] {
     if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
     if (!Number.isFinite(time) || time <= 0) continue;
     const volume = candle.volume ?? 0;
-    byTime.set(time, { time, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 });
+    byTime.set(time, {
+      time,
+      open,
+      high: Math.max(high, open, close),
+      low: Math.min(low, open, close),
+      close,
+      volume: volume >= 0 && Number.isFinite(volume) ? volume : 0,
+    });
   }
   return [...byTime.values()].sort((a, b) => a.time - b.time);
 }
@@ -153,6 +179,8 @@ describe('normalization path equivalence', () => {
     { ...row(4), close: NaN },
     { time: 5, open: 1, high: 3, low: 0, close: 2 },
     { ...row(6), volume: NaN },
+    { ...row(8), volume: -4 },
+    { time: 9, open: 5, high: 4, low: 6, close: 7, volume: 1 },
     row(7), row(Infinity),
   ];
   for (const [name, input] of [

@@ -7,22 +7,21 @@
  */
 
 import type { DrawingPoint } from '../config.js';
-import type { Candle } from './data.js';
-
-/** Whether every field a candle is drawn and scaled from is a finite number. */
-const drawable = (c: Candle): boolean =>
-  Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close);
+import { finiteCandle, repairCandle, type Candle } from './data.js';
 
 /**
  * Rows of `candles` strictly older than `firstTime` (all of them when it is
  * undefined), deduped by `time` with the last row winning and sorted
  * ascending. Rows with a non-finite time, open, high, low or close are dropped
- * (before deduping, so they never displace a valid row).
+ * (before deduping, so they never displace a valid row). Kept rows have
+ * `high`/`low` expanded to cover `open` and `close`, and a negative or
+ * non-finite volume replaced with 0.
  */
 export function olderCandles(candles: readonly Candle[], firstTime: number | undefined): Candle[] {
   const byTime = new Map<number, Candle>();
   for (const candle of candles) {
-    if (drawable(candle) && (firstTime === undefined || candle.time < firstTime)) byTime.set(candle.time, candle);
+    if (!finiteCandle(candle) || (firstTime !== undefined && candle.time >= firstTime)) continue;
+    byTime.set(candle.time, repairCandle(candle));
   }
   return [...byTime.values()].sort((a, b) => a.time - b.time);
 }

@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { Candle } from '../core/data.js';
+import { noteCandleTime, type Candle } from '../core/data.js';
 
 /** Open time (ms) of the `intervalMs` bucket containing `nowMs`; buckets are epoch-aligned. */
 export function bucketStartMs(nowMs: number, intervalMs: number): number {
@@ -39,10 +39,28 @@ export function applyTick(bar: Candle, price: number, bucketMs: number): Candle 
   return { ...bar, high: Math.max(bar.high, price), low: Math.min(bar.low, price), close: price };
 }
 
+/** A fresh OHLCV row, or null when the time or OHLC cannot be drawn. */
+function normalizedRow(candle: Candle): Candle | null {
+  const { time, open, high, low, close } = candle;
+  if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) return null;
+  if (!Number.isFinite(time) || !(time > 0)) return null;
+  if (time > 1e11) noteCandleTime(time);
+  const volume = candle.volume ?? 0;
+  return {
+    time,
+    open,
+    high: Math.max(high, open, close),
+    low: Math.min(low, open, close),
+    close,
+    volume: volume >= 0 && Number.isFinite(volume) ? volume : 0,
+  };
+}
+
 /**
  * Cleans a history page: drops rows with a non-finite OHLC or a non-finite /
- * non-positive time, zeroes a missing or non-finite volume, dedupes on `time`
- * with the last row winning, and sorts ascending. Returns fresh candles.
+ * non-positive time, expands `high`/`low` to cover `open` and `close`, zeroes
+ * a missing, non-finite or negative volume, dedupes on `time` with the last
+ * row winning, and sorts ascending. Returns fresh candles.
  */
 export function normalizeCandles(candles: readonly Candle[]): Candle[] {
   let increasing = true;
@@ -57,21 +75,15 @@ export function normalizeCandles(candles: readonly Candle[]): Candle[] {
   if (increasing) {
     const rows: Candle[] = [];
     for (const candle of candles) {
-      const { time, open, high, low, close } = candle;
-      if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
-      if (!Number.isFinite(time) || time <= 0) continue;
-      const volume = candle.volume ?? 0;
-      rows.push({ time, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 });
+      const row = normalizedRow(candle);
+      if (row !== null) rows.push(row);
     }
     return rows;
   }
   const byTime = new Map<number, Candle>();
   for (const candle of candles) {
-    const { time, open, high, low, close } = candle;
-    if (!Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
-    if (!Number.isFinite(time) || time <= 0) continue;
-    const volume = candle.volume ?? 0;
-    byTime.set(time, { time, open, high, low, close, volume: Number.isFinite(volume) ? volume : 0 });
+    const row = normalizedRow(candle);
+    if (row !== null) byTime.set(row.time, row);
   }
   return [...byTime.values()].sort((a, b) => a.time - b.time);
 }
