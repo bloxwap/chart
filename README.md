@@ -33,7 +33,7 @@ npm install @bloxwap/chart
 
 ## Release status
 
-`0.4.0` is an early developer preview; expect breaking changes before `1.0`.
+`0.5.0` is an early developer preview; expect breaking changes before `1.0`.
 
 ## Usage
 
