@@ -48,7 +48,7 @@ if (process.argv.includes('--check')) {
   }
   const packageName = '@bloxwap/hig';
   const chartVersion = JSON.parse(await readFile(new URL('packages/chart/package.json', root), 'utf8')).version;
-  // Published 0.2.0 peers @bloxwap/chart ^0.3.0, which excludes this workspace's 0.4.0. The override
+  // Published 0.2.0 peers @bloxwap/chart ^0.3.0, which excludes this workspace's 0.5.0. The override
   // keeps that required peer on the workspace package so install does not fetch a second chart.
   assert.equal(rootPackage.overrides?.[packageName]?.['@bloxwap/chart'], chartVersion, 'root override must point the HIG chart peer at the workspace chart version');
   assert.equal(bunLock.overrides?.[packageName]?.['@bloxwap/chart'], chartVersion, 'bun.lock override must match the workspace chart version');

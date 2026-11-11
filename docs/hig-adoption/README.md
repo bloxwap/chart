@@ -30,7 +30,7 @@ Earlier candidate evidence and the 0.1.0 install results in
 [`registry-verification.json`](registry-verification.json) stay historical.
 
 `@bloxwap/hig@0.2.0` declares a required `@bloxwap/chart` peer of `^0.3.0`. This
-workspace is `0.4.0`, outside that range, and the docs do not import `@bloxwap/hig/chart`.
+workspace is `0.5.0`, outside that range, and the docs do not import `@bloxwap/hig/chart`.
 The root `package.json` `overrides` entry (recorded in `bun.lock`) points that peer at the
 workspace version, so `bun install` and `npm ci` keep one chart link and do not download a
 second copy. OG cards use `readOgFont()` from `@bloxwap/hig/og-fonts/node` and do not load
@@ -149,7 +149,7 @@ copy guards) and `docs:test` (browser checks).
 | Repository/surface | Applicability | Version | Owner | Status | Residual work / review date |
 | --- | --- | --- | --- | --- | --- |
 | chart / apps/docs | SDK docs shell and embedded DOM chart | HIG 0.2.0 from npm (`@bloxwap/hig` tokens, contracts, react and og-fonts subpaths); Font 0.1.2 | Chart maintainers | Migrated to the unified HIG package; automated + browser evidence | Physical touch/mobile chart gestures, VoiceOver/TalkBack, iOS/Android hardware; 2026-11-13 |
-| chart / published SDK | Engine and optional DOM UI | SDK 0.4.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
+| chart / published SDK | Engine and optional DOM UI | SDK 0.5.0 | Chart maintainers | Unchanged; standalone themes stay host-configurable | Product owners configure the HIG theme in their host; 2026-11-13 |
 
 Exceptions (Chart maintainers, review 2026-11-13):
 
@@ -157,7 +157,7 @@ Exceptions (Chart maintainers, review 2026-11-13):
   generated role CSS, the button font bridge and local Callout edges.
 - Resolved in step 4: normal lockfile regeneration keeps the Chart workspace; scoped OG fonts replace the native-font archive.
 - Resolved in step 5: all HIG dependencies use the published npm release, with no vendored tarballs.
-- Resolved in step 6: the unpublished 0.1 split packages are replaced by `@bloxwap/hig@0.2.0` subpath exports. A root override keeps the required `@bloxwap/chart` peer on this workspace's `0.4.0` because the published range is `^0.3.0`. The docs do not import the chart entry.
+- Resolved in step 6: the unpublished 0.1 split packages are replaced by `@bloxwap/hig@0.2.0` subpath exports. A root override keeps the required `@bloxwap/chart` peer on this workspace's `0.5.0` because the published range is `^0.3.0`. The docs do not import the chart entry.
 - Decorative OG brand-spectrum colors (purple/pink/yellow) are illustration assets, not a control palette.
 
 The canonical org matrix lives in `bloxwap/hig/planning/adoption.json`; HIG maintainers copy this row,
