@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   security:
-    # Single-job publish: adds the scan serially.
+    # Gate release preparation with the existing self-hosted security scan.
     uses: bloxwap/.github/.github/workflows/security-scan.yml@2a70724cd0d803abef5f5a7c64c46065f4fda19b # v1.1.0
     permissions:
       contents: read
@@ -30,14 +30,13 @@ jobs:
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
 
-  publish:
+  prepare:
     needs: security
-    runs-on: ubuntu-24.04
-    environment: npm-release
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      tag: ${{ steps.tag.outputs.value }}
 
     steps:
       # Job-level env cannot use the runner context; RUNNER_TEMP is set by the runner.
@@ -50,14 +49,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
-
-      - name: Install npm with trusted publishing support
-        # Bootstrap a fixed OIDC-capable npm CLI outside the project dependency lockfile.
-        run: npm install --global npm@11.6.1 # zizmor: ignore[adhoc-packages]
-
-      - run: npm ci
 
       - name: Determine version and npm tag
         id: tag
@@ -86,11 +78,50 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
 
-      # prepack builds and prepublishOnly runs the full Node/Happy DOM test suite;
-      # no browser download is needed. publishConfig.access is public.
-      - name: Publish @bloxwap/chart@${{ steps.tag.outputs.version }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+
+      # Build and run the full Node/Happy DOM suite once before packing.
+      - run: npm test
+
+      # Reuse the tested build instead of rebuilding through prepack.
+      - name: Pack tested package
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-package"
+          npm pack --workspace @bloxwap/chart --ignore-scripts --pack-destination "$RUNNER_TEMP/npm-package"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/npm-package/*.tgz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    environment: npm-release
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Node 24 includes npm >= 11.5.1, required for OIDC trusted publishing.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: npm-package
+          path: npm-package
+      - name: Publish @bloxwap/chart@${{ needs.prepare.outputs.version }}
         env:
-          NPM_TAG: ${{ steps.tag.outputs.value }}
+          NPM_TAG: ${{ needs.prepare.outputs.tag }}
           # Transitional fallback: delete once the npm Trusted Publisher is verified.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --workspace @bloxwap/chart --tag "$NPM_TAG" --provenance
+        run: npm publish ./npm-package/*.tgz --ignore-scripts --access public --tag "$NPM_TAG" --provenance
