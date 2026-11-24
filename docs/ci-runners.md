@@ -14,9 +14,9 @@ These jobs stay queued until a runner with all three labels is online. Mac mini 
 
 Only `publish` in `.github/workflows/publish_npm.yml` runs on GitHub-hosted `ubuntu-24.04`: [npm trusted publishing requires GitHub-hosted runners](https://docs.npmjs.com/trusted-publishers/). Its prerequisite security scan and release preparation run on the minis. The `prepare` job validates the version/tag, installs with `bun install --frozen-lockfile`, builds and runs the full Node/Happy DOM suite once, and uploads the tested npm tarball. Packing skips lifecycle scripts to avoid a second build. The hosted job only sets up Node 24 (which includes an OIDC-capable npm), downloads that tarball, and publishes it with lifecycle scripts disabled and provenance enabled. It needs no checkout, dependency install, browser, or Python. It retains only `contents: read` and `id-token: write` permissions and the `npm-release` environment. Dependency caching is disabled for releases; local publish hooks remain unchanged.
 
-Before releasing, configure GitHub **Settings → Environments → npm-release** with required reviewers. Merely naming the environment in YAML does not configure an approval gate. Keep the existing org/repository `NPM_TOKEN` available during the transition; it is exposed as `NODE_AUTH_TOKEN` only on the publish step. npm tries OIDC first and falls back to this token while no trusted publisher is configured, so releases do not require npmjs.com setup first. `npm publish --provenance` attaches provenance even during token fallback.
+Before releasing, configure GitHub **Settings → Environments → npm-release** with required reviewers. Merely naming the environment in YAML does not configure an approval gate.
 
-In the npmjs.com settings for `@bloxwap/chart`, add a GitHub Actions Trusted Publisher with organization `bloxwap`, repository `chart`, workflow filename `publish_npm.yml` (not its path), and environment `npm-release`, allowing direct publishing. Keep that workflow filename unchanged. Verify a release uses trusted publishing, then remove the fallback `NODE_AUTH_TOKEN` entry and delete this repository's `NPM_TOKEN` secret/access (do not revoke a shared org token still used by other repositories). OIDC does not authorize commands such as `npm whoami`, `npm access`, or `npm deprecate`; do not add token-only auth preflights to this publish path.
+Keep the npm Trusted Publisher for `@bloxwap/chart` bound to organization `bloxwap`, repository `chart`, workflow filename `publish_npm.yml` (not its path), and environment `npm-release`, allowing direct publishing. Keep that workflow filename unchanged. `@bloxwap/chart@0.5.0` already published through that trusted publisher with SLSA provenance, and the transitional `NODE_AUTH_TOKEN` / `NPM_TOKEN` fallback has been removed. OIDC does not authorize commands such as `npm whoami`, `npm access`, or `npm deprecate`; do not add token-only auth preflights to this publish path.
 
 ## Jobs
 
@@ -27,7 +27,7 @@ In the npmjs.com settings for `@bloxwap/chart`, add a GitHub Actions Trusted Pub
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `build` | Mac mini | Docs export, typecheck, lint, Playwright Chrome checks; Pages artifact on `main` only (PRs still build and validate) |
 | [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) | `deploy` | Mac mini | `configure-pages` + `deploy-pages` on `main` |
 | [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `prepare` | Mac mini | Version/tag check, install, build, test, and upload npm tarball |
-| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | GitHub-hosted Ubuntu 24.04 | Approved `npm-release`; download tested tarball and publish with provenance (OIDC; transitional token fallback) |
+| [`.github/workflows/publish_npm.yml`](../.github/workflows/publish_npm.yml) | `publish` | GitHub-hosted Ubuntu 24.04 | Approved `npm-release`; download tested tarball and publish with provenance (OIDC trusted publishing) |
 
 ## Prerequisites on each Mac mini
 

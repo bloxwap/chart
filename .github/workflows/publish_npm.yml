@@ -123,6 +123,4 @@ jobs:
       - name: Publish @bloxwap/chart@${{ needs.prepare.outputs.version }}
         env:
           NPM_TAG: ${{ needs.prepare.outputs.tag }}
-          # Transitional fallback: delete once the npm Trusted Publisher is verified.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish ./npm-package/*.tgz --ignore-scripts --access public --tag "$NPM_TAG" --provenance
