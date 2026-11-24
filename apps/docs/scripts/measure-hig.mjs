@@ -31,9 +31,9 @@ const cssFiles = (ref) => git('ls-tree', '-r', '--name-only', ref, 'apps/docs').
 const cssStats = (ref) => cssFiles(ref).reduce((sum, file) => { const text = git('show', `${ref}:${file}`); return { files: sum.files + 1, lines: sum.lines + text.split('\n').length, bytes: sum.bytes + Buffer.byteLength(text) }; }, { files: 0, lines: 0, bytes: 0 });
 const removed = git('diff', '--name-only', '--diff-filter=D', baselineCommit, '--', 'apps/docs').split('\n').filter(Boolean);
 const removedBytes = removed.reduce((sum, file) => sum + Number(git('cat-file', '-s', `${baselineCommit}:${file}`)), 0);
-const lockPackages = (text) => Object.keys(JSON.parse(text).packages).filter(Boolean);
-const beforeLock = lockPackages(git('show', `${baselineCommit}:package-lock.json`));
-const afterLock = lockPackages(await readFile('package-lock.json', 'utf8'));
+const bunPackages = (text) => Object.keys(JSON.parse(text.replace(/,(?=[\s]*[}\]])/g, '')).packages).filter(Boolean);
+const beforeLock = bunPackages(git('show', `${baselineCommit}:bun.lock`));
+const afterLock = bunPackages(await readFile('bun.lock', 'utf8'));
 const docsDeps = (text) => Object.keys({ ...JSON.parse(text).dependencies, ...JSON.parse(text).devDependencies });
 const release = JSON.parse(await readFile('docs/hig-adoption/registry-release.json', 'utf8'));
 // Generated token adapters: hig.generated.css (copied snapshot, step 1), hig-roles.generated.css (step 2), none since

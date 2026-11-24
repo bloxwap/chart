@@ -11,7 +11,7 @@ const cli = join(root, 'scripts/check-invariants.mjs');
 function fixture(t) {
   const dir = mkdtempSync(join(root, '.invariants-test-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  for (const path of ['package.json', 'package-lock.json', 'bun.lock', 'packages/chart/package.json', 'apps/docs/package.json', 'apps/playground/package.json']) {
+  for (const path of ['package.json', 'bun.lock', 'packages/chart/package.json', 'apps/docs/package.json', 'apps/playground/package.json']) {
     mkdirSync(join(dir, path, '..'), { recursive: true });
     cpSync(join(root, path), join(dir, path));
   }
@@ -81,21 +81,18 @@ for (const version of ['^0.18.0', '0.19.0']) test(`#103 rejects workspace pin ${
   edit(dir, 'apps/docs/package.json', (pkg) => { pkg.devDependencies.tsrs = version; });
   rejects('tsrs', dir, /exact version|differs from/);
 });
-for (const lock of ['bun.lock', 'package-lock.json']) test(`#103 rejects platform compiler drift in ${lock}`, (t) => {
+test('#103 rejects platform compiler drift in bun.lock', (t) => {
   const dir = fixture(t);
-  edit(dir, lock, (data) => {
-    if (lock === 'bun.lock') data.packages['@tsrs/linux-x64-gnu'][0] = '@tsrs/linux-x64-gnu@0.0.1';
-    else data.packages['node_modules/@tsrs/linux-x64-gnu'].version = '0.0.1';
+  edit(dir, 'bun.lock', (data) => {
+    data.packages['@tsrs/linux-x64-gnu'][0] = '@tsrs/linux-x64-gnu@0.0.1';
   });
   rejects('tsrs', dir, /expected 0.18.0/);
 });
-for (const mode of ['npm-only', 'bun-only', 'nested-version']) test(`#104 rejects ${mode} drift`, (t) => {
+test('#104 reports bun.lock package counts', (t) => {
   const dir = fixture(t);
-  if (mode === 'bun-only') edit(dir, 'bun.lock', (lock) => { lock.packages.accidental = ['accidental@1.0.0']; });
-  else edit(dir, 'package-lock.json', (lock) => {
-    lock.packages[mode === 'npm-only' ? 'node_modules/accidental' : 'node_modules/parent/node_modules/react'] = { version: '0.0.1' };
-  });
-  rejects('lockfiles', dir, /lockfile mismatch/);
+  const result = spawnSync(process.execPath, [cli, 'lockfiles', dir], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /bun\.lock OK:/);
 });
 test('Bun trailing comma parsing preserves string contents', () => {
   assert.deepEqual(parseBunLock('{"x": ["literal,}",],}'), { x: ['literal,}'] });

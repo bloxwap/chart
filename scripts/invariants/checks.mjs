@@ -14,16 +14,11 @@ export function parseBunLock(text) {
 }
 
 export function lockVersions(root) {
-  const npm = new Map();
   const bun = new Map();
   function add(map, name, version) {
     if (!version) fail(`missing locked version for ${name}`);
     if (!map.has(name)) map.set(name, new Set());
     map.get(name).add(version);
-  }
-  for (const [path, entry] of Object.entries(json(join(root, 'package-lock.json')).packages)) {
-    if (entry.link || !path.includes('node_modules/')) continue;
-    add(npm, entry.name ?? path.split('node_modules/').at(-1), entry.version);
   }
   for (const entry of Object.values(parseBunLock(read(join(root, 'bun.lock'))).packages)) {
     const resolved = entry[0];
@@ -33,19 +28,13 @@ export function lockVersions(root) {
     if (version.startsWith('workspace:')) continue;
     add(bun, name, version);
   }
-  return { npm, bun };
+  return { bun };
 }
 
 export function checkLocks(root) {
-  const { npm, bun } = lockVersions(root);
-  const errors = [];
-  for (const name of new Set([...npm.keys(), ...bun.keys()])) {
-    const a = [...(npm.get(name) ?? [])].sort().join(', ');
-    const b = [...(bun.get(name) ?? [])].sort().join(', ');
-    if (a !== b) errors.push(`${name}: npm=[${a}] bun=[${b}]`);
-  }
-  if (errors.length) fail(`lockfile mismatch:\n${errors.join('\n')}`);
-  console.log(`lockfiles OK: ${npm.size} package names, ${[...npm.values()].reduce((n, v) => n + v.size, 0)} name/version pairs`);
+  const { bun } = lockVersions(root);
+  if (!bun.size) fail('bun.lock has no packages');
+  console.log(`bun.lock OK: ${bun.size} package names, ${[...bun.values()].reduce((n, v) => n + v.size, 0)} name/version pairs`);
 }
 
 export function checkTsrs(root) {

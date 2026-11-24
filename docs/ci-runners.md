@@ -64,7 +64,7 @@ Browsers go to `$RUNNER_TEMP/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`). There 
 
 ## Operator notes
 
-- Give the runner enough free disk for `npm ci` (and a persistent `~/.npm`), the Next.js static export, and a Chrome for Testing download.
+- Give the runner enough free disk for `bun install --frozen-lockfile` (and a persistent `~/.npm`), the Next.js static export, and a Chrome for Testing download.
 - Headless Chrome on macOS does not need the Accessibility TCC prompt that headed browsers do.
 - npm publish (`Publish to npm`) uses the Ubuntu exception and approval setup above. GitHub Pages deploy still uses `pages: write` and `id-token: write`.
 - Fork pull requests on a public repository should stay on GitHub-hosted runners or a dedicated untrusted pool if org policy forbids self-hosted runners on forks. This repo's workflows themselves do not special-case forks.
