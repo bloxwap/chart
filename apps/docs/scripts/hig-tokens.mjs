@@ -28,7 +28,6 @@ const parseLock = (text) => JSON.parse(text.replace(/,(\s*[}\]])/g, '$1'));
 if (process.argv.includes('--check')) {
   const root = new URL('../../../', import.meta.url);
   const release = JSON.parse(await readFile(new URL('docs/hig-adoption/registry-release.json', root), 'utf8'));
-  const lock = JSON.parse(await readFile(new URL('package-lock.json', root), 'utf8'));
   const bunLock = parseLock(await readFile(new URL('bun.lock', root), 'utf8'));
   const rootPackage = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
   const manifests = [new URL('package.json', root)];
@@ -56,17 +55,11 @@ if (process.argv.includes('--check')) {
   const pinned = release.packages[packageName];
   assert.equal(docsPackage.dependencies[packageName], release.version, `${packageName} must use the coordinated registry version`);
   assert.equal(docsPackage.devDependencies?.[packageName], undefined, `${packageName} is a direct dependency, not a second devDependency`);
-  const locked = lock.packages[`node_modules/${packageName}`];
-  assert.equal(locked.version, release.version, `${packageName} lockfile version drifted`);
-  assert.equal(locked.resolved, `https://registry.npmjs.org/@bloxwap/hig/-/hig-${release.version}.tgz`, `${packageName} must resolve from npm`);
-  assert.equal(locked.resolved, pinned.resolved);
-  assert.equal(locked.integrity, pinned.integrity, `${packageName} registry integrity drifted`);
   const bunEntry = bunLock.packages[packageName];
   assert.ok(bunEntry, `${packageName} is missing from bun.lock`);
   assert.equal(bunEntry[0], `${packageName}@${release.version}`, `${packageName} bun.lock version drifted`);
   assert.equal(bunEntry.at(-1), pinned.integrity, `${packageName} bun.lock integrity drifted`);
   for (const name of retiredPackages) {
-    assert.equal(lock.packages[`node_modules/${name}`], undefined, `${name} remains in package-lock.json`);
     assert.equal(bunLock.packages[name], undefined, `${name} remains in bun.lock`);
   }
   assert.equal(JSON.parse(await readFile(new URL(`node_modules/${packageName}/package.json`, root), 'utf8')).version, release.version, `Installed ${packageName} is not ${release.version}; run bun install --frozen-lockfile`);

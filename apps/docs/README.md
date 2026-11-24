@@ -7,7 +7,7 @@ are isolated from the published library.
 From the repository root (Node.js 24+):
 
 ```sh
-npm ci
+bun install --frozen-lockfile
 npm run docs:dev
 ```
 

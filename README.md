@@ -73,7 +73,7 @@ Guides, API reference, and the complete chart controls: **https://bloxwap.github
 The repository uses npm workspaces with two root lockfiles: `bun.lock` for CI and `package-lock.json` for npm releases. `npm run check:lockfiles` checks that their package versions agree. Each workspace declares its own dependencies; the chart package has no runtime dependencies.
 
 ```sh
-npm ci
+bun install --frozen-lockfile
 npm test            # build and run the library tests
 npm run coverage    # tests with 100% line, branch, and function coverage enforcement
 npm run bench       # calculation and rendering benchmarks
